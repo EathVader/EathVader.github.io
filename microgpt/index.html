@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MicroGPT 交互式教程 / Interactive Tutorial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Hero -->
+<header class="hero">
+  <h1>🧠 <span>MicroGPT</span> 交互式教程</h1>
+  <p class="subtitle">用纯 Python 从零实现 GPT —— 没有 PyTorch，没有 NumPy，只有数学<br>
+  A GPT from scratch in ~200 lines of pure Python, by <a href="https://github.com/karpathy" target="_blank">Andrej Karpathy</a></p>
+  <span class="badge">📦 零依赖 / Zero Dependencies</span>
+  <span class="badge">📝 ~200 行 / ~200 Lines</span>
+  <span class="badge">🎓 完整算法 / Complete Algorithm</span>
+</header>
+
+<!-- TOC -->
+<div class="container">
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-overview">整体架构概览 / Architecture Overview</a></li>
+    <li><a href="#sec-data">数据与分词器 / Data & Tokenizer</a></li>
+    <li><a href="#sec-autograd">自动微分引擎 / Autograd Engine</a></li>
+    <li><a href="#sec-params">模型参数初始化 / Parameter Initialization</a></li>
+    <li><a href="#sec-model">GPT 模型架构 / GPT Model Architecture</a></li>
+    <li><a href="#sec-training">训练循环 / Training Loop</a></li>
+    <li><a href="#sec-inference">推理与生成 / Inference & Generation</a></li>
+    <li><a href="#sec-summary">总结与延伸 / Summary & Further Reading</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1: Overview -->
+<section id="sec-overview">
+<h2 class="section-title"><span class="num">1</span> 整体架构概览 / Architecture Overview</h2>
+
+<p>MicroGPT 是 Andrej Karpathy 写的一段极简代码，用约 200 行纯 Python 实现了 GPT 的<strong>完整训练和推理流程</strong>。正如代码开头所说：</p>
+
+<div class="box box-purple">
+<div class="title">💬 代码哲学 / Code Philosophy</div>
+<em>"This file is the complete algorithm. Everything else is just efficiency."</em><br>
+这个文件就是完整的算法。其他一切都只是效率优化。
+</div>
+
+<p>整个程序由 5 个核心模块组成，按顺序执行：</p>
+
+<div class="diagram" id="diagram-arch"></div>
+
+<table>
+<tr><th>模块 Module</th><th>代码行数</th><th>功能 Purpose</th></tr>
+<tr><td>📄 Data & Tokenizer</td><td>L1-30</td><td>加载名字数据集，将字符串转为数字序列</td></tr>
+<tr><td>⚙️ Autograd Engine</td><td>L33-110</td><td>自动微分引擎，自动计算梯度（链式法则）</td></tr>
+<tr><td>🧠 GPT Model</td><td>L112-180</td><td>Transformer 架构的前向传播</td></tr>
+<tr><td>🔄 Training Loop</td><td>L182-225</td><td>损失计算 + 反向传播 + Adam 优化器</td></tr>
+<tr><td>✨ Inference</td><td>L227-243</td><td>用训练好的模型生成新名字</td></tr>
+</table>
+
+<div class="box box-blue">
+<div class="title">🎯 学习目标 / Learning Goals</div>
+学完本教程，你将理解：<br>
+• 字符级分词器如何工作<br>
+• 自动微分（Autograd）的原理和实现<br>
+• Transformer 的注意力机制和前馈网络<br>
+• 交叉熵损失和 Adam 优化器<br>
+• Temperature 采样如何控制生成多样性
+</div>
+</section>
+
+<!-- Section 2: Data & Tokenizer -->
+<section id="sec-data">
+<h2 class="section-title"><span class="num">2</span> 数据与分词器 / Data & Tokenizer</h2>
+
+<h3>2.1 数据加载 / Data Loading</h3>
+<p>数据集是一个人名列表（来自 <a href="https://github.com/karpathy/makemore" target="_blank">karpathy/makemore</a>），每行一个名字：</p>
+
+<pre><code># 自动下载数据集（如果不存在）
+if not os.path.exists('input.txt'):
+    import urllib.request
+    names_url = 'https://raw.githubusercontent.com/karpathy/makemore/refs/heads/master/names.txt'
+    urllib.request.urlretrieve(names_url, 'input.txt')
+
+# 读取并清洗
+docs = [l.strip() for l in open('input.txt').read().strip().split('\n') if l.strip()]
+random.shuffle(docs)  # 打乱顺序
+# docs = ["emma", "olivia", "ava", "sophia", ...]  约 32,000 个名字</code></pre>
+
+<h3>2.2 字符级分词器 / Character-Level Tokenizer</h3>
+<p>分词器的任务是把文本转换为模型能处理的数字序列。MicroGPT 使用最简单的方式：<strong>每个字符就是一个 token</strong>。</p>
+
+<pre><code>chars = ['&lt;BOS&gt;'] + sorted(set(''.join(docs)))
+# chars = ['&lt;BOS&gt;', 'a', 'b', 'c', ..., 'z']  共 27 个
+
+stoi = { ch:i for i, ch in enumerate(chars) }  # 编码: 'a' → 1, 'b' → 2, ...
+itos = { i:ch for i, ch in enumerate(chars) }  # 解码: 1 → 'a', 2 → 'b', ...
+BOS = stoi['&lt;BOS&gt;']  # = 0</code></pre>
+
+<div class="box box-green">
+<div class="title">💡 为什么需要 &lt;BOS&gt; 特殊标记？</div>
+BOS (Beginning Of Sequence) 用于标识序列的<strong>开始和结束</strong>。训练时，每个名字两端都加上 BOS：<br>
+<code>"emma" → [BOS, e, m, m, a, BOS]</code><br>
+• 开头的 BOS 告诉模型"从这里开始生成"<br>
+• 结尾的 BOS 让模型学会"在这里停止"<br>
+推理时，模型从 BOS 开始，生成到 BOS 就停止。
+</div>
+
+<div class="box box-amber">
+<div class="title">📊 对比：真实 LLM 的分词器</div>
+MicroGPT 用字符级分词（vocab=27），而 GPT-2 使用 BPE 分词（vocab=50,257），ChatGPT 使用更大的词表。<br>
+字符级分词简单但序列更长；BPE 分词更高效但实现更复杂。<br>
+参考：<a href="https://platform.openai.com/tokenizer" target="_blank">OpenAI Tokenizer 可视化工具</a>
+</div>
+
+<h3>🎮 动手试试 / Try It Yourself</h3>
+<div class="demo">
+<h4>交互演示：字符级分词器</h4>
+<p>输入一个英文名字，看看它如何被编码为数字序列：</p>
+<input type="text" id="tok-input" value="emma" placeholder="输入名字 (a-z)" style="width:200px">
+<button onclick="runTokenizerDemo()">编码 Tokenize →</button>
+<div class="output" id="tok-output"></div>
+</div>
+</section>
+
+<!-- Section 3: Autograd -->
+<section id="sec-autograd">
+<h2 class="section-title"><span class="num">3</span> 自动微分引擎 / Autograd Engine</h2>
+
+<p>这是整个程序最精妙的部分。<code>Value</code> 类让每个标量值都能<strong>自动追踪梯度</strong>，是 PyTorch 等深度学习框架的核心原理。</p>
+
+<div class="diagram" id="diagram-autograd"></div>
+
+<h3>3.1 Value 类的核心结构</h3>
+<p>每个 <code>Value</code> 对象存储 4 个关键信息：</p>
+
+<pre><code>class Value:
+    def __init__(self, data, _children=(), _op=''):
+        self.data = data       # 实际数值（前向传播的结果）
+        self.grad = 0          # 梯度（反向传播时计算）
+        self._backward = lambda: None  # 闭包：如何把梯度传给父节点
+        self._prev = set(_children)    # 产生自己的那些节点（计算图的边）
+        self._op = _op         # 运算符，用于调试</code></pre>
+
+<h3>3.2 运算符重载 —— 构建计算图</h3>
+<p>每次数学运算都会自动构建计算图。以乘法为例：</p>
+
+<pre><code>def __mul__(self, other):
+    other = other if isinstance(other, Value) else Value(other)
+    out = Value(self.data * other.data, (self, other), '*')  # ① 前向计算
+    def _backward():
+        self.grad += other.data * out.grad   # ② 定义反向传播规则
+        other.grad += self.data * out.grad   #    d(a*b)/da = b, d(a*b)/db = a
+    out._backward = _backward
+    return out</code></pre>
+
+<div class="box box-blue">
+<div class="title">🔑 关键洞察 / Key Insight</div>
+每次运算做三件事：<br>
+1. <strong>前向计算</strong>：算出结果值<br>
+2. <strong>记录来源</strong>：记住"谁产生了我"（构建计算图）<br>
+3. <strong>定义反向规则</strong>：用闭包保存"如何把梯度传回去"<br>
+这就是自动微分的全部秘密！
+</div>
+
+<h3>3.3 支持的运算及其梯度</h3>
+<table>
+<tr><th>运算 Op</th><th>前向 Forward</th><th>反向 Backward (∂L/∂x)</th><th>数学直觉</th></tr>
+<tr><td><code>x + y</code></td><td><code>x + y</code></td><td>grad 直接传递</td><td>加法不改变斜率</td></tr>
+<tr><td><code>x * y</code></td><td><code>x × y</code></td><td><code>y × grad</code> / <code>x × grad</code></td><td>乘法的导数是对方</td></tr>
+<tr><td><code>x ** n</code></td><td><code>x^n</code></td><td><code>n·x^(n-1) × grad</code></td><td>幂函数求导法则</td></tr>
+<tr><td><code>log(x)</code></td><td><code>ln(x)</code></td><td><code>(1/x) × grad</code></td><td>对数的导数是倒数</td></tr>
+<tr><td><code>exp(x)</code></td><td><code>e^x</code></td><td><code>e^x × grad</code></td><td>指数函数导数是自身</td></tr>
+<tr><td><code>relu(x)</code></td><td><code>max(0, x)</code></td><td><code>(x>0) × grad</code></td><td>正数通过，负数截断</td></tr>
+</table>
+
+<h3>3.4 反向传播 —— 链式法则的自动化</h3>
+<pre><code>def backward(self):
+    # Step 1: 拓扑排序 —— 找到所有节点的正确计算顺序
+    topo = []
+    visited = set()
+    def build_topo(v):
+        if v not in visited:
+            visited.add(v)
+            for child in v._prev:
+                build_topo(child)
+            topo.append(v)
+    build_topo(self)
+
+    # Step 2: 从 loss 开始，逆序传播梯度
+    self.grad = 1  # dL/dL = 1
+    for v in reversed(topo):
+        v._backward()  # 每个节点把梯度传给自己的父节点</code></pre>
+
+<div class="box box-green">
+<div class="title">🧮 链式法则直觉 / Chain Rule Intuition</div>
+如果 <code>L = f(g(x))</code>，那么 <code>dL/dx = dL/df · df/dg · dg/dx</code><br><br>
+就像问"最终结果对 x 有多敏感？"—— 把每一步的敏感度乘起来。<br><br>
+<strong>例子：</strong><code>L = log(a*b + 4)</code>，其中 a=2, b=3<br>
+• <code>dL/d(a*b+4) = 1/10 = 0.1</code> （log 的导数）<br>
+• <code>d(a*b+4)/d(a*b) = 1</code> （加法的导数）<br>
+• <code>d(a*b)/da = b = 3</code> （乘法对 a 的导数）<br>
+• 所以 <code>dL/da = 0.1 × 1 × 3 = 0.3</code> ✓
+</div>
+
+<h3>🎮 动手试试 / Try It Yourself</h3>
+<div class="demo">
+<h4>交互演示：自动微分计算图</h4>
+<p>修改 a 和 b 的值，观察前向传播和反向传播的结果：<br>
+<code>L = log(a × b + 4)</code></p>
+<label>a = </label><input type="number" id="ag-a" value="2" step="0.5" style="width:80px">
+<label>b = </label><input type="number" id="ag-b" value="3" step="0.5" style="width:80px">
+<button onclick="runAutogradDemo()">计算 Compute →</button>
+<div class="output" id="ag-output"></div>
+</div>
+
+<div class="box box-amber">
+<div class="title">📚 延伸阅读 / Further Reading</div>
+• <a href="https://github.com/karpathy/micrograd" target="_blank">karpathy/micrograd</a> — MicroGPT 的 Autograd 引擎就是基于这个项目<br>
+• <a href="https://www.youtube.com/watch?v=VMj-3S1tku0" target="_blank">Karpathy: The spelled-out intro to neural networks and backpropagation</a> — 2.5 小时详细讲解<br>
+• <a href="https://en.wikipedia.org/wiki/Automatic_differentiation" target="_blank">Wikipedia: Automatic Differentiation</a>
+</div>
+</section>
+
+<!-- Section 4: Parameters -->
+<section id="sec-params">
+<h2 class="section-title"><span class="num">4</span> 模型参数初始化 / Parameter Initialization</h2>
+
+<h3>4.1 超参数 / Hyperparameters</h3>
+<pre><code>n_embd = 16      # 嵌入维度 —— 每个 token 用 16 个数字表示
+n_head = 4       # 注意力头数 —— 4 个"视角"同时关注不同特征
+n_layer = 1      # Transformer 层数 —— 只有 1 层（GPT-2 有 12 层）
+block_size = 8   # 最大序列长度 —— 最多看 8 个 token
+head_dim = n_embd // n_head  # = 4，每个头的维度</code></pre>
+
+<div class="box box-blue">
+<div class="title">📏 规模对比 / Scale Comparison</div>
+<table>
+<tr><th></th><th>MicroGPT</th><th>GPT-2 Small</th><th>GPT-3</th></tr>
+<tr><td>嵌入维度</td><td>16</td><td>768</td><td>12,288</td></tr>
+<tr><td>注意力头数</td><td>4</td><td>12</td><td>96</td></tr>
+<tr><td>层数</td><td>1</td><td>12</td><td>96</td></tr>
+<tr><td>参数量</td><td>~5K</td><td>117M</td><td>175B</td></tr>
+</table>
+虽然规模天差地别，但<strong>算法原理完全一样</strong>！
+</div>
+
+<h3>4.2 参数矩阵 / Parameter Matrices</h3>
+<pre><code># 创建随机初始化的参数矩阵
+matrix = lambda nout, nin, std=0.02: [
+    [Value(random.gauss(0, std)) for _ in range(nin)]
+    for _ in range(nout)
+]
+
+state_dict = {
+    'wte': matrix(vocab_size, n_embd),   # Token 嵌入表: 27×16
+    'wpe': matrix(block_size, n_embd),   # 位置嵌入表: 8×16
+    'lm_head': matrix(vocab_size, n_embd), # 输出投影: 27×16
+}
+
+# 每层 Transformer 的参数
+for i in range(n_layer):
+    state_dict[f'layer{i}.attn_wq'] = matrix(n_embd, n_embd)  # Q 投影: 16×16
+    state_dict[f'layer{i}.attn_wk'] = matrix(n_embd, n_embd)  # K 投影: 16×16
+    state_dict[f'layer{i}.attn_wv'] = matrix(n_embd, n_embd)  # V 投影: 16×16
+    state_dict[f'layer{i}.attn_wo'] = matrix(n_embd, n_embd, std=0)  # 输出投影 (初始化为0附近)
+    state_dict[f'layer{i}.mlp_fc1'] = matrix(4*n_embd, n_embd)  # MLP 扩展: 64×16
+    state_dict[f'layer{i}.mlp_fc2'] = matrix(n_embd, 4*n_embd, std=0)  # MLP 压缩: 16×64</code></pre>
+
+<div class="box box-green">
+<div class="title">💡 为什么 attn_wo 和 mlp_fc2 初始化为 ~0？</div>
+这两个矩阵的 <code>std=0</code> 意味着初始值接近零。因为它们的输出会通过<strong>残差连接</strong>加回输入：<br>
+<code>x = x_residual + output</code><br>
+初始时 output ≈ 0，所以 x ≈ x_residual，相当于"什么都不做"。<br>
+这让训练初期更稳定，模型可以逐渐学会有用的变换。
+</div>
+
+<h3>4.3 参数展平 / Flatten Parameters</h3>
+<pre><code># 把所有参数矩阵展平成一个列表，方便优化器统一更新
+params = [p for mat in state_dict.values() for row in mat for p in row]
+print(f"num params: {len(params)}")  # ~5000 个参数</code></pre>
+</section>
+
+<!-- Section 5: GPT Model -->
+<section id="sec-model">
+<h2 class="section-title"><span class="num">5</span> GPT 模型架构 / GPT Model Architecture</h2>
+
+<p>GPT 的前向传播是一个<strong>无状态函数</strong>：输入 token 序列和参数，输出下一个 token 的概率分布。</p>
+
+<div class="diagram" id="diagram-transformer"></div>
+
+<h3>5.1 辅助函数 / Helper Functions</h3>
+
+<h4>Linear（线性变换）</h4>
+<pre><code>def linear(x, w):
+    # 矩阵乘法: y = W · x
+    # x: 输入向量 [n_in], w: 权重矩阵 [n_out × n_in]
+    return [sum(wi * xi for wi, xi in zip(wo, x)) for wo in w]
+
+# 例: linear([1,2,3], [[1,0,0],[0,1,0]]) = [1, 2]  (3维→2维)</code></pre>
+
+<h4>Softmax（概率归一化）</h4>
+<pre><code>def softmax(logits):
+    max_val = max(val.data for val in logits)  # 数值稳定性技巧
+    exps = [(val - max_val).exp() for val in logits]
+    total = sum(exps)
+    return [e / total for e in exps]
+
+# 把任意实数变成概率分布（所有值 ∈ [0,1]，总和 = 1）</code></pre>
+
+<div class="demo">
+<h4>🎮 交互演示：Softmax</h4>
+<p>输入逗号分隔的 logits，观察 softmax 如何将它们转换为概率：</p>
+<input type="text" id="sm-input" value="2.5, 1.0, 0.5, -0.5, -1.0" style="width:280px">
+<button onclick="runSoftmaxDemo()">计算 Softmax →</button>
+<div class="output" id="sm-output"></div>
+</div>
+
+<h4>RMSNorm（归一化）</h4>
+<pre><code>def rmsnorm(x):
+    ms = sum(xi * xi for xi in x) / len(x)  # 均方值 (Mean Square)
+    scale = (ms + 1e-5) ** -0.5              # 1 / √(ms + ε)
+    return [xi * scale for xi in x]          # 缩放每个元素</code></pre>
+
+<div class="box box-blue">
+<div class="title">🔑 RMSNorm 的作用</div>
+让向量的"能量"（RMS 值）归一化到约 1.0，防止数值在深层网络中爆炸或消失。<br>
+相比 LayerNorm，RMSNorm 省去了均值计算和偏移参数，更简单高效。<br>
+参考：<a href="https://arxiv.org/abs/1910.07467" target="_blank">Root Mean Square Layer Normalization (论文)</a>
+</div>
+
+<div class="demo">
+<h4>🎮 交互演示：RMSNorm</h4>
+<p>输入逗号分隔的数字，观察归一化效果：</p>
+<input type="text" id="rms-input" value="3.0, -1.0, 4.0, 2.0" style="width:250px">
+<button onclick="runRMSNormDemo()">归一化 Normalize →</button>
+<div class="output" id="rms-output"></div>
+</div>
+
+<h3>5.2 嵌入层 / Embedding Layer</h3>
+<pre><code>def gpt(token_id, pos_id, keys, values):
+    tok_emb = state_dict['wte'][token_id]  # 查表: token → 16维向量
+    pos_emb = state_dict['wpe'][pos_id]    # 查表: 位置 → 16维向量
+    x = [t + p for t, p in zip(tok_emb, pos_emb)]  # 逐元素相加
+    x = rmsnorm(x)  # 归一化</code></pre>
+
+<div class="box box-green">
+<div class="title">💡 嵌入的直觉 / Embedding Intuition</div>
+想象一个 16 维空间：<br>
+• 每个字符被映射到这个空间中的一个点（Token Embedding）<br>
+• 每个位置也被映射到一个点（Position Embedding）<br>
+• 两者相加 = 模型同时知道"这是什么字符"和"它在第几个位置"<br><br>
+训练过程中，相似的字符（如元音 a, e, i）会在嵌入空间中靠近彼此。
+</div>
+
+<h3>5.3 多头注意力 / Multi-Head Attention</h3>
+<p>这是 Transformer 的核心，让模型能"关注"序列中不同位置的信息。</p>
+
+<div class="diagram" id="diagram-attention"></div>
+
+<pre><code># Step 1: 计算 Q, K, V
+q = linear(x, state_dict[f'layer{li}.attn_wq'])  # Query: "我在找什么？"
+k = linear(x, state_dict[f'layer{li}.attn_wk'])  # Key:   "我能提供什么？"
+v = linear(x, state_dict[f'layer{li}.attn_wv'])  # Value: "我的实际内容"
+
+# 缓存 K, V 用于后续 token（KV Cache）
+keys[li].append(k)
+values[li].append(v)
+
+# Step 2: 对每个注意力头
+for h in range(n_head):  # 4 个头
+    hs = h * head_dim    # 每个头处理 4 维
+    q_h = q[hs:hs+head_dim]
+    k_h = [ki[hs:hs+head_dim] for ki in keys[li]]   # 所有历史 K
+    v_h = [vi[hs:hs+head_dim] for vi in values[li]]  # 所有历史 V
+
+    # Step 3: 计算注意力分数 = Q·K^T / √d
+    attn_logits = [sum(q_h[j] * k_h[t][j] for j in range(head_dim))
+                   / head_dim**0.5
+                   for t in range(len(k_h))]
+
+    # Step 4: Softmax → 概率分布
+    attn_weights = softmax(attn_logits)
+
+    # Step 5: 加权求和 V
+    head_out = [sum(attn_weights[t] * v_h[t][j]
+                    for t in range(len(v_h)))
+                for j in range(head_dim)]
+
+# Step 6: 拼接所有头 + 输出投影 + 残差连接
+x = linear(x_attn, state_dict[f'layer{li}.attn_wo'])
+x = [a + b for a, b in zip(x, x_residual)]  # 残差连接</code></pre>
+
+<div class="box box-purple">
+<div class="title">🧩 多头注意力的直觉 / Multi-Head Intuition</div>
+4 个头就像 4 个"专家"，各自关注不同的特征：<br>
+• 头 1 可能关注：前一个字符是什么（局部模式）<br>
+• 头 2 可能关注：名字的开头字母（全局模式）<br>
+• 头 3 可能关注：元音/辅音的交替模式<br>
+• 头 4 可能关注：名字的长度模式<br><br>
+最后把 4 个头的输出拼接起来，得到更丰富的表示。<br>
+参考：<a href="https://arxiv.org/abs/1706.03762" target="_blank">Attention Is All You Need (原始论文)</a>
+</div>
+
+<h3>5.4 MLP 前馈网络 / Feed-Forward Network</h3>
+<pre><code># 注意力之后，每个位置独立地通过 MLP
+x_residual = x
+x = rmsnorm(x)
+x = linear(x, state_dict[f'layer{li}.mlp_fc1'])  # 16 → 64 (扩展 4 倍)
+x = [xi.relu() ** 2 for xi in x]                  # ReLU² 激活函数
+x = linear(x, state_dict[f'layer{li}.mlp_fc2'])  # 64 → 16 (压缩回来)
+x = [a + b for a, b in zip(x, x_residual)]        # 残差连接</code></pre>
+
+<div class="box box-blue">
+<div class="title">🔑 MLP 的作用</div>
+注意力机制负责"信息交换"（不同位置之间），MLP 负责"信息处理"（每个位置独立）。<br><br>
+<strong>ReLU² vs ReLU：</strong><code>relu(x)² = max(0, x)²</code><br>
+• 普通 ReLU 在 x=0 处不可导（有尖角）<br>
+• ReLU² 在 x=0 处平滑过渡，梯度更好<br>
+• 这是 <a href="https://arxiv.org/abs/2104.03113" target="_blank">Primer 论文</a> 中发现的改进
+</div>
+
+<h3>5.5 输出层 / Output Head</h3>
+<pre><code>    # 最后一步：把 16 维向量映射回词表大小（27）
+    logits = linear(x, state_dict['lm_head'])
+    return logits  # 27 个数字，代表每个字符的"得分"</code></pre>
+</section>
+
+<!-- Section 6: Training -->
+<section id="sec-training">
+<h2 class="section-title"><span class="num">6</span> 训练循环 / Training Loop</h2>
+
+<div class="diagram" id="diagram-training"></div>
+
+<h3>6.1 数据准备 / Data Preparation</h3>
+<pre><code>doc = docs[step % len(docs)]                       # 循环取一个名字
+tokens = [BOS] + [stoi[ch] for ch in doc] + [BOS]  # 分词 + 加 BOS
+n = min(block_size, len(tokens) - 1)                # 截断到最大长度 8
+
+# 例: "emma" → tokens = [0, 5, 13, 13, 1, 0], n = 5</code></pre>
+
+<h3>6.2 前向传播与损失计算 / Forward Pass & Loss</h3>
+<pre><code>keys, values = [[] for _ in range(n_layer)], [[] for _ in range(n_layer)]
+losses = []
+for pos_id in range(n):
+    token_id = tokens[pos_id]      # 当前 token
+    target_id = tokens[pos_id + 1] # 下一个 token（标签）
+
+    logits = gpt(token_id, pos_id, keys, values)  # 模型预测
+    probs = softmax(logits)                         # 转为概率
+    loss_t = -probs[target_id].log()                # 交叉熵损失
+    losses.append(loss_t)
+
+loss = (1 / n) * sum(losses)  # 平均损失</code></pre>
+
+<div class="box box-green">
+<div class="title">💡 交叉熵损失的直觉 / Cross-Entropy Intuition</div>
+<code>loss = -log(P(正确答案))</code><br><br>
+• 模型给正确答案 90% 概率 → loss = -log(0.9) = 0.105 ✅ 低损失<br>
+• 模型给正确答案 10% 概率 → loss = -log(0.1) = 2.302 ❌ 高损失<br>
+• 模型给正确答案 1% 概率 → loss = -log(0.01) = 4.605 ❌❌ 很高<br><br>
+损失越低 = 模型预测越准确。训练的目标就是让损失尽可能低。
+</div>
+
+<div class="demo">
+<h4>🎮 交互演示：交叉熵损失</h4>
+<p>拖动滑块，看模型给正确答案不同概率时的损失值：</p>
+<input type="range" id="ce-prob" min="0.01" max="0.99" step="0.01" value="0.5" style="width:300px" oninput="runCrossEntropyDemo()">
+<span id="ce-display">50%</span>
+<button onclick="runCrossEntropyDemo()">计算 →</button>
+<div class="output" id="ce-output"></div>
+</div>
+
+<h3>6.3 反向传播 / Backward Pass</h3>
+<pre><code>loss.backward()  # 一行代码，自动计算所有 ~5000 个参数的梯度！</code></pre>
+<p>这就是第 3 节 Autograd 引擎的威力。<code>backward()</code> 会沿着计算图逆序遍历，用链式法则自动计算每个参数的梯度。</p>
+
+<h3>6.4 Adam 优化器 / Adam Optimizer</h3>
+<pre><code># 学习率线性衰减: 从 0.01 逐渐降到 0
+lr_t = learning_rate * (1 - step / num_steps)
+
+for i, p in enumerate(params):
+    # 一阶动量 (方向): 梯度的指数移动平均
+    m[i] = beta1 * m[i] + (1 - beta1) * p.grad          # β1 = 0.9
+
+    # 二阶动量 (步长): 梯度平方的指数移动平均
+    v[i] = beta2 * v[i] + (1 - beta2) * p.grad ** 2     # β2 = 0.95
+
+    # 偏差修正 (训练初期 m,v 偏向 0)
+    m_hat = m[i] / (1 - beta1 ** (step + 1))
+    v_hat = v[i] / (1 - beta2 ** (step + 1))
+
+    # 更新参数
+    p.data -= lr_t * m_hat / (v_hat ** 0.5 + eps_adam)
+
+    # 梯度清零，为下一步做准备
+    p.grad = 0</code></pre>
+
+<div class="box box-purple">
+<div class="title">🧮 Adam vs SGD 的直觉</div>
+<strong>SGD（随机梯度下降）：</strong>每步沿梯度方向走固定步长<br>
+→ 问题：在平坦区域走太慢，在陡峭区域走太快<br><br>
+<strong>Adam：</strong>自适应调整每个参数的步长<br>
+• <code>m</code> (一阶动量) = 梯度的"惯性"，让方向更稳定（不会来回震荡）<br>
+• <code>v</code> (二阶动量) = 自适应步长，梯度大的参数走小步，梯度小的走大步<br>
+• 偏差修正 = 训练初期 m,v 都是 0，会低估真实值，需要修正<br><br>
+参考：<a href="https://arxiv.org/abs/1412.6980" target="_blank">Adam: A Method for Stochastic Optimization (原始论文)</a>
+</div>
+</section>
+
+<!-- Section 7: Inference -->
+<section id="sec-inference">
+<h2 class="section-title"><span class="num">7</span> 推理与生成 / Inference & Generation</h2>
+
+<pre><code>temperature = 0.6  # 控制"创意"程度
+
+for sample_idx in range(20):
+    keys, values = [[] for _ in range(n_layer)], [[] for _ in range(n_layer)]
+    token_id = BOS  # 从 BOS 开始
+
+    for pos_id in range(block_size):
+        logits = gpt(token_id, pos_id, keys, values)
+
+        # 温度缩放: logits / temperature
+        probs = softmax([l / temperature for l in logits])
+
+        # 按概率随机采样下一个 token
+        token_id = random.choices(range(vocab_size),
+                                  weights=[p.data for p in probs])[0]
+
+        if token_id == BOS:  # 遇到 BOS 就停止
+            break
+        print(itos[token_id], end="")</code></pre>
+
+<h3>7.1 Temperature 温度参数</h3>
+<p>Temperature 通过缩放 logits 来控制生成的随机性：</p>
+
+<table>
+<tr><th>Temperature</th><th>效果</th><th>类比</th></tr>
+<tr><td>0.1</td><td>几乎确定性，总选最高概率</td><td>🧊 考试时只写最有把握的答案</td></tr>
+<tr><td>0.6</td><td>偏保守，但有一定随机性</td><td>❄️ 日常对话，偶尔有惊喜</td></tr>
+<tr><td>1.0</td><td>原始概率分布</td><td>🌡️ 正常发挥</td></tr>
+<tr><td>2.0</td><td>很随机，"有创意"</td><td>🔥 头脑风暴，天马行空</td></tr>
+</table>
+
+<div class="demo">
+<h4>🎮 交互演示：Temperature 效果</h4>
+<p>拖动滑块观察不同温度下的概率分布变化：</p>
+<input type="range" id="temp-val" min="0.1" max="3.0" step="0.1" value="0.6" style="width:300px" oninput="runTemperatureDemo()">
+<span id="temp-display">0.6</span>
+<button onclick="runTemperatureDemo()">计算 →</button>
+<div class="output" id="temp-output"></div>
+</div>
+
+<h3>7.2 KV Cache</h3>
+<pre><code>keys[li].append(k)    # 缓存当前 token 的 Key
+values[li].append(v)  # 缓存当前 token 的 Value</code></pre>
+
+<div class="box box-blue">
+<div class="title">⚡ KV Cache 的作用</div>
+注意力机制需要看到<strong>所有之前的 token</strong>。如果每次都重新计算所有 K 和 V，计算量是 O(n²)。<br><br>
+KV Cache 的思路：之前 token 的 K 和 V 不会变，缓存起来复用即可。<br>
+• 第 1 个 token：计算 K₁, V₁，缓存<br>
+• 第 2 个 token：计算 K₂, V₂，缓存。注意力用 [K₁,K₂] 和 [V₁,V₂]<br>
+• 第 n 个 token：只需计算 Kₙ, Vₙ，注意力用 [K₁,...,Kₙ] 和 [V₁,...,Vₙ]<br><br>
+这是 LLM 推理加速的核心技巧，也是为什么 GPU 显存是推理的瓶颈。
+</div>
+
+<h3>7.3 预期输出 / Expected Output</h3>
+<pre><code>step    1 / 500 | loss 3.2958   ← 初始随机猜测 (loss ≈ -log(1/27) ≈ 3.3)
+step  100 / 500 | loss 2.1234   ← 开始学到模式
+step  300 / 500 | loss 1.7890   ← 持续改善
+step  500 / 500 | loss 1.5678   ← 收敛
+
+--- inference ---
+sample 1: mara      ← 看起来像名字！
+sample 2: keli
+sample 3: jona
+sample 4: elin</code></pre>
+
+<div class="box box-green">
+<div class="title">🎯 模型学到了什么？</div>
+虽然生成的不是真实名字，但它们"看起来像"名字。模型学会了：<br>
+• 名字通常以辅音开头<br>
+• 元音和辅音交替出现<br>
+• 名字长度通常 3-7 个字符<br>
+• 某些字母组合更常见（如 "an", "el", "ar"）<br><br>
+这就是语言模型的本质：学习数据中的<strong>统计模式</strong>。
+</div>
+</section>
+
+<!-- Section 8: Summary -->
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">8</span> 总结与延伸 / Summary & Further Reading</h2>
+
+<h3>8.1 核心算法总结</h3>
+<p>这 ~200 行代码包含了现代 LLM 的<strong>全部核心算法</strong>：</p>
+
+<table>
+<tr><th>#</th><th>概念</th><th>代码中的体现</th><th>在真实 LLM 中</th></tr>
+<tr><td>1</td><td>Tokenization</td><td>字符级分词 (vocab=27)</td><td>BPE/SentencePiece (vocab=50K+)</td></tr>
+<tr><td>2</td><td>Autograd</td><td>Value 类 (~80行)</td><td>PyTorch/JAX 自动微分</td></tr>
+<tr><td>3</td><td>Transformer</td><td>1层, 4头, 16维</td><td>96层, 96头, 12288维 (GPT-3)</td></tr>
+<tr><td>4</td><td>Cross-Entropy</td><td><code>-log(prob)</code></td><td>相同，但分布式计算</td></tr>
+<tr><td>5</td><td>Adam Optimizer</td><td>标准 Adam</td><td>AdamW + 权重衰减</td></tr>
+<tr><td>6</td><td>KV Cache</td><td>列表缓存 K,V</td><td>GPU 显存中的张量缓存</td></tr>
+<tr><td>7</td><td>Temperature</td><td><code>logits / temp</code></td><td>相同 + top-p/top-k 采样</td></tr>
+</table>
+
+<h3>8.2 与 GPT-2 的差异</h3>
+<table>
+<tr><th>特性</th><th>GPT-2</th><th>MicroGPT</th><th>原因</th></tr>
+<tr><td>归一化</td><td>LayerNorm</td><td>RMSNorm</td><td>更简单，效果相当</td></tr>
+<tr><td>偏置</td><td>有</td><td>无</td><td>简化，现代模型也倾向去掉</td></tr>
+<tr><td>激活函数</td><td>GeLU</td><td>ReLU²</td><td>纯 Python 实现更简单</td></tr>
+<tr><td>框架</td><td>PyTorch</td><td>纯 Python</td><td>教学目的</td></tr>
+</table>
+
+<h3>8.3 延伸阅读 / Further Reading</h3>
+
+<div class="box box-purple">
+<div class="title">📚 推荐学习路径</div>
+
+<strong>入门级：</strong><br>
+• <a href="https://www.youtube.com/watch?v=VMj-3S1tku0" target="_blank">Karpathy: Intro to Neural Networks & Backpropagation</a> — 从零讲解 micrograd<br>
+• <a href="https://www.youtube.com/watch?v=PaCmpygFfXo" target="_blank">Karpathy: Let's build GPT from scratch</a> — 从零构建 GPT<br>
+• <a href="https://github.com/karpathy/micrograd" target="_blank">karpathy/micrograd</a> — 本项目 Autograd 引擎的来源<br>
+• <a href="https://github.com/karpathy/nanoGPT" target="_blank">karpathy/nanoGPT</a> — 更完整的 GPT 实现（用 PyTorch）<br><br>
+
+<strong>进阶级：</strong><br>
+• <a href="https://arxiv.org/abs/1706.03762" target="_blank">Attention Is All You Need</a> — Transformer 原始论文<br>
+• <a href="https://arxiv.org/abs/1412.6980" target="_blank">Adam Optimizer 论文</a><br>
+• <a href="https://jalammar.github.io/illustrated-transformer/" target="_blank">The Illustrated Transformer</a> — 图解 Transformer<br>
+• <a href="https://jalammar.github.io/illustrated-gpt2/" target="_blank">The Illustrated GPT-2</a> — 图解 GPT-2<br><br>
+
+<strong>深入级：</strong><br>
+• <a href="https://arxiv.org/abs/2005.14165" target="_blank">GPT-3 论文</a> — Language Models are Few-Shot Learners<br>
+• <a href="https://arxiv.org/abs/1910.07467" target="_blank">RMSNorm 论文</a><br>
+• <a href="https://arxiv.org/abs/2104.03113" target="_blank">Primer 论文</a> — ReLU² 激活函数的来源
+</div>
+
+<div class="box box-green">
+<div class="title">🚀 下一步可以做什么？</div>
+1. <strong>运行代码</strong>：<code>python microgpt.py</code>，观察训练过程和生成结果<br>
+2. <strong>调参实验</strong>：修改 n_embd, n_head, n_layer, block_size，观察效果变化<br>
+3. <strong>换数据集</strong>：用其他文本替换 input.txt（如诗歌、代码片段）<br>
+4. <strong>加可视化</strong>：打印注意力权重，观察模型在"看"什么<br>
+5. <strong>学 nanoGPT</strong>：用 PyTorch 实现更大规模的 GPT
+</div>
+</section>
+
+</div><!-- end container -->
+
+<footer>
+  <p>MicroGPT Tutorial — Based on code by <a href="https://github.com/karpathy" target="_blank">Andrej Karpathy</a></p>
+  <p>教程由 AI 辅助生成 / Tutorial generated with AI assistance</p>
+</footer>
+
+<a href="#" class="back-top" id="back-top" title="回到顶部">↑</a>
+
+<script src="diagrams.js"></script>
+<script src="demos.js"></script>
+<script>
+// Render diagrams
+document.getElementById('diagram-arch').innerHTML = createArchDiagram() + '<div class="caption">图 1: MicroGPT 五大模块及数据流向</div>';
+document.getElementById('diagram-autograd').innerHTML = createAutogradDiagram() + '<div class="caption">图 2: 计算图与自动微分 — 蓝色为前向传播，红色为反向梯度</div>';
+document.getElementById('diagram-transformer').innerHTML = createTransformerDiagram() + '<div class="caption">图 3: GPT 前向传播流程 — 从嵌入到输出 logits</div>';
+document.getElementById('diagram-attention').innerHTML = createAttentionDiagram() + '<div class="caption">图 4: 多头注意力机制详解</div>';
+document.getElementById('diagram-training').innerHTML = createTrainingDiagram() + '<div class="caption">图 5: 训练循环的 5 个步骤</div>';
+
+// Init demos
+runTokenizerDemo();
+runAutogradDemo();
+runSoftmaxDemo();
+runTemperatureDemo();
+runCrossEntropyDemo();
+runRMSNormDemo();
+</script>
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
