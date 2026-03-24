@@ -23,4 +23,12 @@ export const tutorials: Tutorial[] = [
       '从自旋锁到 Futex，一步步理解互斥锁的实现原理。包含数据竞争可视化、原子操作图解、三状态机、性能对比图表。',
     meta: '基于 Chris Rybicki 的博客 · 2026-03',
   },
+  {
+    slug: 'btree-concurrency',
+    tag: '🗄️ Database',
+    title: 'B+树并发控制的前世今生',
+    description:
+      '从粗粒度锁到 Lock-Free，40 年并发优化之路。覆盖 MySQL 5.6/5.7、SX 锁、Blink 树、OLFIT 版本号、缓存一致性等核心概念。',
+    meta: '基于 POLARDB 内核团队文章 · 2026-03',
+  },
 ];

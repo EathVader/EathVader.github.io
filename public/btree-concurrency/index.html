@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B+树并发控制的前世今生 / B+ Tree Concurrency Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>🌲 <span>B+树</span>并发控制的前世今生</h1>
+  <p class="subtitle">从粗粒度锁到 Lock-Free —— 40 年并发优化之路<br>
+  Based on <a href="https://zhuanlan.zhihu.com/p/50112182" target="_blank">POLARDB 内核团队（执壹）的文章</a></p>
+  <span class="badge">🗄️ 数据库</span>
+  <span class="badge">🔒 并发控制</span>
+  <span class="badge">📊 MySQL 内核</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-basics">B+树基础 / B+ Tree Basics</a></li>
+    <li><a href="#sec-requirements">并发正确性要求 / Correctness Requirements</a></li>
+    <li><a href="#sec-coarse">粗粒度锁 (MySQL 5.6) / Coarse-Grained Locking</a></li>
+    <li><a href="#sec-branch">只锁修改分支 / Lock Only Modified Branch</a></li>
+    <li><a href="#sec-sx">SX 锁横空出世 / SX Lock</a></li>
+    <li><a href="#sec-cache">缓存一致性问题 / Cache Coherence Problem</a></li>
+    <li><a href="#sec-blink">Blink 树 / Blink Tree</a></li>
+    <li><a href="#sec-olfit">OLFIT 树：版本号 / Version-based Optimistic</a></li>
+    <li><a href="#sec-mysql57">MySQL 5.7 的方案 / MySQL 5.7 Approach</a></li>
+    <li><a href="#sec-summary">总结与演进 / Summary</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1: B+ Tree Basics -->
+<section id="sec-basics">
+<h2 class="section-title"><span class="num">1</span> B+树基础 / B+ Tree Basics</h2>
+
+<div class="analogy">
+  <div class="emoji">📚</div>
+  <h4>类比 / Analogy</h4>
+  <p>B+树就像一本<strong>多级目录的字典</strong>：最上面是总目录（根节点），中间是分类目录（内部节点），最下面是实际的词条（叶节点）。你通过目录一层层定位，最终找到想要的词条。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 700 260" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="350" y="18" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">B+树结构示意</text>
+    <!-- Root -->
+    <rect x="270" y="30" width="160" height="36" rx="6" fill="#172554" stroke="#3b82f6" stroke-width="2"/>
+    <text x="350" y="53" text-anchor="middle" fill="#93c5fd" font-size="12" font-family="JetBrains Mono">30 | 60</text>
+    <text x="350" y="82" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">根节点 Root</text>
+    <!-- Internal L -->
+    <rect x="80" y="100" width="140" height="36" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="150" y="123" text-anchor="middle" fill="#e2e8f0" font-size="12" font-family="JetBrains Mono">10 | 20</text>
+    <!-- Internal R -->
+    <rect x="480" y="100" width="140" height="36" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="550" y="123" text-anchor="middle" fill="#e2e8f0" font-size="12" font-family="JetBrains Mono">40 | 50</text>
+    <!-- Lines root->internal -->
+    <line x1="310" y1="66" x2="180" y2="100" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="390" y1="66" x2="520" y2="100" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr)"/>
+    <!-- Leaves -->
+    <rect x="10" y="180" width="100" height="36" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="60" y="203" text-anchor="middle" fill="#86efac" font-size="11" font-family="JetBrains Mono">5,8</text>
+    <rect x="130" y="180" width="100" height="36" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="180" y="203" text-anchor="middle" fill="#86efac" font-size="11" font-family="JetBrains Mono">10,15</text>
+    <rect x="250" y="180" width="100" height="36" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="300" y="203" text-anchor="middle" fill="#86efac" font-size="11" font-family="JetBrains Mono">20,25</text>
+    <!-- Leaf links -->
+    <line x1="110" y1="198" x2="128" y2="198" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="230" y1="198" x2="248" y2="198" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr)"/>
+    <!-- Lines internal->leaf -->
+    <line x1="120" y1="136" x2="70" y2="180" stroke="#334155" stroke-width="1"/>
+    <line x1="150" y1="136" x2="180" y2="180" stroke="#334155" stroke-width="1"/>
+    <line x1="180" y1="136" x2="300" y2="180" stroke="#334155" stroke-width="1"/>
+    <text x="350" y="240" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">叶节点通过链表相连，支持范围查询</text>
+    <text x="60" y="240" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">叶节点 Leaf</text>
+  </svg>
+  <div class="caption">B+树：数据只存在叶节点，内部节点仅做索引</div>
+</div>
+
+<div class="box box-blue">
+  <div class="title">📐 B+树的核心性质</div>
+  <ul>
+    <li>所有路径等长（平衡树）→ 查找时间 <code>O(log n)</code></li>
+    <li>数据只存叶节点，内部节点仅存索引键</li>
+    <li>每个节点至少半满（M/2 个键值对）</li>
+    <li>叶节点通过链表相连 → 高效范围查询</li>
+  </ul>
+</div>
+</section>
+
+<!-- Section 2: Correctness Requirements -->
+<section id="sec-requirements">
+<h2 class="section-title"><span class="num">2</span> 并发正确性要求 / Correctness Requirements</h2>
+
+<p>不管用什么并发机制，都必须满足以下四个要求：</p>
+
+<table>
+  <tr><th>编号</th><th>要求</th><th>说明</th><th>类比</th></tr>
+  <tr><td style="color:#3b82f6;font-weight:700">R.1</td><td>不读到中间状态</td><td>读操作不会看到写了一半的数据</td><td>🚫 不会看到只写了一半的文件</td></tr>
+  <tr><td style="color:#3b82f6;font-weight:700">R.2</td><td>不丢失已有数据</td><td>数据被分裂移动时，读操作仍能找到它</td><td>🔍 搬家后邮件仍能送达</td></tr>
+  <tr><td style="color:#f59e0b;font-weight:700">W.1</td><td>写写互斥</td><td>两个写操作不会同时修改同一数据</td><td>✏️ 两人不能同时编辑同一行</td></tr>
+  <tr><td style="color:#ef4444;font-weight:700">D.1</td><td>无死锁</td><td>不会出现循环等待</td><td>🔄 不会互相等对方让路</td></tr>
+</table>
+
+<div class="analogy">
+  <div class="emoji">🏦</div>
+  <h4>类比 / Analogy</h4>
+  <p>想象一个银行系统：<strong>R.1</strong> = 查余额时不会看到转账转了一半的金额；<strong>R.2</strong> = 账户迁移分行后仍能查到；<strong>W.1</strong> = 两笔转账不会同时扣同一笔钱；<strong>D.1</strong> = 不会两个柜员互相等对方处理完。</p>
+</div>
+</section>
+
+<!-- Section 3: Coarse-Grained Locking -->
+<section id="sec-coarse">
+<h2 class="section-title"><span class="num">3</span> 粗粒度锁 (MySQL 5.6) / Coarse-Grained Locking</h2>
+
+<p>MySQL 5.6 使用两种粒度的锁：<strong>索引级 S/X 锁</strong> + <strong>页级 S/X 锁</strong>。</p>
+
+<h3>读操作</h3>
+<pre><code>/* 读操作 */
+1. SL(index)          // 对整个索引加共享锁
+2. 遍历到叶节点        // Travel down to leaf
+3. SL(leaf)           // 对叶节点加共享锁
+4. SU(index)          // 释放索引锁
+5. 读取叶节点          // Read leaf
+6. SU(leaf)           // 释放叶节点锁</code></pre>
+
+<h3>悲观写操作</h3>
+<pre><code>/* 悲观写操作 */
+1. XL(index)          // 对整个索引加互斥锁 🔒
+2. 遍历到叶节点        // Travel down to leaf
+3. XL(leaf)           // 对叶节点加互斥锁
+4. 修改树结构          // Modify tree structure
+5. XU(index)          // 释放索引锁
+6. 修改叶节点          // Modify leaf
+7. XU(leaf)           // 释放叶节点锁</code></pre>
+
+<div class="diagram">
+  <svg viewBox="0 0 650 160" xmlns="http://www.w3.org/2000/svg">
+    <text x="325" y="18" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">悲观写：锁住整棵树 😱</text>
+    <!-- Tree outline -->
+    <rect x="150" y="30" width="350" height="100" rx="12" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="6"/>
+    <text x="325" y="50" text-anchor="middle" fill="#fca5a5" font-size="11" font-family="Inter">🔒 XL(index) — 整棵树被锁住</text>
+    <!-- Nodes inside -->
+    <rect x="280" y="58" width="90" height="24" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="325" y="74" text-anchor="middle" fill="#fca5a5" font-size="10" font-family="Inter">Root</text>
+    <rect x="200" y="95" width="70" height="24" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="235" y="111" text-anchor="middle" fill="#fca5a5" font-size="10" font-family="Inter">Node</text>
+    <rect x="380" y="95" width="70" height="24" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="415" y="111" text-anchor="middle" fill="#fca5a5" font-size="10" font-family="Inter">Node</text>
+    <!-- Blocked threads -->
+    <rect x="10" y="55" width="110" height="30" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="65" y="74" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">Reader ⏳ 被阻塞</text>
+    <rect x="10" y="95" width="110" height="30" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="65" y="114" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">Writer ⏳ 被阻塞</text>
+    <rect x="540" y="55" width="100" height="30" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="590" y="74" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">Reader ⏳</text>
+  </svg>
+  <div class="caption">悲观写操作锁住整个索引，所有其他读写操作都被阻塞</div>
+</div>
+
+<h3>乐观写操作</h3>
+<p>大多数写操作不会触发分裂/合并，所以可以<strong>乐观地</strong>只加 S 锁遍历，到叶节点再加 X 锁：</p>
+<pre><code>/* 乐观写操作 */
+1. SL(index)          // 只加共享锁！
+2. 遍历到叶节点
+3. XL(leaf)           // 叶节点加互斥锁
+4. SU(index)
+5. 修改叶节点
+6. XU(leaf)</code></pre>
+
+<div class="box box-green">
+  <div class="title">💡 乐观 vs 悲观</div>
+  <p><strong>乐观写</strong>：假设不会分裂，用 S 锁遍历 → 读写可并发<br>
+  <strong>悲观写</strong>：假设会分裂，用 X 锁锁住整棵树 → 所有操作串行<br>
+  MySQL 5.6 优先尝试乐观写，失败才退回悲观写。</p>
+</div>
+</section>
+
+<!-- Section 4: Lock Only Modified Branch -->
+<section id="sec-branch">
+<h2 class="section-title"><span class="num">4</span> 只锁修改分支 / Lock Only Modified Branch</h2>
+
+<p>1976 年的论文提出：写操作不需要锁住整棵树，只需要锁住<strong>被修改的分支</strong>。核心概念是 <strong>Safe Node</strong>：</p>
+
+<div class="box box-blue">
+  <div class="title">🛡️ Safe Node（安全节点）</div>
+  <p>如果当前操作<strong>不会影响祖先节点</strong>，则该节点是安全的：</p>
+  <ul>
+    <li><strong>插入</strong>：键值对数量 &lt; M → 不会分裂 → Safe ✅</li>
+    <li><strong>删除</strong>：键值对数量 &gt; M/2 → 不会合并 → Safe ✅</li>
+  </ul>
+  <p>遇到 Safe Node 时，可以释放所有祖先节点的锁！</p>
+</div>
+
+<pre><code>/* 写操作：只锁修改分支 */
+1.  current = root
+2.  XL(current)
+3.  While current is not leaf {
+4.      XL(current->son)
+5.      current = current->son
+6.      If current is safe {
+7.          XU(所有祖先节点)  // 释放！
+8.      }
+9.  }
+10. 修改叶节点和上层节点
+11. XU(current) + XU(祖先)</code></pre>
+
+<div class="diagram">
+  <svg viewBox="0 0 650 200" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="325" y="18" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">Safe Node 释放祖先锁</text>
+    <!-- Root: locked then released -->
+    <rect x="260" y="30" width="130" height="32" rx="6" fill="#1e293b" stroke="#22c55e" stroke-dasharray="4"/>
+    <text x="325" y="50" text-anchor="middle" fill="#86efac" font-size="11" font-family="Inter">Root 🔓 已释放</text>
+    <!-- Internal: safe node -->
+    <rect x="140" y="85" width="130" height="32" rx="6" fill="#1e293b" stroke="#22c55e" stroke-dasharray="4"/>
+    <text x="205" y="105" text-anchor="middle" fill="#86efac" font-size="11" font-family="Inter">Node 🔓 已释放</text>
+    <rect x="380" y="85" width="130" height="32" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="445" y="105" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Inter">Node（未访问）</text>
+    <!-- Leaf: still locked -->
+    <rect x="60" y="150" width="120" height="32" rx="6" fill="#450a0a" stroke="#ef4444" stroke-width="2"/>
+    <text x="120" y="170" text-anchor="middle" fill="#fca5a5" font-size="11" font-family="Inter">Leaf 🔒 锁住</text>
+    <rect x="200" y="150" width="120" height="32" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="260" y="170" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Inter">Leaf</text>
+    <!-- Arrow showing safe release -->
+    <line x1="290" y1="62" x2="220" y2="85" stroke="#60a5fa" stroke-width="1.5"/>
+    <line x1="170" y1="117" x2="130" y2="150" stroke="#60a5fa" stroke-width="1.5"/>
+    <!-- Annotation -->
+    <text x="480" y="170" fill="#86efac" font-size="10" font-family="Inter">✅ 其他线程可以访问</text>
+    <text x="480" y="185" fill="#86efac" font-size="10" font-family="Inter">   未锁定的节点</text>
+  </svg>
+  <div class="caption">遇到 Safe Node 后释放祖先锁，其他线程可以并发访问其他分支</div>
+</div>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 问题 / Problem</div>
+  <p>写操作在到达 Safe Node 之前，对途经的节点加的是 <strong>X 锁</strong>，仍然会阻塞读操作。能不能更好？</p>
+</div>
+</section>
+
+<!-- Section 5: SX Lock -->
+<section id="sec-sx">
+<h2 class="section-title"><span class="num">5</span> SX 锁横空出世 / SX Lock</h2>
+
+<p>1977 年，Rudolf Bayer 教授提出了介于 S 锁和 X 锁之间的 <strong>SX 锁</strong>：</p>
+
+<table>
+  <tr><th>请求 \ 持有</th><th>S</th><th>SX</th><th>X</th></tr>
+  <tr><td><strong>S</strong></td><td style="color:#86efac">✅ 兼容</td><td style="color:#86efac">✅ 兼容</td><td style="color:#fca5a5">❌ 冲突</td></tr>
+  <tr><td><strong>SX</strong></td><td style="color:#86efac">✅ 兼容</td><td style="color:#fca5a5">❌ 冲突</td><td style="color:#fca5a5">❌ 冲突</td></tr>
+  <tr><td><strong>X</strong></td><td style="color:#fca5a5">❌ 冲突</td><td style="color:#fca5a5">❌ 冲突</td><td style="color:#fca5a5">❌ 冲突</td></tr>
+</table>
+
+<div class="analogy">
+  <div class="emoji">🚧</div>
+  <h4>类比 / Analogy</h4>
+  <p><strong>S 锁</strong> = 参观者通行证（多人可同时参观）<br>
+  <strong>SX 锁</strong> = 施工预告牌（参观者仍可通行，但其他施工队不能进入）<br>
+  <strong>X 锁</strong> = 施工围挡（所有人都不能进入）<br>
+  SX 锁在确定要修改时可以<strong>升级为 X 锁</strong>。</p>
+</div>
+
+<pre><code>/* 使用 SX 锁的写操作 */
+1.  current = root
+2.  SXL(current)          // SX 锁！读操作不被阻塞
+3.  While current is not leaf {
+4.      SXL(current->son)
+5.      current = current->son
+6.      If current is safe {
+7.          SXU(祖先节点)
+8.      }
+9.  }
+10. XL(修改的节点)         // SX → X 升级
+11. 修改分支
+12. XU(所有锁)</code></pre>
+
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">SX 锁遍历<br><small style="color:#64748b">读操作不阻塞</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">到达叶节点</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#ef4444">SX → X 升级<br><small style="color:#64748b">开始修改</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">释放所有锁</div>
+</div>
+</section>
+
+<!-- Section 6: Cache Coherence -->
+<section id="sec-cache">
+<h2 class="section-title"><span class="num">6</span> 缓存一致性问题 / Cache Coherence Problem</h2>
+
+<p>即使用了 SX 锁，每次加锁都要<strong>修改锁变量</strong>，这会导致多核 CPU 上严重的<strong>缓存一致性开销</strong>。</p>
+
+<div class="analogy">
+  <div class="emoji">📋</div>
+  <h4>类比 / Analogy</h4>
+  <p>4 个人各有一份文件副本。每当一个人在自己的副本上签名（加锁），其他人的副本就<strong>全部作废</strong>，必须重新复印。即使他们看的是不同的页面！</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 650 180" xmlns="http://www.w3.org/2000/svg">
+    <text x="325" y="18" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">Cache Coherence Miss 问题</text>
+    <!-- CPUs -->
+    <rect x="30" y="35" width="80" height="50" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="70" y="55" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="Inter">CPU 1</text>
+    <text x="70" y="72" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">Cache: n1,n2</text>
+    <rect x="170" y="35" width="80" height="50" rx="6" fill="#2e1065" stroke="#a78bfa"/>
+    <text x="210" y="55" text-anchor="middle" fill="#c4b5fd" font-size="11" font-family="Inter">CPU 2</text>
+    <text x="210" y="72" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">Cache: n1,n2</text>
+    <rect x="310" y="35" width="80" height="50" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="350" y="55" text-anchor="middle" fill="#86efac" font-size="11" font-family="Inter">CPU 3</text>
+    <text x="350" y="72" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">Cache: n1,n3</text>
+    <rect x="450" y="35" width="80" height="50" rx="6" fill="#451a03" stroke="#f59e0b"/>
+    <text x="490" y="55" text-anchor="middle" fill="#fcd34d" font-size="11" font-family="Inter">CPU 4</text>
+    <text x="490" y="72" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">Cache: n1</text>
+    <!-- Shared memory -->
+    <rect x="130" y="120" width="390" height="40" rx="8" fill="#1e293b" stroke="#334155"/>
+    <text x="325" y="145" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="Inter">共享内存：n1 | n2 | n3 | n4 | n5 | n6 | n7</text>
+    <!-- Invalidation arrows -->
+    <text x="70" y="105" text-anchor="middle" fill="#ef4444" font-size="9" font-family="Inter">❌ n1 失效!</text>
+    <text x="350" y="105" text-anchor="middle" fill="#ef4444" font-size="9" font-family="Inter">❌ n1 失效!</text>
+    <text x="490" y="105" text-anchor="middle" fill="#ef4444" font-size="9" font-family="Inter">❌ n1 失效!</text>
+    <text x="210" y="105" text-anchor="middle" fill="#f59e0b" font-size="9" font-family="Inter">✏️ 修改 n1 锁</text>
+  </svg>
+  <div class="caption">CPU 2 修改 n1 的锁 → 所有其他 CPU 缓存中的 n1 失效</div>
+</div>
+
+<div class="box box-amber">
+  <div class="title">📊 NUMA 架构下的延迟</div>
+  <p>跨 socket 的缓存同步延迟高达 <strong>200-300ns</strong>，而普通内存访问仅 50-100ns。加锁导致的缓存失效开销远超访存本身！</p>
+  <p>解决方向：<strong>减少加锁频率</strong> → 自底向上加锁，只对真正修改的节点加锁。</p>
+</div>
+</section>
+
+<!-- Section 7: Blink Tree -->
+<section id="sec-blink">
+<h2 class="section-title"><span class="num">7</span> Blink 树 / Blink Tree (1981)</h2>
+
+<p>Blink 树的核心创新：为每个节点添加一个<strong>右指针 (right link)</strong>，使得<strong>无锁遍历 + 自底向上加锁</strong>成为可能。</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 650 160" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#22c55e"/></marker></defs>
+    <text x="325" y="18" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">Blink 树：每个节点有右指针</text>
+    <!-- Root -->
+    <rect x="240" y="30" width="170" height="32" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="325" y="50" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="Inter">Root [30|60] →nil</text>
+    <!-- Internal -->
+    <rect x="60" y="85" width="140" height="32" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="130" y="105" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="Inter">[10|20] →</text>
+    <rect x="250" y="85" width="140" height="32" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="320" y="105" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="Inter">[40|50] →</text>
+    <rect x="440" y="85" width="140" height="32" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="510" y="105" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="Inter">[70|80] →nil</text>
+    <!-- Right links -->
+    <line x1="200" y1="101" x2="248" y2="101" stroke="#22c55e" stroke-width="2" marker-end="url(#arrG)"/>
+    <line x1="390" y1="101" x2="438" y2="101" stroke="#22c55e" stroke-width="2" marker-end="url(#arrG)"/>
+    <!-- Label -->
+    <text x="325" y="145" text-anchor="middle" fill="#86efac" font-size="11" font-weight="600" font-family="Inter">→ 右指针 (Right Link)：分裂时数据只会往右移</text>
+  </svg>
+  <div class="caption">右指针让读操作在无锁状态下也能追踪被分裂移走的数据</div>
+</div>
+
+<h3>读操作：无锁遍历！</h3>
+<pre><code>/* Blink 树读操作 — 不需要加锁！ */
+1. current = root
+2. While current is not leaf {
+3.     current = scanNode(current, v)  // 可能向右走
+4.     current = current->son
+5. }
+6. 在叶节点中查找（可能继续向右走）
+
+/* scanNode：如果目标在右兄弟，就向右移动 */
+func scanNode(node, v) {
+    If node->right->key[0] <= v
+        return scanNode(node->right, v)
+    return node
+}</code></pre>
+
+<h3>写操作：自底向上加锁</h3>
+<pre><code>/* Blink 树写操作 */
+1.  无锁遍历到叶节点（同读操作）
+2.  将路径压入 stack
+3.  XL(leaf)
+4.  If leaf is safe:
+5.      insert + XU(leaf)  // 完成！
+6.  Else:
+7.      分裂叶节点，创建新节点
+8.      设置右指针
+9.      parent = pop(stack)
+10.     XL(parent)         // 向上加锁
+11.     XU(leaf)
+12.     重复插入过程...</code></pre>
+
+<div class="box box-green">
+  <div class="title">🎯 Blink 树的突破</div>
+  <ul>
+    <li><strong>读操作完全无锁</strong> → 读-读、读-写零冲突</li>
+    <li><strong>自底向上加锁</strong> → 只锁真正需要修改的节点</li>
+    <li><strong>右指针</strong> → 分裂时数据只往右移，读操作通过右指针追踪</li>
+    <li>加锁顺序"自左向右，自底向上" → 无死锁</li>
+  </ul>
+</div>
+</section>
+
+<!-- Section 8: OLFIT Tree -->
+<section id="sec-olfit">
+<h2 class="section-title"><span class="num">8</span> OLFIT 树：版本号 / Version-based Optimistic (2001)</h2>
+
+<p>Blink 树假设"读写节点是原子的"，这在现实中不成立。OLFIT 树引入<strong>版本号</strong>解决这个问题。</p>
+
+<div class="analogy">
+  <div class="emoji">📝</div>
+  <h4>类比 / Analogy</h4>
+  <p>就像 Google Docs 的版本号：你开始读文档时记下版本号 v5，读完后发现变成了 v6 → 说明有人改过了，你需要重新读。</p>
+</div>
+
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">📝 记录版本号<br><small>version = v</small></div>
+  <div class="arrow">→</div>
+  <div class="step">读取节点内容</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">检查版本号<br><small>changed?</small></div>
+  <div class="arrow">→ 变了</div>
+  <div class="step" style="border-color:#ef4444">🔄 重试</div>
+</div>
+
+<pre><code>/* 写操作：修改节点时递增版本号 */
+1. XL(node)
+2. 修改节点内容
+3. version++              // 递增版本号
+4. XU(node)
+
+/* 读操作：用版本号检测并发修改 */
+1. v = node.version       // 记录版本号
+2. 读取节点内容
+3. If node.locked → 重试   // 正在被写
+4. If node.version != v → 重试  // 已被修改</code></pre>
+
+<div class="box box-purple">
+  <div class="title">🔑 OLFIT 的核心思想</div>
+  <ul>
+    <li><strong>写操作</strong>通过锁互斥 + 版本号通知读操作</li>
+    <li><strong>读操作</strong>完全无锁，通过版本号检测是否读到脏数据</li>
+    <li>读操作不修改任何共享变量 → <strong>零缓存一致性开销</strong></li>
+    <li>结合 Blink 树的右指针 → 完整的高性能并发 B+树</li>
+  </ul>
+</div>
+</section>
+
+<!-- Section 9: MySQL 5.7 -->
+<section id="sec-mysql57">
+<h2 class="section-title"><span class="num">9</span> MySQL 5.7 的方案 / MySQL 5.7 Approach</h2>
+
+<p>MySQL 5.7 综合了前面的多种优化：<strong>SX 锁 + 只锁修改分支</strong>。</p>
+
+<table>
+  <tr><th>操作</th><th>索引锁</th><th>非叶节点</th><th>叶节点</th></tr>
+  <tr><td>读操作</td><td>S</td><td>S</td><td>S</td></tr>
+  <tr><td>乐观写</td><td>S</td><td>S</td><td><strong>X</strong></td></tr>
+  <tr><td>悲观写</td><td><strong>SX</strong></td><td><strong>X</strong>（修改分支）</td><td><strong>X</strong></td></tr>
+</table>
+
+<pre><code>/* MySQL 5.7 悲观写操作 */
+1. SXL(index)             // SX 锁：不阻塞读操作！
+2. XL(修改分支)            // 只锁被影响的分支
+3. XL(leaf)
+4. 修改树结构
+5. XU(修改分支)
+6. SXU(index)
+7. 修改叶节点
+8. XU(leaf)</code></pre>
+
+<div class="diagram">
+  <svg viewBox="0 0 650 100" xmlns="http://www.w3.org/2000/svg">
+    <text x="325" y="18" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">MySQL 5.6 → 5.7 的进化</text>
+    <rect x="30" y="35" width="250" height="50" rx="8" fill="#450a0a" stroke="#ef4444"/>
+    <text x="155" y="55" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="600" font-family="Inter">MySQL 5.6 悲观写</text>
+    <text x="155" y="72" text-anchor="middle" fill="#fca5a5" font-size="10" font-family="Inter">XL(整个索引) → 全部阻塞</text>
+    <rect x="370" y="35" width="250" height="50" rx="8" fill="#14532d" stroke="#22c55e"/>
+    <text x="495" y="55" text-anchor="middle" fill="#86efac" font-size="11" font-weight="600" font-family="Inter">MySQL 5.7 悲观写</text>
+    <text x="495" y="72" text-anchor="middle" fill="#86efac" font-size="10" font-family="Inter">SXL(索引) + XL(分支) → 读不阻塞</text>
+    <text x="325" y="65" text-anchor="middle" fill="#60a5fa" font-size="16" font-family="Inter">→</text>
+  </svg>
+</div>
+
+<div class="box box-blue">
+  <div class="title">🤔 为什么 MySQL 没有用 Blink/OLFIT？</div>
+  <p>MySQL 的 B+树远比学术论文中的复杂：</p>
+  <ul>
+    <li>需要支持 Spatial Index 等复杂索引</li>
+    <li>需要支持 purging 线程优先级</li>
+    <li>存在锁住"左-当前-右"三个节点的场景</li>
+    <li>需要支持 <code>modify_prev</code>/<code>search_prev</code> 等回溯操作</li>
+  </ul>
+  <p>这些复杂需求使得完全无锁的方案难以直接应用。</p>
+</div>
+</section>
+
+<!-- Section 10: Summary -->
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">10</span> 总结与演进 / Summary</h2>
+
+<h3>40 年演进路线</h3>
+
+<div class="timeline">
+  <div class="timeline-item">
+    <div class="tl-label">1970s</div>
+    <strong>粗粒度锁</strong> — 索引级 X 锁，写操作锁住整棵树
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">1976</div>
+    <strong>只锁修改分支</strong> — Safe Node 概念，释放安全祖先的锁
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">1977</div>
+    <strong>SX 锁</strong> — 写操作遍历时不阻塞读操作
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">1981</div>
+    <strong>Blink 树</strong> — 右指针 + 无锁读 + 自底向上加锁
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">2001</div>
+    <strong>OLFIT 树</strong> — 版本号乐观读，零缓存一致性开销
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">2012</div>
+    <strong>Masstree</strong> — B+树 + Trie 混合，集大成者
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">至今</div>
+    <strong>Lock-Free B+树</strong> — Bw-Tree 等完全无锁设计
+  </div>
+</div>
+
+<h3>核心优化思路</h3>
+
+<table>
+  <tr><th>优化方向</th><th>手段</th><th>效果</th></tr>
+  <tr><td>减小锁粒度</td><td>索引级 → 分支级 → 节点级</td><td>减少阻塞范围</td></tr>
+  <tr><td>减少锁冲突</td><td>SX 锁、乐观写</td><td>读写可并发</td></tr>
+  <tr><td>减少加锁频率</td><td>无锁读 + 版本号</td><td>消除缓存一致性开销</td></tr>
+  <tr><td>改变加锁方向</td><td>自底向上 + 右指针</td><td>只锁真正修改的节点</td></tr>
+</table>
+
+<div class="box box-purple">
+  <div class="title">📚 延伸阅读 / References</div>
+  <ul>
+    <li>[1] Bayer & McCreight, 1970 — <em>Organization and Maintenance of Large Ordered Indices</em></li>
+    <li>[2] Samadi, 1976 — <em>B-trees in a system with multiple users</em></li>
+    <li>[3] Bayer & Schkolnick, 1977 — <em>Concurrency of operations on B-trees</em></li>
+    <li>[4] Lehman & Yao, 1981 — <em>Efficient locking for concurrent operations on B-trees</em> (Blink Tree)</li>
+    <li>[6] Cha et al., 2001 VLDB — <em>Cache-Conscious Concurrency Control</em> (OLFIT)</li>
+    <li>[8] Mao et al., 2012 EuroSys — <em>Cache craftiness for fast multicore key-value storage</em> (Masstree)</li>
+  </ul>
+</div>
+</section>
+
+</div><!-- /.container -->
+
+<footer>
+  <p>基于 <a href="https://zhuanlan.zhihu.com/p/50112182" target="_blank">POLARDB 内核团队（执壹）的文章</a> 改编为交互式教程</p>
+  <p><a href="../">← 返回主页 / Back to Home</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+<script>
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => btn.classList.toggle('show', window.scrollY > 400));
+</script>
+
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
