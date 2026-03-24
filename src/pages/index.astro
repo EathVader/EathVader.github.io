@@ -1,0 +1,27 @@
+---
+import Base from '../layouts/Base.astro';
+import { tutorials } from '../data/tutorials';
+import '../styles/global.css';
+---
+
+<Base title="EathVader's Lab">
+  <header class="hero">
+    <h1>🧪 <span>EathVader</span>'s Lab</h1>
+    <p>学习笔记 & 交互式教程</p>
+  </header>
+
+  <div class="grid">
+    {tutorials.map((t) => (
+      <a class="card" href={`/${t.slug}/`}>
+        <span class="tag">{t.tag}</span>
+        <h2>{t.title}</h2>
+        <p>{t.description}</p>
+        <div class="meta">{t.meta}</div>
+      </a>
+    ))}
+  </div>
+
+  <footer>
+    <p><a href="https://github.com/EathVader" target="_blank">GitHub @EathVader</a></p>
+  </footer>
+</Base>

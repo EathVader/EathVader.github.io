@@ -1,2 +1,8 @@
 AGENTS.md
-AGENTS.md
+agents.md
+
+# astro
+dist/
+node_modules/
+.astro/
+.DS_Store
