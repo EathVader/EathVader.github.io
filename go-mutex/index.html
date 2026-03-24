@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Go Mutex 从零实现 / Writing Mutexes from Scratch in Go</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Hero -->
+<header class="hero">
+  <h1>🔒 <span>Go Mutex</span> 从零实现</h1>
+  <p class="subtitle">从自旋锁到 Futex —— 一步步理解互斥锁的实现原理<br>
+  Writing Mutexes from Scratch in Go, based on <a href="https://rybicki.io/blog/2026/01/01/mutexes-from-scratch-in-go.html" target="_blank">Chris Rybicki's blog post</a></p>
+  <span class="badge">🔧 Go 语言</span>
+  <span class="badge">🧵 并发编程</span>
+  <span class="badge">⚡ 性能优化</span>
+</header>
+
+<div class="container">
+
+<!-- TOC -->
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-what">什么是 Mutex？/ What is a Mutex?</a></li>
+    <li><a href="#sec-naive">天真的尝试 / A Naive Attempt</a></li>
+    <li><a href="#sec-spin">自旋锁 / Working Spin Lock</a></li>
+    <li><a href="#sec-perf1">性能测量 / Measuring Performance</a></li>
+    <li><a href="#sec-futex">Futex：操作系统来帮忙 / OS-Assisted Locking</a></li>
+    <li><a href="#sec-futex2">优化 Futex / Optimized Futex Lock</a></li>
+    <li><a href="#sec-adaptive">自适应锁 / Adaptive Spinning</a></li>
+    <li><a href="#sec-summary">总结 / Summary</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1: What is a Mutex -->
+<section id="sec-what">
+<h2 class="section-title"><span class="num">1</span> 什么是 Mutex？/ What is a Mutex?</h2>
+
+<div class="analogy">
+  <div class="emoji">🚻</div>
+  <h4>生活类比 / Real-life Analogy</h4>
+  <p>想象一个<strong>单人洗手间</strong>：门上有一把锁。进去的人锁上门（Lock），出来时打开锁（Unlock）。其他人必须在外面等待。这就是 Mutex（互斥锁）的核心思想——<strong>同一时刻只有一个线程能进入临界区</strong>。</p>
+  <p>Think of a <strong>single-occupancy restroom</strong>: one person enters and locks the door (Lock), others wait outside until it's unlocked (Unlock). That's mutual exclusion.</p>
+</div>
+
+<p>Mutex 是 <strong>Mutual Exclusion</strong>（互斥）的缩写。在多线程编程中，它保证同一时刻只有一个线程能执行"临界区"代码。</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 120" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker>
+    </defs>
+    <rect x="10" y="30" width="100" height="60" rx="8" fill="#172554" stroke="#3b82f6"/>
+    <text x="60" y="55" text-anchor="middle" fill="#93c5fd" font-size="12" font-family="Inter">Thread A</text>
+    <text x="60" y="72" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">mu.Lock()</text>
+    <line x1="110" y1="60" x2="195" y2="60" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrow)"/>
+    <rect x="200" y="20" width="200" height="80" rx="10" fill="#14532d" stroke="#22c55e" stroke-dasharray="4"/>
+    <text x="300" y="50" text-anchor="middle" fill="#86efac" font-size="13" font-weight="600" font-family="Inter">🔒 临界区</text>
+    <text x="300" y="70" text-anchor="middle" fill="#86efac" font-size="11" font-family="Inter">Critical Section</text>
+    <text x="300" y="88" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">counter++</text>
+    <line x1="400" y1="60" x2="485" y2="60" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrow)"/>
+    <rect x="490" y="30" width="100" height="60" rx="8" fill="#172554" stroke="#3b82f6"/>
+    <text x="540" y="55" text-anchor="middle" fill="#93c5fd" font-size="12" font-family="Inter">Thread A</text>
+    <text x="540" y="72" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">mu.Unlock()</text>
+  </svg>
+  <div class="caption">Mutex 保护临界区：Lock() → 执行 → Unlock()</div>
+</div>
+
+<p>各语言的用法非常简洁：</p>
+
+<div class="code-label">Go</div>
+<pre><code>var mu sync.Mutex
+
+mu.Lock()
+// critical section（临界区）
+mu.Unlock()</code></pre>
+
+<p>接口也很简单——只需要两个方法：</p>
+<pre><code>type locker interface {
+    Lock()    // 获取锁，如果已被持有则阻塞等待
+    Unlock()  // 释放锁
+}</code></pre>
+
+<div class="box box-blue">
+  <div class="title">💡 关键概念 / Key Concept</div>
+  <p><strong>临界区 (Critical Section)</strong>：需要互斥访问的代码段。比如多个线程同时修改同一个计数器，如果不加锁，结果就会出错。</p>
+</div>
+</section>
+
+<!-- Section 2: Naive Attempt -->
+<section id="sec-naive">
+<h2 class="section-title"><span class="num">2</span> 天真的尝试 / A Naive Attempt</h2>
+
+<p>最直觉的想法：用一个 <code>bool</code> 变量记录锁的状态。获取锁时检查是否为 <code>false</code>，是就设为 <code>true</code>；释放时设回 <code>false</code>。</p>
+
+<div class="box box-red">
+  <div class="title">⚠️ 这个实现有 Bug！/ This implementation is broken!</div>
+</div>
+
+<pre><code>type NaiveSpinLock struct {
+    state bool
+}
+
+func (l *NaiveSpinLock) Lock() {
+    for l.state != false {
+        // busy-wait（忙等待）
+    }
+    l.state = true
+}
+
+func (l *NaiveSpinLock) Unlock() {
+    l.state = false
+}</code></pre>
+
+<h3>为什么不行？/ Why doesn't this work?</h3>
+
+<p>因为存在<strong>数据竞争 (Data Race)</strong>。两个线程可能同时通过检查，都认为自己拿到了锁：</p>
+
+<div class="timeline">
+  <div class="timeline-item">
+    <div class="tl-label">⏱ Step 1</div>
+    <strong>Thread A</strong> 检查 <code>l.state == false</code> ✅ 通过循环
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">⏱ Step 2</div>
+    <strong>Thread B</strong> 检查 <code>l.state == false</code> ✅ 也通过了！
+  </div>
+  <div class="timeline-item bad">
+    <div class="tl-label">⏱ Step 3</div>
+    <strong>Thread A</strong> 设置 <code>l.state = true</code>（以为自己拿到了锁）
+  </div>
+  <div class="timeline-item bad">
+    <div class="tl-label">⏱ Step 4</div>
+    <strong>Thread B</strong> 设置 <code>l.state = true</code>（也以为自己拿到了锁！💥）
+  </div>
+</div>
+
+<div class="analogy">
+  <div class="emoji">🚪</div>
+  <h4>类比 / Analogy</h4>
+  <p>就像两个人同时看到洗手间门是开的，都冲了进去——因为"看"和"锁门"是两个独立的动作，中间可能被打断。</p>
+  <p>问题的根源：<strong>"检查"和"设置"不是一个原子操作</strong>。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+    <text x="10" y="20" fill="#94a3b8" font-size="11" font-family="Inter">时间线 / Timeline →</text>
+    <!-- Thread A -->
+    <rect x="10" y="35" width="580" height="70" rx="6" fill="none" stroke="#334155" stroke-dasharray="4"/>
+    <text x="20" y="55" fill="#60a5fa" font-size="12" font-weight="600" font-family="Inter">Thread A</text>
+    <rect x="80" y="42" width="120" height="26" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="140" y="59" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">读取 state=false</text>
+    <rect x="300" y="42" width="120" height="26" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="360" y="59" text-anchor="middle" fill="#fca5a5" font-size="10" font-family="Inter">设置 state=true</text>
+    <text x="140" y="90" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">✅ 以为可以进入</text>
+    <!-- Thread B -->
+    <rect x="10" y="115" width="580" height="70" rx="6" fill="none" stroke="#334155" stroke-dasharray="4"/>
+    <text x="20" y="135" fill="#a78bfa" font-size="12" font-weight="600" font-family="Inter">Thread B</text>
+    <rect x="180" y="122" width="120" height="26" rx="4" fill="#2e1065" stroke="#a78bfa"/>
+    <text x="240" y="139" text-anchor="middle" fill="#c4b5fd" font-size="10" font-family="Inter">读取 state=false</text>
+    <rect x="420" y="122" width="120" height="26" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="480" y="139" text-anchor="middle" fill="#fca5a5" font-size="10" font-family="Inter">设置 state=true</text>
+    <text x="240" y="170" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">✅ 也以为可以进入！💥</text>
+  </svg>
+  <div class="caption">数据竞争：两个线程的"读取"和"写入"交错执行</div>
+</div>
+</section>
+
+<!-- Section 3: Working Spin Lock -->
+<section id="sec-spin">
+<h2 class="section-title"><span class="num">3</span> 自旋锁 / Working Spin Lock</h2>
+
+<p>解决方案：使用 CPU 提供的<strong>原子指令</strong>，让"读取 + 写入"变成一个不可分割的操作。</p>
+
+<div class="analogy">
+  <div class="emoji">🔄</div>
+  <h4>类比 / Analogy</h4>
+  <p><code>atomic.SwapUint32(&state, 1)</code> 就像一个"旋转门"——你推门进去的同时，门会告诉你之前是开着还是关着的。这个"推门 + 获取状态"是一个原子动作，不可能被打断。</p>
+</div>
+
+<pre><code>import "sync/atomic"
+
+type SpinLock struct {
+    state uint32 // 0 = unlocked, 1 = locked
+}
+
+func (l *SpinLock) Lock() {
+    for atomic.SwapUint32(&l.state, 1) == 1 {
+        // busy-wait（忙等待）
+    }
+}
+
+func (l *SpinLock) Unlock() {
+    atomic.StoreUint32(&l.state, 0)
+}</code></pre>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 160" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="18" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">atomic.Swap 工作原理</text>
+    <!-- state box -->
+    <rect x="230" y="35" width="140" height="50" rx="8" fill="#14532d" stroke="#22c55e"/>
+    <text x="300" y="55" text-anchor="middle" fill="#86efac" font-size="11" font-family="Inter">state = 0</text>
+    <text x="300" y="72" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">(unlocked)</text>
+    <!-- Thread A -->
+    <rect x="20" y="40" width="150" height="40" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="95" y="64" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">Swap(&state, 1) → 0 ✅</text>
+    <line x1="170" y1="60" x2="228" y2="60" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr2)"/>
+    <!-- Thread B -->
+    <rect x="20" y="105" width="150" height="40" rx="6" fill="#2e1065" stroke="#a78bfa"/>
+    <text x="95" y="129" text-anchor="middle" fill="#c4b5fd" font-size="10" font-family="Inter">Swap(&state, 1) → 1 ❌</text>
+    <line x1="170" y1="125" x2="228" y2="80" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4"/>
+    <!-- result -->
+    <rect x="420" y="40" width="160" height="40" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="500" y="64" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">Thread A 获得锁 🎉</text>
+    <line x1="370" y1="60" x2="418" y2="60" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr2)"/>
+    <rect x="420" y="105" width="160" height="40" rx="6" fill="#451a03" stroke="#f59e0b"/>
+    <text x="500" y="129" text-anchor="middle" fill="#fcd34d" font-size="10" font-family="Inter">Thread B 继续等待 🔄</text>
+  </svg>
+  <div class="caption">原子 Swap：返回旧值 0 表示获取成功，返回 1 表示需要重试</div>
+</div>
+
+<h3>优化 1：让出 CPU / Yielding</h3>
+<p>纯忙等待会浪费 CPU。Go 运行时可能让一个 goroutine 空转长达 10ms 才切换。加上 <code>runtime.Gosched()</code> 主动让出：</p>
+
+<pre><code>func (l *SpinLock) Lock() {
+    for atomic.SwapUint32(&l.state, 1) == 1 {
+        runtime.Gosched() // 让出 CPU，让其他 goroutine 运行
+    }
+}</code></pre>
+
+<div class="box box-green">
+  <div class="title">📊 效果 / Result</div>
+  <p>测试耗时从 6~10 秒降到 ~3.34 秒！因为等待的 goroutine 不再空转，而是主动让出 CPU。</p>
+</div>
+
+<h3>优化 2：Test-and-Test-and-Set</h3>
+<p>原子 Swap 指令需要刷新 CPU 缓存，比较昂贵。优化思路：先用便宜的 <code>Load</code> 检查，只在看到 0 时才尝试 Swap：</p>
+
+<pre><code>func (l *SpinLock) Lock() {
+    for {
+        for atomic.LoadUint32(&l.state) == 1 {
+            runtime.Gosched() // 便宜的读取 + 让出
+        }
+        if atomic.SwapUint32(&l.state, 1) == 0 {
+            return // 获取成功！
+        }
+    }
+}</code></pre>
+
+<div class="flow">
+  <div class="step">🔍 Load 检查<br><small style="color:#64748b">便宜</small></div>
+  <div class="arrow">→</div>
+  <div class="step">state == 0?</div>
+  <div class="arrow">→ Yes</div>
+  <div class="step">🔄 Swap 尝试<br><small style="color:#64748b">昂贵</small></div>
+  <div class="arrow">→ 成功</div>
+  <div class="step" style="border-color:#22c55e">🎉 获得锁</div>
+</div>
+</section>
+
+<!-- Section 4: Measuring Performance -->
+<section id="sec-perf1">
+<h2 class="section-title"><span class="num">4</span> 性能测量 / Measuring Performance</h2>
+
+<p>SpinLock 的墙钟时间 (wall time) 看起来和 <code>sync.Mutex</code> 差不多，但用 <code>/usr/bin/time</code> 看 CPU 时间就暴露了问题：</p>
+
+<div class="box box-amber">
+  <div class="title">⏱ 三种时间 / Three Types of Time</div>
+  <ul>
+    <li><strong>Real time</strong>（墙钟时间）：你实际等了多久</li>
+    <li><strong>User time</strong>（用户态 CPU 时间）：程序自己的代码用了多少 CPU</li>
+    <li><strong>System time</strong>（内核态 CPU 时间）：操作系统内核为程序花了多少 CPU</li>
+  </ul>
+  <p>多核 CPU 下，User + System 可以<strong>大于</strong> Real time！比如 10 核 CPU，3 秒内可以完成 30 秒的 CPU 工作。</p>
+</div>
+
+<h3>SpinLock vs sync.Mutex</h3>
+
+<table>
+  <tr><th>锁 / Lock</th><th>Real</th><th>User</th><th>System</th><th>CPU 总计</th></tr>
+  <tr><td>SpinLock</td><td>3.27s</td><td style="color:#fca5a5">16.06s</td><td style="color:#fca5a5">4.15s</td><td style="color:#fca5a5">20.21s</td></tr>
+  <tr><td>sync.Mutex</td><td>3.29s</td><td style="color:#86efac">8.81s</td><td style="color:#86efac">0.58s</td><td style="color:#86efac">9.39s</td></tr>
+</table>
+
+<div class="bar-chart">
+  <h4 style="color:#94a3b8; font-size:.9rem; margin-bottom:.5rem">CPU 时间对比 / CPU Time Comparison</h4>
+  <div class="bar-row">
+    <div class="bar-label">SpinLock User</div>
+    <div class="bar-track"><div class="bar-fill user" style="width:80%">16.06s</div></div>
+  </div>
+  <div class="bar-row">
+    <div class="bar-label">SpinLock Sys</div>
+    <div class="bar-track"><div class="bar-fill sys" style="width:20%">4.15s</div></div>
+  </div>
+  <div class="bar-row">
+    <div class="bar-label">sync.Mutex User</div>
+    <div class="bar-track"><div class="bar-fill user" style="width:44%">8.81s</div></div>
+  </div>
+  <div class="bar-row">
+    <div class="bar-label">sync.Mutex Sys</div>
+    <div class="bar-track"><div class="bar-fill sys" style="width:3%">0.58s</div></div>
+  </div>
+  <div class="bar-legend">
+    <span class="l-user">User time</span>
+    <span class="l-sys">System time</span>
+  </div>
+</div>
+
+<div class="box box-purple">
+  <div class="title">🎯 结论 / Takeaway</div>
+  <p>SpinLock 的墙钟时间差不多，但 <strong>CPU 消耗是 sync.Mutex 的 2 倍多</strong>！大量 CPU 时间浪费在 Go 调度器反复暂停/恢复忙等待的 goroutine 上。</p>
+</div>
+</section>
+
+<!-- Section 5: Futex -->
+<section id="sec-futex">
+<h2 class="section-title"><span class="num">5</span> Futex：操作系统来帮忙 / OS-Assisted Locking</h2>
+
+<p>自旋锁的问题是<strong>忙等待浪费 CPU</strong>。解决方案：让操作系统帮忙——用 <strong>Futex</strong>（Fast Userspace Mutex）让等待的线程真正"睡觉"。</p>
+
+<div class="analogy">
+  <div class="emoji">🏨</div>
+  <h4>类比 / Analogy</h4>
+  <p><strong>自旋锁</strong>：你站在洗手间门口不停敲门问"好了没？好了没？"（浪费精力）<br>
+  <strong>Futex</strong>：你在旁边的椅子上坐下睡觉，里面的人出来时会叫醒你（节省精力）</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 180" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="18" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">Futex 两个核心操作</text>
+    <!-- WAIT -->
+    <rect x="30" y="35" width="240" height="60" rx="10" fill="#172554" stroke="#3b82f6"/>
+    <text x="150" y="58" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="600" font-family="Inter">WAIT(addr, val)</text>
+    <text x="150" y="78" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">如果 *addr == val → 线程睡眠 💤</text>
+    <!-- WAKE -->
+    <rect x="330" y="35" width="240" height="60" rx="10" fill="#14532d" stroke="#22c55e"/>
+    <text x="450" y="58" text-anchor="middle" fill="#86efac" font-size="12" font-weight="600" font-family="Inter">WAKE(addr, num)</text>
+    <text x="450" y="78" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">唤醒 num 个等待的线程 ⏰</text>
+    <!-- Flow -->
+    <rect x="30" y="120" width="120" height="40" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="90" y="144" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">Lock() 失败</text>
+    <line x1="150" y1="140" x2="198" y2="140" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr3)"/>
+    <rect x="200" y="120" width="100" height="40" rx="6" fill="#451a03" stroke="#f59e0b"/>
+    <text x="250" y="144" text-anchor="middle" fill="#fcd34d" font-size="10" font-family="Inter">💤 WAIT</text>
+    <line x1="300" y1="140" x2="348" y2="140" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr3)"/>
+    <rect x="350" y="120" width="100" height="40" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="400" y="144" text-anchor="middle" fill="#86efac" font-size="10" font-family="Inter">⏰ WAKE</text>
+    <line x1="450" y1="140" x2="498" y2="140" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr3)"/>
+    <rect x="500" y="120" width="80" height="40" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="540" y="144" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">重试 Lock</text>
+  </svg>
+  <div class="caption">Futex 工作流：获取失败 → 睡眠等待 → 被唤醒 → 重试</div>
+</div>
+
+<h3>基础 FutexLock 实现</h3>
+
+<pre><code>type FutexLock struct {
+    state uint32
+}
+
+func (m *FutexLock) Lock() {
+    for {
+        for atomic.LoadUint32(&m.state) == 1 {
+            futexWait(&m.state, 1) // 睡眠，而不是忙等待
+        }
+        if atomic.SwapUint32(&m.state, 1) == 0 {
+            return
+        }
+    }
+}
+
+func (m *FutexLock) Unlock() {
+    atomic.StoreUint32(&m.state, 0)
+    futexWake(&m.state, 1) // 唤醒一个等待者
+}</code></pre>
+
+<div class="box box-blue">
+  <div class="title">📝 注意 / Note</div>
+  <p>Futex 是 Linux 特有的系统调用。macOS 有类似的 <code>os_sync_wait_on_address</code>，Windows 有 <code>WaitOnAddress</code>。</p>
+</div>
+</section>
+
+<!-- Section 6: Optimized Futex -->
+<section id="sec-futex2">
+<h2 class="section-title"><span class="num">6</span> 优化 Futex / Optimized Futex Lock</h2>
+
+<p>基础版的 <code>Unlock()</code> 每次都调用 <code>futexWake()</code>，即使没有人在等待。系统调用是昂贵的！</p>
+
+<p>优化思路：用<strong>三个状态</strong>来追踪是否有等待者：</p>
+
+<div class="flow">
+  <div class="step" style="border-color:#22c55e"><strong>0</strong><br>未锁定<br><small style="color:#64748b">Unlocked</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#3b82f6"><strong>1</strong><br>已锁定，无等待者<br><small style="color:#64748b">Locked, no waiters</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#ef4444"><strong>2</strong><br>已锁定，有等待者<br><small style="color:#64748b">Locked, has waiters</small></div>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 140" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <!-- State 0 -->
+    <circle cx="80" cy="60" r="35" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="80" y="55" text-anchor="middle" fill="#86efac" font-size="20" font-weight="700" font-family="Inter">0</text>
+    <text x="80" y="72" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">unlocked</text>
+    <!-- State 1 -->
+    <circle cx="300" cy="60" r="35" fill="#172554" stroke="#3b82f6" stroke-width="2"/>
+    <text x="300" y="55" text-anchor="middle" fill="#93c5fd" font-size="20" font-weight="700" font-family="Inter">1</text>
+    <text x="300" y="72" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">locked</text>
+    <!-- State 2 -->
+    <circle cx="520" cy="60" r="35" fill="#450a0a" stroke="#ef4444" stroke-width="2"/>
+    <text x="520" y="55" text-anchor="middle" fill="#fca5a5" font-size="20" font-weight="700" font-family="Inter">2</text>
+    <text x="520" y="72" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">contended</text>
+    <!-- Arrows -->
+    <line x1="118" y1="50" x2="262" y2="50" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr4)"/>
+    <text x="190" y="43" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">CAS(0→1)</text>
+    <line x1="338" y1="50" x2="482" y2="50" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arr4)"/>
+    <text x="410" y="43" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">Swap(→2)</text>
+    <path d="M 520 98 Q 520 130 300 130 Q 80 130 80 98" fill="none" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr4)"/>
+    <text x="300" y="125" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">Unlock: Swap(→0) + Wake</text>
+    <line x1="262" y1="70" x2="118" y2="70" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr4)"/>
+    <text x="190" y="85" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">Unlock: Swap(→0) 无需 Wake!</text>
+  </svg>
+  <div class="caption">三状态机：状态 1 → 0 时无需系统调用，节省开销</div>
+</div>
+
+<pre><code>func (m *FutexLock) Lock() {
+    // 快速路径：锁未被持有
+    if atomic.CompareAndSwapUint32(&m.state, 0, 1) {
+        return
+    }
+    // 慢速路径
+    for {
+        if atomic.SwapUint32(&m.state, 2) == 0 {
+            return // 获取成功，标记为有竞争状态
+        }
+        _ = futexWait(&m.state, 2) // 睡眠等待
+    }
+}
+
+func (m *FutexLock) Unlock() {
+    prev := atomic.SwapUint32(&m.state, 0)
+    if prev == 0 {
+        panic("unlock of unlocked FutexLock")
+    }
+    if prev == 1 {
+        return // 无等待者，不需要 Wake 系统调用！
+    }
+    _ = futexWake(&m.state, 1) // 有等待者，唤醒一个
+}</code></pre>
+
+<div class="box box-green">
+  <div class="title">✅ 关键优化 / Key Optimization</div>
+  <p>当 <code>prev == 1</code>（无竞争）时，<code>Unlock()</code> 直接返回，<strong>省掉了一次系统调用</strong>。在锁竞争不激烈时，这个优化效果显著。</p>
+</div>
+</section>
+
+<!-- Section 7: Adaptive Spinning -->
+<section id="sec-adaptive">
+<h2 class="section-title"><span class="num">7</span> 自适应锁 / Adaptive Spinning</h2>
+
+<p>自旋锁快但费 CPU，Futex 省 CPU 但系统调用有开销。最佳方案：<strong>先自旋一小会儿，不行再睡觉</strong>。</p>
+
+<div class="analogy">
+  <div class="emoji">⏳</div>
+  <h4>类比 / Analogy</h4>
+  <p>等电梯时：先等 30 秒看看电梯来不来（自旋），如果还没来就去坐椅子上等（Futex 睡眠）。大多数时候电梯很快就来了，你不用坐下又站起来。</p>
+</div>
+
+<pre><code>func (m *FutexLock) Lock() {
+    // 快速路径
+    if atomic.CompareAndSwapUint32(&m.state, 0, 1) {
+        return
+    }
+
+    // 中速路径：自旋一小会儿
+    for i := 0; i < 30; i++ {
+        if atomic.LoadUint32(&m.state) == 0 {
+            if atomic.CompareAndSwapUint32(&m.state, 0, 1) {
+                return
+            }
+        }
+        runtime.Gosched()
+    }
+
+    // 慢速路径：放弃自旋，用 Futex 睡眠
+    for {
+        if atomic.SwapUint32(&m.state, 2) == 0 {
+            return
+        }
+        _ = futexWait(&m.state, 2)
+    }
+}</code></pre>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 100" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <rect x="10" y="25" width="130" height="50" rx="8" fill="#14532d" stroke="#22c55e"/>
+    <text x="75" y="45" text-anchor="middle" fill="#86efac" font-size="11" font-weight="600" font-family="Inter">⚡ Fast Path</text>
+    <text x="75" y="62" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">CAS(0→1)</text>
+    <line x1="140" y1="50" x2="178" y2="50" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr5)"/>
+    <text x="160" y="42" fill="#94a3b8" font-size="8" font-family="Inter">fail</text>
+    <rect x="180" y="25" width="170" height="50" rx="8" fill="#451a03" stroke="#f59e0b"/>
+    <text x="265" y="45" text-anchor="middle" fill="#fcd34d" font-size="11" font-weight="600" font-family="Inter">🔄 Medium: Spin ×30</text>
+    <text x="265" y="62" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">Load + CAS + Gosched</text>
+    <line x1="350" y1="50" x2="398" y2="50" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr5)"/>
+    <text x="375" y="42" fill="#94a3b8" font-size="8" font-family="Inter">fail</text>
+    <rect x="400" y="25" width="180" height="50" rx="8" fill="#450a0a" stroke="#ef4444"/>
+    <text x="490" y="45" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="600" font-family="Inter">💤 Slow: Futex Sleep</text>
+    <text x="490" y="62" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">Swap(→2) + WAIT</text>
+  </svg>
+  <div class="caption">三级策略：快速 CAS → 短暂自旋 → Futex 睡眠</div>
+</div>
+
+<h3>最终性能对比 / Final Benchmark</h3>
+
+<p>高竞争场景（320 goroutines × 100,000 次，无临界区工作）：</p>
+
+<table>
+  <tr><th>锁 / Lock</th><th>Real</th><th>User</th><th>System</th></tr>
+  <tr><td>SpinLock V1</td><td>0.78s</td><td>8.19s</td><td>1.30s</td></tr>
+  <tr><td>SpinLock V2</td><td>0.69s</td><td>7.94s</td><td>1.14s</td></tr>
+  <tr><td>FutexLock V1（基础）</td><td style="color:#fca5a5">13.30s</td><td>13.81s</td><td style="color:#fca5a5">95.17s</td></tr>
+  <tr><td>FutexLock V2（三状态）</td><td>2.58s</td><td>9.28s</td><td>6.17s</td></tr>
+  <tr><td style="color:#86efac">FutexLock V3（自适应）</td><td style="color:#86efac">0.69s</td><td>8.07s</td><td>1.24s</td></tr>
+  <tr><td>sync.Mutex</td><td>2.07s</td><td>10.46s</td><td>0.56s</td></tr>
+</table>
+
+<div class="bar-chart">
+  <h4 style="color:#94a3b8; font-size:.9rem; margin-bottom:.5rem">Real Time 对比（越短越好）</h4>
+  <div class="bar-row">
+    <div class="bar-label">SpinLock V2</div>
+    <div class="bar-track"><div class="bar-fill real" style="width:5%">0.69s</div></div>
+  </div>
+  <div class="bar-row">
+    <div class="bar-label">FutexLock V1</div>
+    <div class="bar-track"><div class="bar-fill real" style="width:100%; background:linear-gradient(90deg,#ef4444,#dc2626)">13.30s 😱</div></div>
+  </div>
+  <div class="bar-row">
+    <div class="bar-label">FutexLock V2</div>
+    <div class="bar-track"><div class="bar-fill real" style="width:19%">2.58s</div></div>
+  </div>
+  <div class="bar-row">
+    <div class="bar-label">FutexLock V3 ⭐</div>
+    <div class="bar-track"><div class="bar-fill real" style="width:5%; background:linear-gradient(90deg,#22c55e,#16a34a)">0.69s</div></div>
+  </div>
+  <div class="bar-row">
+    <div class="bar-label">sync.Mutex</div>
+    <div class="bar-track"><div class="bar-fill real" style="width:15%">2.07s</div></div>
+  </div>
+</div>
+
+<div class="box box-green">
+  <div class="title">🏆 结论 / Conclusion</div>
+  <p>自适应 FutexLock V3 在高竞争场景下甚至<strong>超越了 sync.Mutex</strong>！它结合了自旋锁的低延迟和 Futex 的低 CPU 消耗。</p>
+</div>
+</section>
+
+<!-- Section 8: Summary -->
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">8</span> 总结 / Summary</h2>
+
+<h3>锁的演进路线 / Evolution Path</h3>
+
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">❌ Naive<br><small>有数据竞争</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">🔄 SpinLock<br><small>原子操作</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#3b82f6">💤 FutexLock<br><small>OS 辅助睡眠</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">⚡ Adaptive<br><small>先旋后睡</small></div>
+</div>
+
+<h3>核心知识点 / Key Takeaways</h3>
+
+<table>
+  <tr><th>概念</th><th>说明</th></tr>
+  <tr><td>数据竞争</td><td>多线程同时读写共享变量，导致不可预测的结果</td></tr>
+  <tr><td>原子操作</td><td>CPU 硬件保证的不可分割操作（如 <code>atomic.Swap</code>）</td></tr>
+  <tr><td>自旋锁</td><td>忙等待直到获取锁，简单但浪费 CPU</td></tr>
+  <tr><td>Futex</td><td>Linux 系统调用，让线程在内核中睡眠等待</td></tr>
+  <tr><td>Test-and-TAS</td><td>先用便宜的 Load 检查，再用昂贵的 Swap 尝试</td></tr>
+  <tr><td>自适应自旋</td><td>先短暂自旋，失败后再用 Futex 睡眠</td></tr>
+  <tr><td>内存序</td><td>编译器和 CPU 会重排指令，原子操作保证正确的内存可见性</td></tr>
+</table>
+
+<div class="box box-purple">
+  <div class="title">📚 延伸阅读 / Further Reading</div>
+  <ul>
+    <li><a href="https://research.swtch.com/hwmm" target="_blank">Hardware Memory Models</a> — Russ Cox 关于内存模型的深度文章</li>
+    <li><a href="https://eli.thegreenplace.net/2018/basics-of-futexes/" target="_blank">Basics of Futexes</a> — Eli Bendersky 的 Futex 入门</li>
+    <li><a href="https://dept-info.labri.fr/~denis/Enseignement/2008-IR/Articles/01-futex.pdf" target="_blank">Futexes Are Tricky</a> — Ulrich Drepper 的经典论文</li>
+    <li><a href="https://github.com/Chriscbr/go-mutex-playground" target="_blank">go-mutex-playground</a> — 本文所有代码的 GitHub 仓库</li>
+  </ul>
+</div>
+</section>
+
+</div><!-- /.container -->
+
+<footer>
+  <p>基于 <a href="https://rybicki.io/blog/2026/01/01/mutexes-from-scratch-in-go.html" target="_blank">Chris Rybicki 的博客文章</a> 改编为交互式教程</p>
+  <p><a href="../">← 返回主页 / Back to Home</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+// Scroll to top button
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => {
+  btn.classList.toggle('show', window.scrollY > 400);
+});
+</script>
+
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
