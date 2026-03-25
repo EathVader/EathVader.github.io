@@ -31,4 +31,12 @@ export const tutorials: Tutorial[] = [
       '从粗粒度锁到 Lock-Free，40 年并发优化之路。覆盖 MySQL 5.6/5.7、SX 锁、Blink 树、OLFIT 版本号、缓存一致性等核心概念。',
     meta: '基于 POLARDB 内核团队文章 · 2026-03',
   },
+  {
+    slug: 'rbtree',
+    tag: '🌲 Data Structure',
+    title: '红黑树图解教程',
+    description:
+      '从二叉查找树到红黑树，用 SVG 图解理解自平衡的奥秘。覆盖 5 条规则、旋转操作、插入修复 3 种情况、删除修复 4 种情况。',
+    meta: '综合多篇文章 · 2026-03',
+  },
 ];

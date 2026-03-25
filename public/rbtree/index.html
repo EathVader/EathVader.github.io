@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>红黑树图解教程 / Red-Black Tree Visual Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>🔴⚫ <span>红黑树</span>图解教程</h1>
+  <p class="subtitle">从二叉查找树到红黑树 —— 用图解理解自平衡的奥秘<br>
+  Red-Black Tree: A Visual Guide to Self-Balancing BST</p>
+  <span class="badge">🌲 数据结构</span>
+  <span class="badge">⚖️ 自平衡</span>
+  <span class="badge">⏱️ O(log n)</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-bst">二叉查找树 / Binary Search Tree</a></li>
+    <li><a href="#sec-problem">BST 的退化问题 / The Degeneration Problem</a></li>
+    <li><a href="#sec-rules">红黑树的 5 条规则 / Five Rules</a></li>
+    <li><a href="#sec-rotate">旋转操作 / Rotation</a></li>
+    <li><a href="#sec-insert">插入与修复 / Insertion & Fix-up</a></li>
+    <li><a href="#sec-delete">删除与修复 / Deletion & Fix-up</a></li>
+    <li><a href="#sec-summary">总结 / Summary</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1: BST -->
+<section id="sec-bst">
+<h2 class="section-title"><span class="num">1</span> 二叉查找树 / Binary Search Tree</h2>
+
+<div class="analogy">
+  <div class="emoji">📖</div>
+  <h4>类比 / Analogy</h4>
+  <p>BST 就像一本按字母排序的通讯录：翻到中间看一眼，比目标大就往前翻，比目标小就往后翻。每次排除一半，很快就能找到。</p>
+</div>
+
+<div class="box box-blue">
+  <div class="title">📐 BST 的性质</div>
+  <ul>
+    <li>左子树所有节点的值 <strong>&lt;</strong> 根节点</li>
+    <li>右子树所有节点的值 <strong>&gt;</strong> 根节点</li>
+    <li>左右子树也分别是 BST</li>
+  </ul>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#334155"/></marker></defs>
+    <text x="200" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">一棵 BST 示例</text>
+    <!-- 9 -->
+    <circle cx="200" cy="50" r="20" fill="#172554" stroke="#3b82f6" stroke-width="2"/>
+    <text x="200" y="55" text-anchor="middle" fill="#93c5fd" font-size="14" font-weight="700" font-family="Inter">9</text>
+    <!-- 4 -->
+    <line x1="185" y1="67" x2="120" y2="93" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="110" cy="105" r="20" fill="#172554" stroke="#3b82f6"/>
+    <text x="110" y="110" text-anchor="middle" fill="#93c5fd" font-size="14" font-weight="700" font-family="Inter">4</text>
+    <!-- 13 -->
+    <line x1="215" y1="67" x2="280" y2="93" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="290" cy="105" r="20" fill="#172554" stroke="#3b82f6"/>
+    <text x="290" y="110" text-anchor="middle" fill="#93c5fd" font-size="14" font-weight="700" font-family="Inter">13</text>
+    <!-- 2, 6 -->
+    <line x1="96" y1="122" x2="65" y2="148" stroke="#334155" stroke-width="1"/>
+    <circle cx="55" cy="160" r="16" fill="#1e293b" stroke="#334155"/>
+    <text x="55" y="165" text-anchor="middle" fill="#e2e8f0" font-size="12" font-family="Inter">2</text>
+    <line x1="124" y1="122" x2="155" y2="148" stroke="#334155" stroke-width="1"/>
+    <circle cx="165" cy="160" r="16" fill="#1e293b" stroke="#334155"/>
+    <text x="165" y="165" text-anchor="middle" fill="#e2e8f0" font-size="12" font-family="Inter">6</text>
+    <!-- 11, 15 -->
+    <line x1="276" y1="122" x2="245" y2="148" stroke="#334155" stroke-width="1"/>
+    <circle cx="235" cy="160" r="16" fill="#1e293b" stroke="#334155"/>
+    <text x="235" y="165" text-anchor="middle" fill="#e2e8f0" font-size="12" font-family="Inter">11</text>
+    <line x1="304" y1="122" x2="335" y2="148" stroke="#334155" stroke-width="1"/>
+    <circle cx="345" cy="160" r="16" fill="#1e293b" stroke="#334155"/>
+    <text x="345" y="165" text-anchor="middle" fill="#e2e8f0" font-size="12" font-family="Inter">15</text>
+  </svg>
+  <div class="caption">查找 10：9→右→13→左→11→左→10 ✅</div>
+</div>
+</section>
+
+<!-- Section 2: BST Degeneration -->
+<section id="sec-problem">
+<h2 class="section-title"><span class="num">2</span> BST 的退化问题 / The Degeneration Problem</h2>
+
+<p>如果按顺序插入 9, 8, 7, 6, 5, 4, 3，BST 会退化成一条链表，查找变成 O(n)！</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 500 260" xmlns="http://www.w3.org/2000/svg">
+    <text x="130" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">退化的 BST 😱</text>
+    <text x="380" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">平衡的红黑树 ✅</text>
+    <!-- Degenerated BST -->
+    <circle cx="130" cy="40" r="14" fill="#450a0a" stroke="#ef4444"/>
+    <text x="130" y="45" text-anchor="middle" fill="#fca5a5" font-size="11" font-family="Inter">9</text>
+    <line x1="120" y1="53" x2="110" y2="67" stroke="#ef4444" stroke-width="1"/>
+    <circle cx="105" cy="78" r="14" fill="#450a0a" stroke="#ef4444"/>
+    <text x="105" y="83" text-anchor="middle" fill="#fca5a5" font-size="11" font-family="Inter">8</text>
+    <line x1="95" y1="91" x2="85" y2="105" stroke="#ef4444" stroke-width="1"/>
+    <circle cx="80" cy="116" r="14" fill="#450a0a" stroke="#ef4444"/>
+    <text x="80" y="121" text-anchor="middle" fill="#fca5a5" font-size="11" font-family="Inter">7</text>
+    <line x1="70" y1="129" x2="60" y2="143" stroke="#ef4444" stroke-width="1"/>
+    <circle cx="55" cy="154" r="14" fill="#450a0a" stroke="#ef4444"/>
+    <text x="55" y="159" text-anchor="middle" fill="#fca5a5" font-size="11" font-family="Inter">6</text>
+    <line x1="45" y1="167" x2="35" y2="181" stroke="#ef4444" stroke-width="1"/>
+    <circle cx="30" cy="192" r="14" fill="#450a0a" stroke="#ef4444"/>
+    <text x="30" y="197" text-anchor="middle" fill="#fca5a5" font-size="11" font-family="Inter">5</text>
+    <text x="100" y="230" text-anchor="middle" fill="#fca5a5" font-size="11" font-family="Inter">高度 = n → O(n) 💀</text>
+    <!-- Balanced RBT -->
+    <circle cx="380" cy="50" r="16" fill="#1e293b" stroke="#e2e8f0" stroke-width="2"/>
+    <text x="380" y="55" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="700" font-family="Inter">7</text>
+    <line x1="368" y1="64" x2="330" y2="90" stroke="#334155" stroke-width="1.5"/>
+    <line x1="392" y1="64" x2="430" y2="90" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="320" cy="105" r="16" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="320" y="110" text-anchor="middle" fill="#fca5a5" font-size="12" font-weight="700" font-family="Inter">5</text>
+    <circle cx="440" cy="105" r="16" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="440" y="110" text-anchor="middle" fill="#fca5a5" font-size="12" font-weight="700" font-family="Inter">9</text>
+    <line x1="308" y1="119" x2="280" y2="145" stroke="#334155" stroke-width="1"/>
+    <line x1="332" y1="119" x2="360" y2="145" stroke="#334155" stroke-width="1"/>
+    <circle cx="270" cy="158" r="14" fill="#1e293b" stroke="#e2e8f0"/>
+    <text x="270" y="163" text-anchor="middle" fill="#f8fafc" font-size="11" font-family="Inter">4</text>
+    <circle cx="370" cy="158" r="14" fill="#1e293b" stroke="#e2e8f0"/>
+    <text x="370" y="163" text-anchor="middle" fill="#f8fafc" font-size="11" font-family="Inter">6</text>
+    <line x1="428" y1="119" x2="410" y2="145" stroke="#334155" stroke-width="1"/>
+    <circle cx="405" cy="158" r="14" fill="#1e293b" stroke="#e2e8f0"/>
+    <text x="405" y="163" text-anchor="middle" fill="#f8fafc" font-size="11" font-family="Inter">8</text>
+    <text x="380" y="210" text-anchor="middle" fill="#86efac" font-size="11" font-family="Inter">高度 = log n → O(log n) 🎉</text>
+    <!-- VS -->
+    <text x="250" y="130" text-anchor="middle" fill="#60a5fa" font-size="20" font-weight="700" font-family="Inter">→</text>
+  </svg>
+  <div class="caption">红黑树通过旋转和变色保持平衡，避免退化</div>
+</div>
+
+<div class="box box-amber">
+  <div class="title">❓ 核心问题</div>
+  <p>如何让 BST 在插入/删除后<strong>自动保持平衡</strong>？答案就是红黑树——通过给节点染色 + 旋转操作，保证树高始终为 O(log n)。</p>
+</div>
+</section>
+
+<!-- Section 3: Five Rules -->
+<section id="sec-rules">
+<h2 class="section-title"><span class="num">3</span> 红黑树的 5 条规则 / Five Rules</h2>
+
+<div class="analogy">
+  <div class="emoji">🏛️</div>
+  <h4>类比 / Analogy</h4>
+  <p>红黑树就像一个有严格着装规定的公司：每个员工（节点）必须穿红色或黑色衣服，而且有 5 条规定确保"组织架构"不会太偏。</p>
+</div>
+
+<table>
+  <tr><th>#</th><th>规则</th><th>直觉理解</th></tr>
+  <tr><td style="font-weight:700">1</td><td>每个节点是<span style="color:#ef4444">红色</span>或<span style="color:#e2e8f0">黑色</span></td><td>二选一，没有其他颜色</td></tr>
+  <tr><td style="font-weight:700">2</td><td>根节点是<span style="color:#e2e8f0">黑色</span></td><td>老板穿黑色</td></tr>
+  <tr><td style="font-weight:700">3</td><td>叶节点（NIL）是<span style="color:#e2e8f0">黑色</span></td><td>空位算黑色</td></tr>
+  <tr><td style="font-weight:700">4</td><td><span style="color:#ef4444">红色</span>节点的两个孩子必须是<span style="color:#e2e8f0">黑色</span></td><td>🔴 不能连续出现两个红色（"不能红红相连"）</td></tr>
+  <tr><td style="font-weight:700">5</td><td>从任一节点到其叶节点的所有路径包含相同数目的<span style="color:#e2e8f0">黑色</span>节点</td><td>每条路径的"黑色深度"相同（"黑色平衡"）</td></tr>
+</table>
+
+<div class="diagram">
+  <svg viewBox="0 0 450 200" xmlns="http://www.w3.org/2000/svg">
+    <text x="225" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">一棵合法的红黑树</text>
+    <!-- 13 Black -->
+    <circle cx="225" cy="50" r="18" fill="#1e293b" stroke="#e2e8f0" stroke-width="2"/>
+    <text x="225" y="55" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="700" font-family="Inter">13</text>
+    <!-- 8 Red -->
+    <line x1="210" y1="65" x2="140" y2="95" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="130" cy="105" r="18" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="130" y="110" text-anchor="middle" fill="#fca5a5" font-size="13" font-weight="700" font-family="Inter">8</text>
+    <!-- 17 Red -->
+    <line x1="240" y1="65" x2="310" y2="95" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="320" cy="105" r="18" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="320" y="110" text-anchor="middle" fill="#fca5a5" font-size="13" font-weight="700" font-family="Inter">17</text>
+    <!-- 1 Black, 11 Black -->
+    <line x1="116" y1="120" x2="80" y2="148" stroke="#334155" stroke-width="1"/>
+    <circle cx="70" cy="160" r="15" fill="#1e293b" stroke="#e2e8f0"/>
+    <text x="70" y="165" text-anchor="middle" fill="#f8fafc" font-size="11" font-family="Inter">1</text>
+    <line x1="144" y1="120" x2="180" y2="148" stroke="#334155" stroke-width="1"/>
+    <circle cx="190" cy="160" r="15" fill="#1e293b" stroke="#e2e8f0"/>
+    <text x="190" y="165" text-anchor="middle" fill="#f8fafc" font-size="11" font-family="Inter">11</text>
+    <!-- 15 Black, 25 Black -->
+    <line x1="306" y1="120" x2="270" y2="148" stroke="#334155" stroke-width="1"/>
+    <circle cx="260" cy="160" r="15" fill="#1e293b" stroke="#e2e8f0"/>
+    <text x="260" y="165" text-anchor="middle" fill="#f8fafc" font-size="11" font-family="Inter">15</text>
+    <line x1="334" y1="120" x2="370" y2="148" stroke="#334155" stroke-width="1"/>
+    <circle cx="380" cy="160" r="15" fill="#1e293b" stroke="#e2e8f0"/>
+    <text x="380" y="165" text-anchor="middle" fill="#f8fafc" font-size="11" font-family="Inter">25</text>
+    <!-- Legend -->
+    <circle cx="100" cy="192" r="6" fill="#7f1d1d" stroke="#ef4444"/>
+    <text x="115" y="196" fill="#94a3b8" font-size="10" font-family="Inter">= 红色节点</text>
+    <circle cx="200" cy="192" r="6" fill="#1e293b" stroke="#e2e8f0"/>
+    <text x="215" y="196" fill="#94a3b8" font-size="10" font-family="Inter">= 黑色节点</text>
+  </svg>
+  <div class="caption">验证：根是黑色 ✅ 红色节点的孩子都是黑色 ✅ 每条路径黑色节点数 = 2 ✅</div>
+</div>
+
+<div class="box box-purple">
+  <div class="title">🎯 为什么这 5 条规则能保证平衡？</div>
+  <p>规则 4（不能红红相连）+ 规则 5（黑色平衡）共同约束了树的高度：最长路径（红黑交替）最多是最短路径（全黑）的 <strong>2 倍</strong>。因此树高 ≤ 2·log(n+1)，保证 O(log n)。</p>
+</div>
+</section>
+
+<!-- Section 4: Rotation -->
+<section id="sec-rotate">
+<h2 class="section-title"><span class="num">4</span> 旋转操作 / Rotation</h2>
+
+<p>旋转是红黑树维持平衡的核心操作，分为<strong>左旋</strong>和<strong>右旋</strong>。旋转不改变 BST 的搜索性质，只改变树的形状。</p>
+
+<div class="analogy">
+  <div class="emoji">🎡</div>
+  <h4>类比 / Analogy</h4>
+  <p>左旋就像把右孩子"提上来"当新的根，原来的根变成左孩子。就像跷跷板——右边太重了，就把右边提上去。</p>
+</div>
+
+<h3>左旋 / Left Rotation</h3>
+<div class="diagram">
+  <svg viewBox="0 0 550 160" xmlns="http://www.w3.org/2000/svg">
+    <!-- Before -->
+    <text x="120" y="16" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Inter">旋转前</text>
+    <circle cx="100" cy="45" r="16" fill="#172554" stroke="#3b82f6" stroke-width="2"/>
+    <text x="100" y="50" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="700" font-family="Inter">X</text>
+    <line x1="60" y1="30" x2="86" y2="32" stroke="#334155" stroke-width="1"/>
+    <text x="50" y="35" fill="#64748b" font-size="10" font-family="Inter">a</text>
+    <line x1="112" y1="58" x2="160" y2="85" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="170" cy="95" r="16" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="170" y="100" text-anchor="middle" fill="#fca5a5" font-size="12" font-weight="700" font-family="Inter">Y</text>
+    <line x1="158" y1="108" x2="135" y2="130" stroke="#334155" stroke-width="1"/>
+    <text x="125" y="140" fill="#64748b" font-size="10" font-family="Inter">b</text>
+    <line x1="182" y1="108" x2="205" y2="130" stroke="#334155" stroke-width="1"/>
+    <text x="210" y="140" fill="#64748b" font-size="10" font-family="Inter">c</text>
+    <!-- Arrow -->
+    <text x="275" y="75" text-anchor="middle" fill="#60a5fa" font-size="24" font-family="Inter">⟹</text>
+    <text x="275" y="95" text-anchor="middle" fill="#60a5fa" font-size="10" font-family="Inter">左旋 X</text>
+    <!-- After -->
+    <text x="420" y="16" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Inter">旋转后</text>
+    <circle cx="420" cy="45" r="16" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="420" y="50" text-anchor="middle" fill="#fca5a5" font-size="12" font-weight="700" font-family="Inter">Y</text>
+    <line x1="408" y1="58" x2="360" y2="85" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="350" cy="95" r="16" fill="#172554" stroke="#3b82f6" stroke-width="2"/>
+    <text x="350" y="100" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="700" font-family="Inter">X</text>
+    <line x1="338" y1="108" x2="315" y2="130" stroke="#334155" stroke-width="1"/>
+    <text x="305" y="140" fill="#64748b" font-size="10" font-family="Inter">a</text>
+    <line x1="362" y1="108" x2="385" y2="130" stroke="#334155" stroke-width="1"/>
+    <text x="390" y="140" fill="#64748b" font-size="10" font-family="Inter">b</text>
+    <line x1="432" y1="58" x2="470" y2="80" stroke="#334155" stroke-width="1"/>
+    <text x="478" y="88" fill="#64748b" font-size="10" font-family="Inter">c</text>
+  </svg>
+  <div class="caption">左旋：Y 上升为根，X 变为 Y 的左孩子，b 从 Y 的左孩子变为 X 的右孩子</div>
+</div>
+
+<h3>右旋 / Right Rotation</h3>
+<div class="diagram">
+  <svg viewBox="0 0 550 160" xmlns="http://www.w3.org/2000/svg">
+    <!-- Before -->
+    <text x="120" y="16" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Inter">旋转前</text>
+    <circle cx="150" cy="45" r="16" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="150" y="50" text-anchor="middle" fill="#fca5a5" font-size="12" font-weight="700" font-family="Inter">Y</text>
+    <line x1="138" y1="58" x2="90" y2="85" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="80" cy="95" r="16" fill="#172554" stroke="#3b82f6" stroke-width="2"/>
+    <text x="80" y="100" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="700" font-family="Inter">X</text>
+    <line x1="68" y1="108" x2="45" y2="130" stroke="#334155" stroke-width="1"/>
+    <text x="35" y="140" fill="#64748b" font-size="10" font-family="Inter">a</text>
+    <line x1="92" y1="108" x2="115" y2="130" stroke="#334155" stroke-width="1"/>
+    <text x="120" y="140" fill="#64748b" font-size="10" font-family="Inter">b</text>
+    <line x1="162" y1="58" x2="195" y2="80" stroke="#334155" stroke-width="1"/>
+    <text x="203" y="88" fill="#64748b" font-size="10" font-family="Inter">c</text>
+    <!-- Arrow -->
+    <text x="275" y="75" text-anchor="middle" fill="#60a5fa" font-size="24" font-family="Inter">⟹</text>
+    <text x="275" y="95" text-anchor="middle" fill="#60a5fa" font-size="10" font-family="Inter">右旋 Y</text>
+    <!-- After -->
+    <text x="420" y="16" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Inter">旋转后</text>
+    <circle cx="400" cy="45" r="16" fill="#172554" stroke="#3b82f6" stroke-width="2"/>
+    <text x="400" y="50" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="700" font-family="Inter">X</text>
+    <line x1="388" y1="58" x2="355" y2="80" stroke="#334155" stroke-width="1"/>
+    <text x="345" y="88" fill="#64748b" font-size="10" font-family="Inter">a</text>
+    <line x1="412" y1="58" x2="460" y2="85" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="470" cy="95" r="16" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="470" y="100" text-anchor="middle" fill="#fca5a5" font-size="12" font-weight="700" font-family="Inter">Y</text>
+    <line x1="458" y1="108" x2="435" y2="130" stroke="#334155" stroke-width="1"/>
+    <text x="425" y="140" fill="#64748b" font-size="10" font-family="Inter">b</text>
+    <line x1="482" y1="108" x2="505" y2="130" stroke="#334155" stroke-width="1"/>
+    <text x="510" y="140" fill="#64748b" font-size="10" font-family="Inter">c</text>
+  </svg>
+  <div class="caption">右旋：X 上升为根，Y 变为 X 的右孩子，b 从 X 的右孩子变为 Y 的左孩子</div>
+</div>
+
+<div class="box box-blue">
+  <div class="title">💡 旋转的关键性质</div>
+  <p>旋转前后，<strong>中序遍历的结果不变</strong>（a &lt; X &lt; b &lt; Y &lt; c），所以 BST 的搜索性质被保持。旋转只改变树的"形状"，不改变"内容"。</p>
+</div>
+</section>
+
+<!-- Section 5: Insertion -->
+<section id="sec-insert">
+<h2 class="section-title"><span class="num">5</span> 插入与修复 / Insertion & Fix-up</h2>
+
+<p>插入步骤：① 按 BST 规则插入 ② 新节点染<span style="color:#ef4444">红色</span> ③ 修复可能违反的规则</p>
+
+<div class="box box-green">
+  <div class="title">❓ 为什么新节点染红色？</div>
+  <p>染红色不会违反规则 5（黑色平衡），最多只违反规则 4（红红相连）。只需要局部修复，比染黑色简单得多。</p>
+</div>
+
+<h3>三种需要修复的情况</h3>
+
+<h4>Case 1：叔叔是红色 → 变色</h4>
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">父🔴 叔🔴</div>
+  <div class="arrow">→</div>
+  <div class="step">父叔变⚫<br>祖父变🔴</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">以祖父为<br>新当前节点</div>
+  <div class="arrow">→</div>
+  <div class="step">继续向上修复</div>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 500 140" xmlns="http://www.w3.org/2000/svg">
+    <text x="120" y="14" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">变色前</text>
+    <!-- Before: G black, P red, U red, N red -->
+    <circle cx="120" cy="35" r="14" fill="#1e293b" stroke="#e2e8f0" stroke-width="2"/>
+    <text x="120" y="40" text-anchor="middle" fill="#f8fafc" font-size="11" font-weight="700" font-family="Inter">G</text>
+    <line x1="108" y1="47" x2="75" y2="68" stroke="#334155" stroke-width="1"/>
+    <circle cx="65" cy="78" r="14" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="65" y="83" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="700" font-family="Inter">P</text>
+    <line x1="132" y1="47" x2="165" y2="68" stroke="#334155" stroke-width="1"/>
+    <circle cx="175" cy="78" r="14" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="175" y="83" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="700" font-family="Inter">U</text>
+    <line x1="53" y1="90" x2="35" y2="108" stroke="#334155" stroke-width="1"/>
+    <circle cx="28" cy="118" r="12" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="28" y="122" text-anchor="middle" fill="#fca5a5" font-size="10" font-weight="700" font-family="Inter">N</text>
+    <text x="5" y="122" fill="#f59e0b" font-size="10" font-family="Inter">⬆</text>
+    <!-- Arrow -->
+    <text x="250" y="75" text-anchor="middle" fill="#60a5fa" font-size="20" font-family="Inter">⟹</text>
+    <!-- After -->
+    <text x="380" y="14" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">变色后</text>
+    <circle cx="380" cy="35" r="14" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="380" y="40" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="700" font-family="Inter">G</text>
+    <text x="400" y="30" fill="#f59e0b" font-size="10" font-family="Inter">⬆新</text>
+    <line x1="368" y1="47" x2="335" y2="68" stroke="#334155" stroke-width="1"/>
+    <circle cx="325" cy="78" r="14" fill="#1e293b" stroke="#e2e8f0" stroke-width="2"/>
+    <text x="325" y="83" text-anchor="middle" fill="#f8fafc" font-size="11" font-weight="700" font-family="Inter">P</text>
+    <line x1="392" y1="47" x2="425" y2="68" stroke="#334155" stroke-width="1"/>
+    <circle cx="435" cy="78" r="14" fill="#1e293b" stroke="#e2e8f0" stroke-width="2"/>
+    <text x="435" y="83" text-anchor="middle" fill="#f8fafc" font-size="11" font-weight="700" font-family="Inter">U</text>
+    <line x1="313" y1="90" x2="295" y2="108" stroke="#334155" stroke-width="1"/>
+    <circle cx="288" cy="118" r="12" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="288" y="122" text-anchor="middle" fill="#fca5a5" font-size="10" font-weight="700" font-family="Inter">N</text>
+  </svg>
+  <div class="caption">Case 1：父叔变黑，祖父变红，然后以祖父为新当前节点继续修复</div>
+</div>
+
+<h4>Case 2：叔叔是黑色，当前节点是右孩子 → 左旋转化为 Case 3</h4>
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">N 是右孩子</div>
+  <div class="arrow">→</div>
+  <div class="step">以父节点左旋</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">变成 Case 3</div>
+</div>
+
+<h4>Case 3：叔叔是黑色，当前节点是左孩子 → 变色 + 右旋</h4>
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">N 是左孩子</div>
+  <div class="arrow">→</div>
+  <div class="step">父变⚫ 祖父变🔴</div>
+  <div class="arrow">→</div>
+  <div class="step">以祖父右旋</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">✅ 修复完成</div>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 500 140" xmlns="http://www.w3.org/2000/svg">
+    <text x="120" y="14" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">Case 3 修复前</text>
+    <circle cx="120" cy="35" r="14" fill="#1e293b" stroke="#e2e8f0" stroke-width="2"/>
+    <text x="120" y="40" text-anchor="middle" fill="#f8fafc" font-size="11" font-weight="700" font-family="Inter">G</text>
+    <line x1="108" y1="47" x2="75" y2="68" stroke="#334155" stroke-width="1"/>
+    <circle cx="65" cy="78" r="14" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="65" y="83" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="700" font-family="Inter">P</text>
+    <line x1="132" y1="47" x2="165" y2="68" stroke="#334155" stroke-width="1"/>
+    <circle cx="175" cy="78" r="14" fill="#1e293b" stroke="#e2e8f0"/>
+    <text x="175" y="83" text-anchor="middle" fill="#f8fafc" font-size="11" font-family="Inter">U</text>
+    <line x1="53" y1="90" x2="35" y2="108" stroke="#334155" stroke-width="1"/>
+    <circle cx="28" cy="118" r="12" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="28" y="122" text-anchor="middle" fill="#fca5a5" font-size="10" font-weight="700" font-family="Inter">N</text>
+    <text x="250" y="75" text-anchor="middle" fill="#60a5fa" font-size="20" font-family="Inter">⟹</text>
+    <text x="380" y="14" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">变色 + 右旋后</text>
+    <circle cx="380" cy="45" r="14" fill="#1e293b" stroke="#e2e8f0" stroke-width="2"/>
+    <text x="380" y="50" text-anchor="middle" fill="#f8fafc" font-size="11" font-weight="700" font-family="Inter">P</text>
+    <line x1="368" y1="57" x2="340" y2="78" stroke="#334155" stroke-width="1"/>
+    <circle cx="330" cy="88" r="14" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="330" y="93" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="700" font-family="Inter">N</text>
+    <line x1="392" y1="57" x2="420" y2="78" stroke="#334155" stroke-width="1"/>
+    <circle cx="430" cy="88" r="14" fill="#7f1d1d" stroke="#ef4444" stroke-width="2"/>
+    <text x="430" y="93" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="700" font-family="Inter">G</text>
+    <line x1="442" y1="100" x2="460" y2="118" stroke="#334155" stroke-width="1"/>
+    <circle cx="468" cy="125" r="11" fill="#1e293b" stroke="#e2e8f0"/>
+    <text x="468" y="129" text-anchor="middle" fill="#f8fafc" font-size="9" font-family="Inter">U</text>
+  </svg>
+  <div class="caption">Case 3：父变黑、祖父变红、以祖父右旋 → 平衡恢复 ✅</div>
+</div>
+</section>
+
+<!-- Section 6: Deletion -->
+<section id="sec-delete">
+<h2 class="section-title"><span class="num">6</span> 删除与修复 / Deletion & Fix-up</h2>
+
+<p>删除比插入更复杂。基本思路：先按 BST 规则删除，如果删除的是黑色节点，就需要修复黑色平衡。</p>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 为什么删除红色节点不需要修复？</div>
+  <p>删除红色节点不影响规则 5（黑色平衡），也不会产生红红相连。所以只有删除<strong>黑色节点</strong>才需要修复。</p>
+</div>
+
+<h3>删除修复的 4 种情况</h3>
+
+<table>
+  <tr><th>Case</th><th>条件</th><th>操作</th><th>效果</th></tr>
+  <tr><td style="color:#3b82f6;font-weight:700">1</td><td>兄弟是🔴</td><td>兄弟变⚫，父变🔴，左旋父</td><td>转化为 Case 2/3/4</td></tr>
+  <tr><td style="color:#3b82f6;font-weight:700">2</td><td>兄弟是⚫，兄弟两个孩子都是⚫</td><td>兄弟变🔴，向上传递</td><td>黑色上移，继续修复</td></tr>
+  <tr><td style="color:#3b82f6;font-weight:700">3</td><td>兄弟是⚫，兄弟左孩子🔴右孩子⚫</td><td>兄弟左孩子变⚫，兄弟变🔴，右旋兄弟</td><td>转化为 Case 4</td></tr>
+  <tr><td style="color:#3b82f6;font-weight:700">4</td><td>兄弟是⚫，兄弟右孩子🔴</td><td>兄弟染父色，父变⚫，兄弟右孩子变⚫，左旋父</td><td>✅ 修复完成</td></tr>
+</table>
+
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">Case 1<br><small>兄弟红</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">Case 2<br><small>兄弟黑,孩子全黑</small></div>
+  <div class="arrow">→ 或</div>
+  <div class="step" style="border-color:#a78bfa">Case 3<br><small>兄弟黑,左红右黑</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">Case 4<br><small>兄弟黑,右红</small></div>
+</div>
+
+<div class="box box-purple">
+  <div class="title">🔑 删除修复的核心思想</div>
+  <p>被删节点留下一个"额外的黑色"。修复过程就是把这个额外黑色<strong>向上传递</strong>或通过<strong>旋转+变色</strong>消化掉，直到：</p>
+  <ul>
+    <li>遇到红色节点 → 直接染黑，吸收额外黑色 ✅</li>
+    <li>到达根节点 → 额外黑色自然消失 ✅</li>
+    <li>通过 Case 4 的旋转+变色一步到位 ✅</li>
+  </ul>
+</div>
+</section>
+
+<!-- Section 7: Summary -->
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">7</span> 总结 / Summary</h2>
+
+<table>
+  <tr><th>操作</th><th>时间复杂度</th><th>最多旋转次数</th></tr>
+  <tr><td>查找</td><td>O(log n)</td><td>0</td></tr>
+  <tr><td>插入</td><td>O(log n)</td><td>2</td></tr>
+  <tr><td>删除</td><td>O(log n)</td><td>3</td></tr>
+</table>
+
+<h3>红黑树 vs AVL 树</h3>
+<table>
+  <tr><th></th><th>红黑树</th><th>AVL 树</th></tr>
+  <tr><td>平衡条件</td><td>黑色平衡（宽松）</td><td>高度差 ≤ 1（严格）</td></tr>
+  <tr><td>查找</td><td>稍慢（树更高）</td><td>更快（更矮）</td></tr>
+  <tr><td>插入/删除</td><td>更快（旋转更少）</td><td>稍慢（旋转更多）</td></tr>
+  <tr><td>适用场景</td><td>写多读少（如 Linux 内核、Java TreeMap）</td><td>读多写少（如数据库索引）</td></tr>
+</table>
+
+<div class="box box-green">
+  <div class="title">🌍 红黑树在哪里被使用？</div>
+  <ul>
+    <li><strong>Java</strong>：TreeMap, TreeSet, HashMap（链表长度 &gt; 8 时转红黑树）</li>
+    <li><strong>C++ STL</strong>：std::map, std::set</li>
+    <li><strong>Linux 内核</strong>：进程调度 CFS、内存管理 vm_area_struct</li>
+    <li><strong>Nginx</strong>：定时器管理</li>
+  </ul>
+</div>
+
+<div class="box box-purple">
+  <div class="title">📚 延伸阅读 / References</div>
+  <ul>
+    <li>《算法导论》第 13 章 — 红黑树的权威参考</li>
+    <li><a href="https://www.cs.usfca.edu/~galles/visualization/RedBlack.html" target="_blank">Red-Black Tree Visualization</a> — 在线可视化工具</li>
+    <li>《STL 源码剖析》— 侯捷，C++ STL 中红黑树的实现</li>
+  </ul>
+</div>
+</section>
+
+</div><!-- /.container -->
+
+<footer>
+  <p>基于多篇红黑树文章综合改编为交互式教程</p>
+  <p><a href="../">← 返回主页 / Back to Home</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+<script>
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => btn.classList.toggle('show', window.scrollY > 400));
+</script>
+
+<!-- Giscus Comments -->
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
