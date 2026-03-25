@@ -39,4 +39,12 @@ export const tutorials: Tutorial[] = [
       '从二叉查找树到红黑树，用 SVG 图解理解自平衡的奥秘。覆盖 5 条规则、旋转操作、插入修复 3 种情况、删除修复 4 种情况。',
     meta: '综合多篇文章 · 2026-03',
   },
+  {
+    slug: 'avl-tree',
+    tag: '🌲 Data Structure',
+    title: 'AVL 树图解教程',
+    description:
+      '最早的自平衡 BST，严格平衡查找最快。覆盖平衡因子、四种旋转（LL/LR/RR/RL）、插入删除平衡、AVL vs 红黑树对比。',
+    meta: '综合多篇文章 · 2026-03',
+  },
 ];
