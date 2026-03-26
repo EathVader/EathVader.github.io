@@ -47,4 +47,12 @@ export const tutorials: Tutorial[] = [
       '最早的自平衡 BST，严格平衡查找最快。覆盖平衡因子、四种旋转（LL/LR/RR/RL）、插入删除平衡、AVL vs 红黑树对比。',
     meta: '综合多篇文章 · 2026-03',
   },
+  {
+    slug: 'btree',
+    tag: '🗄️ Database',
+    title: 'B树、B+树与B*树图解',
+    description:
+      '为磁盘而生的多路平衡搜索树。覆盖磁盘 IO 原理、B 树性质、B+ 树索引优势、B* 树空间优化、三者对比。',
+    meta: '综合多篇文章 · 2026-03',
+  },
 ];
