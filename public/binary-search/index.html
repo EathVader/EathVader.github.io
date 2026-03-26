@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二分法图解教程 / Binary Search Visual Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>🔍 <span>二分法</span>图解教程</h1>
+  <p class="subtitle">搜索空间折半的艺术 —— 从基础到旋转数组<br>
+  Binary Search: The Art of Halving the Search Space</p>
+  <span class="badge">🔍 二分搜索</span>
+  <span class="badge">📉 O(log n)</span>
+  <span class="badge">🎯 有序数组</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-basic">基础二分 / Basic Binary Search</a></li>
+    <li><a href="#sec-first-last">找第一个/最后一个 / Find First &amp; Last Position</a></li>
+    <li><a href="#sec-rotated">旋转数组搜索 / Search in Rotated Array</a></li>
+    <li><a href="#sec-peak">寻找峰值 / Find Peak Element</a></li>
+    <li><a href="#sec-matrix">搜索二维矩阵 / Search 2D Matrix</a></li>
+    <li><a href="#sec-demo">交互式演示 / Interactive Demo</a></li>
+    <li><a href="#sec-summary">总结 / Summary</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1 -->
+<section id="sec-basic">
+<h2 class="section-title"><span class="num">1</span> 基础二分 / Basic Binary Search</h2>
+
+<div class="analogy">
+  <div class="emoji">📖</div>
+  <h4>类比 / Analogy</h4>
+  <p>在一本<strong>按页码排列的字典</strong>中找某个词：翻到中间，如果目标在前半部分就往前翻，在后半部分就往后翻。每次翻一半，几次就能找到。这就是二分搜索——每次排除一半的搜索空间。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg">
+    <text x="350" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">二分搜索过程：在 [1,3,5,7,9,11,13] 中查找 9</text>
+    <!-- Round 1 -->
+    <text x="20" y="52" fill="#94a3b8" font-size="10" font-family="Inter">第1轮:</text>
+    <rect x="70" y="38" width="40" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="90" y="54" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="Inter">1</text>
+    <rect x="115" y="38" width="40" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="135" y="54" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="Inter">3</text>
+    <rect x="160" y="38" width="40" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="180" y="54" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="Inter">5</text>
+    <rect x="205" y="38" width="40" height="24" rx="3" fill="#1c1917" stroke="#f59e0b" stroke-width="2"/><text x="225" y="54" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="700" font-family="Inter">7</text>
+    <rect x="250" y="38" width="40" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="270" y="54" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="Inter">9</text>
+    <rect x="295" y="38" width="40" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="315" y="54" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="Inter">11</text>
+    <rect x="340" y="38" width="40" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="360" y="54" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="Inter">13</text>
+    <text x="90" y="75" text-anchor="middle" fill="#22c55e" font-size="9" font-family="Inter">L</text>
+    <text x="225" y="75" text-anchor="middle" fill="#f59e0b" font-size="9" font-family="Inter">mid</text>
+    <text x="360" y="75" text-anchor="middle" fill="#f87171" font-size="9" font-family="Inter">R</text>
+    <text x="450" y="54" fill="#94a3b8" font-size="10" font-family="Inter">9 > 7 → 搜右半</text>
+
+    <!-- Round 2 -->
+    <text x="20" y="112" fill="#94a3b8" font-size="10" font-family="Inter">第2轮:</text>
+    <rect x="70" y="98" width="40" height="24" rx="3" fill="#1e293b" stroke="#334155"/><text x="90" y="114" text-anchor="middle" fill="#475569" font-size="10" font-family="Inter">1</text>
+    <rect x="115" y="98" width="40" height="24" rx="3" fill="#1e293b" stroke="#334155"/><text x="135" y="114" text-anchor="middle" fill="#475569" font-size="10" font-family="Inter">3</text>
+    <rect x="160" y="98" width="40" height="24" rx="3" fill="#1e293b" stroke="#334155"/><text x="180" y="114" text-anchor="middle" fill="#475569" font-size="10" font-family="Inter">5</text>
+    <rect x="205" y="98" width="40" height="24" rx="3" fill="#1e293b" stroke="#334155"/><text x="225" y="114" text-anchor="middle" fill="#475569" font-size="10" font-family="Inter">7</text>
+    <rect x="250" y="98" width="40" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="270" y="114" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="Inter">9</text>
+    <rect x="295" y="98" width="40" height="24" rx="3" fill="#1c1917" stroke="#f59e0b" stroke-width="2"/><text x="315" y="114" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="700" font-family="Inter">11</text>
+    <rect x="340" y="98" width="40" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="360" y="114" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="Inter">13</text>
+    <text x="270" y="135" text-anchor="middle" fill="#22c55e" font-size="9" font-family="Inter">L</text>
+    <text x="315" y="135" text-anchor="middle" fill="#f59e0b" font-size="9" font-family="Inter">mid</text>
+    <text x="360" y="135" text-anchor="middle" fill="#f87171" font-size="9" font-family="Inter">R</text>
+    <text x="450" y="114" fill="#94a3b8" font-size="10" font-family="Inter">9 &lt; 11 → 搜左半</text>
+
+    <!-- Round 3 -->
+    <text x="20" y="172" fill="#94a3b8" font-size="10" font-family="Inter">第3轮:</text>
+    <rect x="250" y="158" width="40" height="24" rx="3" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="270" y="174" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="Inter">9</text>
+    <text x="270" y="195" text-anchor="middle" fill="#22c55e" font-size="9" font-family="Inter">L=mid=R</text>
+    <text x="450" y="174" fill="#86efac" font-size="10" font-family="Inter">✅ 找到 9！</text>
+  </svg>
+  <div class="caption">每轮排除一半，3 轮找到目标（log₂7 ≈ 3）</div>
+</div>
+
+<pre><code>// 基础二分搜索 / Basic binary search
+int binarySearch(int[] nums, int target) {
+    int left = 0, right = nums.length - 1;
+    while (left <= right) {
+        int mid = left + (right - left) / 2;  // 防溢出
+        if (nums[mid] == target) return mid;
+        else if (nums[mid] < target) left = mid + 1;
+        else right = mid - 1;
+    }
+    return -1;
+}</code></pre>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 常见 Bug</div>
+  <p><code>mid = (left + right) / 2</code> 当 left + right 超过 int 最大值时会溢出！用 <code>left + (right - left) / 2</code> 更安全。</p>
+</div>
+</section>
+
+<!-- Section 2 -->
+<section id="sec-first-last">
+<h2 class="section-title"><span class="num">2</span> 找第一个/最后一个位置 / Find First &amp; Last Position</h2>
+
+<div class="analogy">
+  <div class="emoji">🎯</div>
+  <h4>类比 / Analogy</h4>
+  <p>在一排相同颜色的球中找<strong>最左边</strong>和<strong>最右边</strong>的那个。找到一个后不能停，要继续缩小范围，直到确认是边界。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 100" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">在 [1,2,2,2,2,3,4] 中找 2 的第一个和最后一个位置</text>
+    <rect x="60" y="30" width="40" height="28" rx="4" fill="#1e293b" stroke="#334155"/><text x="80" y="48" text-anchor="middle" fill="#64748b" font-size="11" font-family="Inter">1</text>
+    <rect x="105" y="30" width="40" height="28" rx="4" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="125" y="48" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">2</text>
+    <rect x="150" y="30" width="40" height="28" rx="4" fill="#172554" stroke="#3b82f6"/><text x="170" y="48" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">2</text>
+    <rect x="195" y="30" width="40" height="28" rx="4" fill="#172554" stroke="#3b82f6"/><text x="215" y="48" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">2</text>
+    <rect x="240" y="30" width="40" height="28" rx="4" fill="#14532d" stroke="#f59e0b" stroke-width="2"/><text x="260" y="48" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700" font-family="Inter">2</text>
+    <rect x="285" y="30" width="40" height="28" rx="4" fill="#1e293b" stroke="#334155"/><text x="305" y="48" text-anchor="middle" fill="#64748b" font-size="11" font-family="Inter">3</text>
+    <rect x="330" y="30" width="40" height="28" rx="4" fill="#1e293b" stroke="#334155"/><text x="350" y="48" text-anchor="middle" fill="#64748b" font-size="11" font-family="Inter">4</text>
+    <text x="125" y="75" text-anchor="middle" fill="#22c55e" font-size="10" font-weight="600" font-family="Inter">first=1</text>
+    <text x="260" y="75" text-anchor="middle" fill="#f59e0b" font-size="10" font-weight="600" font-family="Inter">last=4</text>
+  </svg>
+</div>
+
+<pre><code>// 找第一个等于 target 的位置
+int findFirst(int[] nums, int target) {
+    int left = 0, right = nums.length - 1, ans = -1;
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+        if (nums[mid] >= target) { if (nums[mid] == target) ans = mid; right = mid - 1; }
+        else left = mid + 1;
+    }
+    return ans;
+}
+
+// 找最后一个等于 target 的位置
+int findLast(int[] nums, int target) {
+    int left = 0, right = nums.length - 1, ans = -1;
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+        if (nums[mid] <= target) { if (nums[mid] == target) ans = mid; left = mid + 1; }
+        else right = mid - 1;
+    }
+    return ans;
+}</code></pre>
+
+<div class="box box-blue">
+  <div class="title">💡 关键区别</div>
+  <p>找到 target 后：找<strong>第一个</strong>→ 继续往左搜（right = mid - 1）；找<strong>最后一个</strong>→ 继续往右搜（left = mid + 1）。</p>
+</div>
+</section>
+
+<!-- Section 3 -->
+<section id="sec-rotated">
+<h2 class="section-title"><span class="num">3</span> 旋转数组搜索 / Search in Rotated Sorted Array</h2>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 130" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">旋转数组 [4,5,6,7,0,1,2] — 原数组 [0,1,2,4,5,6,7] 在 index=4 处旋转</text>
+    <!-- Bars showing values -->
+    <rect x="60" y="55" width="45" height="40" rx="3" fill="#172554" stroke="#3b82f6"/><text x="82" y="80" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">4</text>
+    <rect x="110" y="45" width="45" height="50" rx="3" fill="#172554" stroke="#3b82f6"/><text x="132" y="75" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">5</text>
+    <rect x="160" y="35" width="45" height="60" rx="3" fill="#172554" stroke="#3b82f6"/><text x="182" y="70" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">6</text>
+    <rect x="210" y="25" width="45" height="70" rx="3" fill="#172554" stroke="#3b82f6"/><text x="232" y="65" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">7</text>
+    <!-- Drop -->
+    <line x1="255" y1="50" x2="270" y2="50" stroke="#f87171" stroke-width="2" stroke-dasharray="3"/>
+    <rect x="280" y="80" width="45" height="15" rx="3" fill="#1c1917" stroke="#f59e0b"/><text x="302" y="92" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700" font-family="Inter">0</text>
+    <rect x="330" y="75" width="45" height="20" rx="3" fill="#1c1917" stroke="#f59e0b"/><text x="352" y="90" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700" font-family="Inter">1</text>
+    <rect x="380" y="70" width="45" height="25" rx="3" fill="#1c1917" stroke="#f59e0b"/><text x="402" y="87" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700" font-family="Inter">2</text>
+    <text x="270" y="115" text-anchor="middle" fill="#f87171" font-size="10" font-family="Inter">↑ 旋转断点</text>
+    <text x="480" y="55" fill="#94a3b8" font-size="10" font-family="Inter">至少一半是有序的</text>
+    <text x="480" y="70" fill="#94a3b8" font-size="10" font-family="Inter">判断 target 在有序</text>
+    <text x="480" y="85" fill="#94a3b8" font-size="10" font-family="Inter">的那半还是另一半</text>
+  </svg>
+  <div class="caption">旋转后数组分成两段有序部分，mid 一定落在其中一段</div>
+</div>
+
+<pre><code>// 旋转数组搜索 / Search in rotated sorted array
+int search(int[] nums, int target) {
+    int left = 0, right = nums.length - 1;
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+        if (nums[mid] == target) return mid;
+        if (nums[left] <= nums[mid]) {  // 左半有序
+            if (nums[left] <= target && target < nums[mid]) right = mid - 1;
+            else left = mid + 1;
+        } else {  // 右半有序
+            if (nums[mid] < target && target <= nums[right]) left = mid + 1;
+            else right = mid - 1;
+        }
+    }
+    return -1;
+}</code></pre>
+
+<div class="box box-green">
+  <div class="title">💡 核心思路</div>
+  <p>每次二分后，<strong>至少有一半是有序的</strong>。判断 target 是否在有序的那一半范围内，如果是就搜那半，否则搜另一半。</p>
+</div>
+</section>
+
+<!-- Section 4 -->
+<section id="sec-peak">
+<h2 class="section-title"><span class="num">4</span> 寻找峰值 / Find Peak Element</h2>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 120" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">峰值元素：比左右邻居都大 / Peak: greater than both neighbors</text>
+    <!-- Mountain shape -->
+    <polyline points="60,90 120,70 180,50 240,30 300,60 360,80 420,40 480,70 540,90" fill="none" stroke="#3b82f6" stroke-width="2"/>
+    <!-- Peak markers -->
+    <circle cx="240" cy="30" r="6" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="240" y="22" text-anchor="middle" fill="#86efac" font-size="9" font-family="Inter">peak</text>
+    <circle cx="420" cy="40" r="6" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="420" y="32" text-anchor="middle" fill="#86efac" font-size="9" font-family="Inter">peak</text>
+    <!-- Labels -->
+    <text x="60" y="105" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">1</text>
+    <text x="120" y="105" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">3</text>
+    <text x="180" y="105" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">5</text>
+    <text x="240" y="105" text-anchor="middle" fill="#86efac" font-size="9" font-weight="700" font-family="Inter">8</text>
+    <text x="300" y="105" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">4</text>
+    <text x="360" y="105" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">2</text>
+    <text x="420" y="105" text-anchor="middle" fill="#86efac" font-size="9" font-weight="700" font-family="Inter">6</text>
+    <text x="480" y="105" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">3</text>
+    <text x="540" y="105" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">1</text>
+  </svg>
+  <div class="caption">如果 mid 的右邻居更大，峰值一定在右边；反之在左边</div>
+</div>
+
+<pre><code>// 寻找峰值 / Find peak element - O(log n)
+int findPeakElement(int[] nums) {
+    int left = 0, right = nums.length - 1;
+    while (left < right) {
+        int mid = left + (right - left) / 2;
+        if (nums[mid] < nums[mid + 1]) left = mid + 1;  // 上坡，峰在右
+        else right = mid;  // 下坡或峰顶，峰在左（含 mid）
+    }
+    return left;
+}</code></pre>
+</section>
+
+<!-- Section 5 -->
+<section id="sec-matrix">
+<h2 class="section-title"><span class="num">5</span> 搜索二维矩阵 / Search 2D Matrix</h2>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 140" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">把 m×n 矩阵看作长度 m*n 的有序数组</text>
+    <!-- Matrix -->
+    <rect x="60" y="30" width="45" height="28" rx="2" fill="#172554" stroke="#3b82f6"/><text x="82" y="48" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">1</text>
+    <rect x="108" y="30" width="45" height="28" rx="2" fill="#172554" stroke="#3b82f6"/><text x="130" y="48" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">3</text>
+    <rect x="156" y="30" width="45" height="28" rx="2" fill="#172554" stroke="#3b82f6"/><text x="178" y="48" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">5</text>
+    <rect x="204" y="30" width="45" height="28" rx="2" fill="#172554" stroke="#3b82f6"/><text x="226" y="48" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">7</text>
+    <rect x="60" y="62" width="45" height="28" rx="2" fill="#172554" stroke="#3b82f6"/><text x="82" y="80" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">10</text>
+    <rect x="108" y="62" width="45" height="28" rx="2" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="130" y="80" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="Inter">11</text>
+    <rect x="156" y="62" width="45" height="28" rx="2" fill="#172554" stroke="#3b82f6"/><text x="178" y="80" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">16</text>
+    <rect x="204" y="62" width="45" height="28" rx="2" fill="#172554" stroke="#3b82f6"/><text x="226" y="80" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">20</text>
+    <rect x="60" y="94" width="45" height="28" rx="2" fill="#172554" stroke="#3b82f6"/><text x="82" y="112" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">23</text>
+    <rect x="108" y="94" width="45" height="28" rx="2" fill="#172554" stroke="#3b82f6"/><text x="130" y="112" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">30</text>
+    <rect x="156" y="94" width="45" height="28" rx="2" fill="#172554" stroke="#3b82f6"/><text x="178" y="112" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">34</text>
+    <rect x="204" y="94" width="45" height="28" rx="2" fill="#172554" stroke="#3b82f6"/><text x="226" y="112" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">60</text>
+    <!-- Mapping -->
+    <text x="320" y="55" fill="#f59e0b" font-size="10" font-family="Inter">index=5 → row=5/4=1, col=5%4=1</text>
+    <text x="320" y="75" fill="#86efac" font-size="10" font-family="Inter">matrix[1][1] = 11 ✅</text>
+    <text x="320" y="100" fill="#94a3b8" font-size="10" font-family="Inter">row = mid / cols</text>
+    <text x="320" y="115" fill="#94a3b8" font-size="10" font-family="Inter">col = mid % cols</text>
+  </svg>
+  <div class="caption">将二维坐标映射为一维索引，直接二分</div>
+</div>
+
+<pre><code>// 搜索二维矩阵 / Search 2D matrix
+boolean searchMatrix(int[][] matrix, int target) {
+    int m = matrix.length, n = matrix[0].length;
+    int left = 0, right = m * n - 1;
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+        int val = matrix[mid / n][mid % n];  // 一维→二维
+        if (val == target) return true;
+        else if (val < target) left = mid + 1;
+        else right = mid - 1;
+    }
+    return false;
+}</code></pre>
+</section>
+
+<!-- Section 6 -->
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">6</span> 交互式演示 / Interactive Demo</h2>
+
+<div class="demo">
+  <h4>🎮 二分搜索可视化</h4>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.5rem">
+    <input id="bs-input" type="text" placeholder="搜索目标" style="width:100px">
+    <button id="bs-search">搜索</button>
+    <button id="bs-step" style="background:linear-gradient(135deg,#f59e0b,#d97706)">单步执行</button>
+    <button id="bs-reset" style="background:#334155">重置</button>
+  </div>
+  <svg id="bs-svg" viewBox="0 0 700 100" style="width:100%;height:100px;background:#0f172a;border-radius:8px"></svg>
+  <div id="bs-log" class="output">数组: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19] — 输入目标值开始搜索</div>
+</div>
+</section>
+
+<!-- Section 7 -->
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">7</span> 总结 / Summary</h2>
+
+<table>
+  <tr><th>问题</th><th>核心思路</th><th>时间</th></tr>
+  <tr><td>基础二分</td><td>left ≤ right，每次排除一半</td><td>O(log n)</td></tr>
+  <tr><td>找第一个/最后一个</td><td>找到后继续缩小范围</td><td>O(log n)</td></tr>
+  <tr><td>旋转数组</td><td>至少一半有序，判断 target 在哪半</td><td>O(log n)</td></tr>
+  <tr><td>寻找峰值</td><td>上坡搜右，下坡搜左</td><td>O(log n)</td></tr>
+  <tr><td>搜索二维矩阵</td><td>一维索引映射二维坐标</td><td>O(log(mn))</td></tr>
+</table>
+
+<div class="box box-green">
+  <div class="title">🎯 二分法使用条件</div>
+  <ul>
+    <li>搜索空间具有<strong>单调性</strong>或可以<strong>二段性</strong>划分</li>
+    <li>每次可以排除一半的搜索空间</li>
+    <li>不一定要求数组严格有序——只要能判断"答案在左还是右"</li>
+  </ul>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>二分法图解教程 — 基于 LeetCode 高频题综合整理</p>
+  <p><a href="../">← 返回主页 / Back to Home</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+<script src="binary-search.js"></script>
+<script>
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => btn.classList.toggle('show', window.scrollY > 400));
+</script>
+
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

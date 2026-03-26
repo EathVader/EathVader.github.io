@@ -95,4 +95,60 @@ export const tutorials: Tutorial[] = [
       '十大排序算法从原理到可视化。覆盖冒泡、选择、插入、希尔、归并、快排、堆排序、计数、基数、桶排序，含交互演示与全面对比。',
     meta: '综合多篇文章 · 2026-03',
   },
+  {
+    slug: 'bloom-filter',
+    tag: '🔍 Algorithm',
+    title: '布隆过滤器图解教程',
+    description:
+      '用极少内存判断元素是否存在。覆盖原理、误判率分析、交互式可视化、Cuckoo Filter 对比、Redis/Chrome/HBase 实际应用。',
+    meta: '综合多篇文章 · 2026-03',
+  },
+  {
+    slug: 'dp',
+    tag: '📊 Algorithm',
+    title: '动态规划图解教程',
+    description:
+      '从零理解 DP 的核心思想。覆盖斐波那契、零钱兑换、0/1 背包、LCS、最长回文子串，含交互式 DP 表填充可视化与模式总结。',
+    meta: '综合多篇文章 · 2026-03',
+  },
+  {
+    slug: 'skip-list',
+    tag: '🔍 Data Structure',
+    title: '跳表图解教程',
+    description:
+      '链表也能二分查找，平衡树的优雅替代。覆盖多层结构、随机层高、交互式可视化、跳表 vs 红黑树、Redis 为何选跳表。',
+    meta: '综合多篇文章 · 2026-03',
+  },
+  {
+    slug: 'linked-list',
+    tag: '🔗 Data Structure',
+    title: '链表经典题图解',
+    description:
+      '链表反转、环检测、合并排序，指针操作一网打尽。覆盖迭代/递归反转、Floyd 快慢指针、归并排序链表，含交互式可视化。',
+    meta: '综合多篇文章 · 2026-03',
+  },
+  {
+    slug: 'binary-search',
+    tag: '🔍 Algorithm',
+    title: '二分法图解教程',
+    description:
+      '二分查找的 N 种变体。覆盖基础二分、第一个/最后一个位置、旋转数组、峰值元素、二维矩阵搜索，含交互式可视化。',
+    meta: '综合多篇文章 · 2026-03',
+  },
+  {
+    slug: 'top-k',
+    tag: '🔍 Algorithm',
+    title: 'Top K 问题图解',
+    description:
+      '海量数据找最大 K 个元素。覆盖小顶堆法、Quick Select 快速选择、复杂度对比、热搜排行榜实战。',
+    meta: '综合多篇文章 · 2026-03',
+  },
+  {
+    slug: 'stack-queue',
+    tag: '📦 Data Structure',
+    title: '栈和队列图解教程',
+    description:
+      'LIFO 与 FIFO 的经典应用。覆盖括号匹配、单调栈、最小栈、两栈实现队列，含交互式可视化。',
+    meta: '综合多篇文章 · 2026-03',
+  },
 ];

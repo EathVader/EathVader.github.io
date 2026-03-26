@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Top K 问题图解 / Top K Problems Visual Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>🏆 <span>Top K 问题</span>图解教程</h1>
+  <p class="subtitle">堆、快速选择 —— 海量数据中找最大/最小的 K 个<br>
+  Top K: Heap &amp; Quick Select for Finding K Largest/Smallest</p>
+  <span class="badge">🏆 Top K</span>
+  <span class="badge">📊 堆 / Heap</span>
+  <span class="badge">⚡ Quick Select</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-what">什么是 Top K 问题 / What is Top K</a></li>
+    <li><a href="#sec-heap">小顶堆方法 / Min-Heap Approach</a></li>
+    <li><a href="#sec-quick">快速选择 / Quick Select</a></li>
+    <li><a href="#sec-compare">方法对比 / Comparison</a></li>
+    <li><a href="#sec-apps">应用场景 / Applications</a></li>
+    <li><a href="#sec-summary">总结 / Summary</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1 -->
+<section id="sec-what">
+<h2 class="section-title"><span class="num">1</span> 什么是 Top K 问题 / What is Top K</h2>
+
+<div class="analogy">
+  <div class="emoji">🏅</div>
+  <h4>类比 / Analogy</h4>
+  <p>全校 1000 名学生参加考试，你只需要找出<strong>前 10 名</strong>。你不需要给所有人排名——只需要维护一个"前 10 名候选名单"，每来一个新成绩，如果比名单中最低分高，就替换掉最低分。</p>
+</div>
+
+<div class="box box-blue">
+  <div class="title">📐 三种经典方法</div>
+  <ol>
+    <li><strong>全排序</strong>：排序后取前 K 个 — O(n log n)，简单但慢</li>
+    <li><strong>小顶堆</strong>：维护大小为 K 的堆 — O(n log K)，适合流式数据</li>
+    <li><strong>快速选择</strong>：基于 partition — 平均 O(n)，最快但不稳定</li>
+  </ol>
+</div>
+</section>
+
+<!-- Section 2 -->
+<section id="sec-heap">
+<h2 class="section-title"><span class="num">2</span> 小顶堆方法 / Min-Heap Approach</h2>
+
+<div class="analogy">
+  <div class="emoji">🪣</div>
+  <h4>类比 / Analogy</h4>
+  <p>想象一个只能装 K 个球的<strong>桶</strong>，桶口朝上，最小的球总在最上面。每来一个新球：如果比桶顶的球大，就把桶顶扔掉，放入新球。最终桶里就是最大的 K 个球。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 700 260" xmlns="http://www.w3.org/2000/svg">
+    <text x="350" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">小顶堆找 Top 3：数据流 [5, 2, 8, 1, 9, 3, 7]</text>
+
+    <!-- Step 1: heap [5] -->
+    <text x="30" y="50" fill="#94a3b8" font-size="10" font-family="Inter">+5:</text>
+    <circle cx="80" cy="50" r="14" fill="#172554" stroke="#3b82f6"/><text x="80" y="55" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">5</text>
+    <text x="110" y="50" fill="#64748b" font-size="9" font-family="Inter">size&lt;3, 直接加</text>
+
+    <!-- Step 2: heap [2,5] -->
+    <text x="30" y="90" fill="#94a3b8" font-size="10" font-family="Inter">+2:</text>
+    <circle cx="80" cy="90" r="14" fill="#172554" stroke="#3b82f6"/><text x="80" y="95" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">2</text>
+    <circle cx="110" cy="90" r="14" fill="#172554" stroke="#3b82f6"/><text x="110" y="95" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">5</text>
+    <text x="145" y="90" fill="#64748b" font-size="9" font-family="Inter">size&lt;3, 直接加</text>
+
+    <!-- Step 3: heap [2,5,8] -->
+    <text x="30" y="130" fill="#94a3b8" font-size="10" font-family="Inter">+8:</text>
+    <circle cx="80" cy="130" r="14" fill="#1c1917" stroke="#f59e0b"/><text x="80" y="135" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700" font-family="Inter">2</text>
+    <circle cx="110" cy="130" r="14" fill="#172554" stroke="#3b82f6"/><text x="110" y="135" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">5</text>
+    <circle cx="140" cy="130" r="14" fill="#172554" stroke="#3b82f6"/><text x="140" y="135" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">8</text>
+    <text x="175" y="130" fill="#f59e0b" font-size="9" font-family="Inter">← 堆顶(最小)</text>
+
+    <!-- Step 4: +1, 1 < 2, skip -->
+    <text x="30" y="170" fill="#94a3b8" font-size="10" font-family="Inter">+1:</text>
+    <text x="80" y="170" fill="#fca5a5" font-size="10" font-family="Inter">1 &lt; 堆顶 2 → 跳过 ❌</text>
+
+    <!-- Step 5: +9, 9 > 2, replace -->
+    <text x="30" y="200" fill="#94a3b8" font-size="10" font-family="Inter">+9:</text>
+    <text x="80" y="200" fill="#86efac" font-size="10" font-family="Inter">9 > 堆顶 2 → 弹出 2，加入 9 ✅</text>
+    <circle cx="350" cy="200" r="14" fill="#1c1917" stroke="#f59e0b"/><text x="350" y="205" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700" font-family="Inter">5</text>
+    <circle cx="380" cy="200" r="14" fill="#172554" stroke="#3b82f6"/><text x="380" y="205" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">8</text>
+    <circle cx="410" cy="200" r="14" fill="#172554" stroke="#3b82f6"/><text x="410" y="205" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">9</text>
+
+    <!-- Final -->
+    <text x="30" y="240" fill="#94a3b8" font-size="10" font-family="Inter">最终:</text>
+    <circle cx="80" cy="240" r="14" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="80" y="245" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">7</text>
+    <circle cx="110" cy="240" r="14" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="110" y="245" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">8</text>
+    <circle cx="140" cy="240" r="14" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="140" y="245" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">9</text>
+    <text x="175" y="240" fill="#86efac" font-size="10" font-family="Inter">← Top 3 ✓</text>
+  </svg>
+  <div class="caption">小顶堆始终保持 K 个最大元素，堆顶是"门槛"</div>
+</div>
+
+<pre><code>// 小顶堆找 Top K 最大 / Min-heap for Top K largest
+int[] topK(int[] nums, int k) {
+    PriorityQueue&lt;Integer&gt; heap = new PriorityQueue&lt;&gt;(); // 小顶堆
+    for (int num : nums) {
+        heap.offer(num);
+        if (heap.size() > k) heap.poll(); // 弹出最小的
+    }
+    return heap.stream().mapToInt(i -> i).toArray();
+}</code></pre>
+
+<div class="box box-green">
+  <div class="title">⚡ 为什么用小顶堆而不是大顶堆？</div>
+  <p>找 Top K <strong>最大</strong>用<strong>小</strong>顶堆：堆顶是 K 个中最小的，新元素只需和堆顶比较。如果用大顶堆，需要把所有 n 个元素都放进去，复杂度变成 O(n log n)。</p>
+</div>
+</section>
+
+<!-- Section 3 -->
+<section id="sec-quick">
+<h2 class="section-title"><span class="num">3</span> 快速选择 / Quick Select</h2>
+
+<div class="flow">
+  <div class="step">随机选 pivot</div>
+  <div class="arrow">→</div>
+  <div class="step">partition<br><small>小的左边，大的右边</small></div>
+  <div class="arrow">→</div>
+  <div class="step">pivot 位置 = k?<br><small>是→返回；否→递归一侧</small></div>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg">
+    <text x="350" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">Quick Select 找第 3 大：[3, 1, 5, 2, 8, 4, 7]</text>
+
+    <!-- Step 1: partition around pivot=4 -->
+    <text x="20" y="50" fill="#94a3b8" font-size="10" font-family="Inter">原数组:</text>
+    <rect x="90" y="37" width="35" height="22" rx="3" fill="#172554" stroke="#3b82f6"/><text x="107" y="52" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">3</text>
+    <rect x="130" y="37" width="35" height="22" rx="3" fill="#172554" stroke="#3b82f6"/><text x="147" y="52" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">1</text>
+    <rect x="170" y="37" width="35" height="22" rx="3" fill="#172554" stroke="#3b82f6"/><text x="187" y="52" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">5</text>
+    <rect x="210" y="37" width="35" height="22" rx="3" fill="#172554" stroke="#3b82f6"/><text x="227" y="52" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">2</text>
+    <rect x="250" y="37" width="35" height="22" rx="3" fill="#172554" stroke="#3b82f6"/><text x="267" y="52" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">8</text>
+    <rect x="290" y="37" width="35" height="22" rx="3" fill="#1c1917" stroke="#f59e0b" stroke-width="2"/><text x="307" y="52" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="700" font-family="Inter">4</text>
+    <rect x="330" y="37" width="35" height="22" rx="3" fill="#172554" stroke="#3b82f6"/><text x="347" y="52" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">7</text>
+    <text x="307" y="72" text-anchor="middle" fill="#f59e0b" font-size="9" font-family="Inter">pivot</text>
+
+    <!-- After partition -->
+    <text x="20" y="110" fill="#94a3b8" font-size="10" font-family="Inter">partition:</text>
+    <rect x="90" y="97" width="35" height="22" rx="3" fill="#172554" stroke="#334155"/><text x="107" y="112" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">3</text>
+    <rect x="130" y="97" width="35" height="22" rx="3" fill="#172554" stroke="#334155"/><text x="147" y="112" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">1</text>
+    <rect x="170" y="97" width="35" height="22" rx="3" fill="#172554" stroke="#334155"/><text x="187" y="112" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">2</text>
+    <rect x="220" y="97" width="35" height="22" rx="3" fill="#1c1917" stroke="#f59e0b" stroke-width="2"/><text x="237" y="112" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="700" font-family="Inter">4</text>
+    <rect x="270" y="97" width="35" height="22" rx="3" fill="#172554" stroke="#3b82f6"/><text x="287" y="112" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">5</text>
+    <rect x="310" y="97" width="35" height="22" rx="3" fill="#172554" stroke="#3b82f6"/><text x="327" y="112" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">8</text>
+    <rect x="350" y="97" width="35" height="22" rx="3" fill="#172554" stroke="#3b82f6"/><text x="367" y="112" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">7</text>
+    <text x="147" y="132" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">← 小于 pivot</text>
+    <text x="237" y="132" text-anchor="middle" fill="#f59e0b" font-size="9" font-family="Inter">idx=3</text>
+    <text x="327" y="132" text-anchor="middle" fill="#93c5fd" font-size="9" font-family="Inter">大于 pivot →</text>
+
+    <!-- Recurse right -->
+    <text x="20" y="165" fill="#94a3b8" font-size="10" font-family="Inter">右侧有 3 个元素 = k=3，找到了！</text>
+    <rect x="270" y="155" width="35" height="22" rx="3" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="287" y="170" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="Inter">5</text>
+    <rect x="310" y="155" width="35" height="22" rx="3" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="327" y="170" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="Inter">8</text>
+    <rect x="350" y="155" width="35" height="22" rx="3" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="367" y="170" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="Inter">7</text>
+    <text x="420" y="170" fill="#86efac" font-size="10" font-family="Inter">← Top 3 ✓</text>
+  </svg>
+  <div class="caption">partition 后 pivot 右边恰好有 K 个元素，即为 Top K</div>
+</div>
+
+<pre><code>// Quick Select 找第 K 大 / Quick select for Kth largest
+int findKthLargest(int[] nums, int k) {
+    return quickSelect(nums, 0, nums.length - 1, nums.length - k);
+}
+
+int quickSelect(int[] nums, int lo, int hi, int k) {
+    int pivot = nums[hi], i = lo;
+    for (int j = lo; j < hi; j++) {
+        if (nums[j] <= pivot) { swap(nums, i, j); i++; }
+    }
+    swap(nums, i, hi);
+    if (i == k) return nums[i];
+    return i < k ? quickSelect(nums, i + 1, hi, k)
+                 : quickSelect(nums, lo, i - 1, k);
+}</code></pre>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 最坏情况</div>
+  <p>Quick Select 平均 O(n)，但最坏 O(n²)（每次 pivot 选到最大/最小值）。解决方案：<strong>随机选 pivot</strong> 或使用 <strong>Median of Medians</strong> 保证 O(n)。</p>
+</div>
+</section>
+
+<!-- Section 4 -->
+<section id="sec-compare">
+<h2 class="section-title"><span class="num">4</span> 方法对比 / Comparison</h2>
+
+<table>
+  <tr><th>方法</th><th>时间</th><th>空间</th><th>优点</th><th>缺点</th></tr>
+  <tr><td>排序</td><td>O(n log n)</td><td>O(1)*</td><td>简单直接</td><td style="color:#fca5a5">最慢</td></tr>
+  <tr><td style="color:#86efac;font-weight:700">小顶堆</td><td style="color:#86efac">O(n log K)</td><td>O(K)</td><td style="color:#86efac">流式数据友好</td><td>K 大时慢</td></tr>
+  <tr><td style="color:#86efac;font-weight:700">Quick Select</td><td style="color:#86efac">平均 O(n)</td><td>O(1)</td><td style="color:#86efac">最快</td><td>最坏 O(n²)</td></tr>
+</table>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 120" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">选择策略 / When to Use What</text>
+    <rect x="30" y="35" width="160" height="70" rx="8" fill="#172554" stroke="#3b82f6"/>
+    <text x="110" y="55" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">小顶堆</text>
+    <text x="110" y="72" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">流式数据 / 数据量大</text>
+    <text x="110" y="85" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">K 远小于 n</text>
+    <text x="110" y="98" text-anchor="middle" fill="#86efac" font-size="9" font-family="Inter">✅ 推荐</text>
+
+    <rect x="220" y="35" width="160" height="70" rx="8" fill="#172554" stroke="#3b82f6"/>
+    <text x="300" y="55" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">Quick Select</text>
+    <text x="300" y="72" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">内存中的数组</text>
+    <text x="300" y="85" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">只需第 K 个值</text>
+    <text x="300" y="98" text-anchor="middle" fill="#86efac" font-size="9" font-family="Inter">✅ 最快</text>
+
+    <rect x="410" y="35" width="160" height="70" rx="8" fill="#1e293b" stroke="#334155"/>
+    <text x="490" y="55" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="700" font-family="Inter">排序</text>
+    <text x="490" y="72" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">数据量小</text>
+    <text x="490" y="85" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">需要完整排序结果</text>
+    <text x="490" y="98" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">简单场景</text>
+  </svg>
+</div>
+</section>
+
+<!-- Section 5 -->
+<section id="sec-apps">
+<h2 class="section-title"><span class="num">5</span> 应用场景 / Applications</h2>
+
+<div class="box box-green">
+  <div class="title">🌍 Top K 的实际应用</div>
+  <ul>
+    <li><strong>搜索引擎</strong>：返回相关度最高的 K 个结果</li>
+    <li><strong>推荐系统</strong>：推荐评分最高的 K 个商品</li>
+    <li><strong>监控系统</strong>：找出 CPU 占用最高的 K 个进程</li>
+    <li><strong>数据分析</strong>：找出销量最高的 K 个产品</li>
+    <li><strong>热搜榜</strong>：实时统计搜索频率最高的 K 个词</li>
+  </ul>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 100" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">热搜榜 = 实时 Top K 问题</text>
+    <rect x="30" y="30" width="120" height="55" rx="8" fill="#172554" stroke="#3b82f6"/>
+    <text x="90" y="52" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="600" font-family="Inter">用户搜索流</text>
+    <text x="90" y="68" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">HashMap 计数</text>
+    <text x="170" y="60" fill="#3b82f6" font-size="14" font-family="Inter">→</text>
+    <rect x="200" y="30" width="120" height="55" rx="8" fill="#1c1917" stroke="#f59e0b"/>
+    <text x="260" y="52" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="600" font-family="Inter">小顶堆 (K=10)</text>
+    <text x="260" y="68" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">维护 Top 10</text>
+    <text x="340" y="60" fill="#f59e0b" font-size="14" font-family="Inter">→</text>
+    <rect x="370" y="30" width="120" height="55" rx="8" fill="#14532d" stroke="#22c55e"/>
+    <text x="430" y="52" text-anchor="middle" fill="#86efac" font-size="10" font-weight="600" font-family="Inter">🔥 热搜榜</text>
+    <text x="430" y="68" text-anchor="middle" fill="#86efac" font-size="9" font-family="Inter">实时更新</text>
+  </svg>
+</div>
+</section>
+
+<!-- Section 6 -->
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">6</span> 总结 / Summary</h2>
+
+<table>
+  <tr><th>方法</th><th>时间</th><th>空间</th><th>适用场景</th></tr>
+  <tr><td>小顶堆</td><td>O(n log K)</td><td>O(K)</td><td>流式数据、K ≪ n</td></tr>
+  <tr><td>Quick Select</td><td>平均 O(n)</td><td>O(1)</td><td>内存数组、只需第 K 个</td></tr>
+  <tr><td>排序</td><td>O(n log n)</td><td>O(1)</td><td>小数据、需完整排序</td></tr>
+</table>
+
+<div class="box box-purple">
+  <div class="title">🎯 面试技巧</div>
+  <p>面试中遇到 Top K 问题，先说<strong>小顶堆</strong>方案（最通用），再提<strong>Quick Select</strong>（展示深度）。如果面试官追问流式数据，堆方案是唯一选择。</p>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>Top K 问题图解教程 — 基于 LeetCode 高频题综合整理</p>
+  <p><a href="../">← 返回主页 / Back to Home</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+<script>
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => btn.classList.toggle('show', window.scrollY > 400));
+</script>
+
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

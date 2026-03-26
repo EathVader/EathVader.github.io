@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>跳表图解教程 / Skip List Visual Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>⏭️ <span>跳表</span>图解教程</h1>
+  <p class="subtitle">链表也能二分查找 —— 平衡树的优雅替代方案<br>
+  Skip List: Binary Search on Linked Lists</p>
+  <span class="badge">🔗 链表</span>
+  <span class="badge">⚡ O(log n)</span>
+  <span class="badge">🎲 随机化</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-why">为什么需要跳表 / Why</a></li>
+    <li><a href="#sec-what">什么是跳表 / What</a></li>
+    <li><a href="#sec-demo">交互式演示 / Interactive Demo</a></li>
+    <li><a href="#sec-search">查找过程 / Search</a></li>
+    <li><a href="#sec-insert">插入与层高 / Insert</a></li>
+    <li><a href="#sec-impl">代码实现 / Implementation</a></li>
+    <li><a href="#sec-vs">跳表 vs 平衡树 / Comparison</a></li>
+    <li><a href="#sec-apps">实际应用 / Applications</a></li>
+    <li><a href="#sec-summary">总结 / Summary</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1 -->
+<section id="sec-why">
+<h2 class="section-title"><span class="num">1</span> 为什么需要跳表 / Why</h2>
+
+<div class="analogy">
+  <div class="emoji">🚇</div>
+  <h4>类比 / Analogy</h4>
+  <p>普通链表像<strong>公交车</strong>，每站都停。跳表像<strong>地铁</strong>：有快线（只停大站）和慢线（每站都停）。找目标时先坐快线跳过大段距离，接近目标后换慢线精确定位。</p>
+</div>
+
+<table>
+  <tr><th>数据结构</th><th>查找</th><th>插入</th><th>删除</th><th>实现难度</th></tr>
+  <tr><td>有序链表</td><td style="color:#fca5a5">O(n)</td><td>O(n)</td><td>O(n)</td><td style="color:#86efac">简单</td></tr>
+  <tr><td>平衡树 (AVL/红黑树)</td><td style="color:#86efac">O(log n)</td><td>O(log n)</td><td>O(log n)</td><td style="color:#fca5a5">复杂</td></tr>
+  <tr><td style="color:#86efac">跳表</td><td style="color:#86efac">O(log n)</td><td style="color:#86efac">O(log n)</td><td style="color:#86efac">O(log n)</td><td style="color:#86efac">简单</td></tr>
+</table>
+</section>
+
+<!-- Section 2 -->
+<section id="sec-what">
+<h2 class="section-title"><span class="num">2</span> 什么是跳表 / What</h2>
+
+<div class="box box-blue">
+  <div class="title">📐 跳表的结构</div>
+  <p>跳表是<strong>多层有序链表</strong>。最底层（L0）包含所有元素，每往上一层，节点数约减半。每个节点随机决定自己出现在几层中。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg">
+    <text x="350" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">跳表结构：多层有序链表</text>
+
+    <!-- L3 -->
+    <text x="20" y="42" fill="#64748b" font-size="9" font-family="Inter">L3</text>
+    <rect x="40" y="30" width="25" height="18" rx="3" fill="#1e293b" stroke="#475569"/><text x="52" y="43" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">H</text>
+    <line x1="65" y1="39" x2="310" y2="39" stroke="#334155" stroke-width="1"/>
+    <rect x="310" y="30" width="35" height="18" rx="3" fill="#172554" stroke="#3b82f6"/><text x="327" y="43" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="JetBrains Mono">17</text>
+
+    <!-- L2 -->
+    <text x="20" y="72" fill="#64748b" font-size="9" font-family="Inter">L2</text>
+    <rect x="40" y="60" width="25" height="18" rx="3" fill="#1e293b" stroke="#475569"/><text x="52" y="73" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">H</text>
+    <line x1="65" y1="69" x2="175" y2="69" stroke="#334155" stroke-width="1"/>
+    <rect x="175" y="60" width="35" height="18" rx="3" fill="#172554" stroke="#3b82f6"/><text x="192" y="73" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="JetBrains Mono">9</text>
+    <line x1="210" y1="69" x2="310" y2="69" stroke="#334155" stroke-width="1"/>
+    <rect x="310" y="60" width="35" height="18" rx="3" fill="#172554" stroke="#3b82f6"/><text x="327" y="73" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="JetBrains Mono">17</text>
+    <line x1="345" y1="69" x2="445" y2="69" stroke="#334155" stroke-width="1"/>
+    <rect x="445" y="60" width="35" height="18" rx="3" fill="#172554" stroke="#3b82f6"/><text x="462" y="73" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="JetBrains Mono">25</text>
+
+    <!-- L1 -->
+    <text x="20" y="102" fill="#64748b" font-size="9" font-family="Inter">L1</text>
+    <rect x="40" y="90" width="25" height="18" rx="3" fill="#1e293b" stroke="#475569"/><text x="52" y="103" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">H</text>
+    <line x1="65" y1="99" x2="107" y2="99" stroke="#334155" stroke-width="1"/>
+    <rect x="107" y="90" width="35" height="18" rx="3" fill="#172554" stroke="#3b82f6"/><text x="124" y="103" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="JetBrains Mono">6</text>
+    <line x1="142" y1="99" x2="175" y2="99" stroke="#334155" stroke-width="1"/>
+    <rect x="175" y="90" width="35" height="18" rx="3" fill="#172554" stroke="#3b82f6"/><text x="192" y="103" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="JetBrains Mono">9</text>
+    <line x1="210" y1="99" x2="310" y2="99" stroke="#334155" stroke-width="1"/>
+    <rect x="310" y="90" width="35" height="18" rx="3" fill="#172554" stroke="#3b82f6"/><text x="327" y="103" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="JetBrains Mono">17</text>
+    <line x1="345" y1="99" x2="378" y2="99" stroke="#334155" stroke-width="1"/>
+    <rect x="378" y="90" width="35" height="18" rx="3" fill="#172554" stroke="#3b82f6"/><text x="395" y="103" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="JetBrains Mono">21</text>
+    <line x1="413" y1="99" x2="445" y2="99" stroke="#334155" stroke-width="1"/>
+    <rect x="445" y="90" width="35" height="18" rx="3" fill="#172554" stroke="#3b82f6"/><text x="462" y="103" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="JetBrains Mono">25</text>
+
+    <!-- L0 -->
+    <text x="20" y="132" fill="#64748b" font-size="9" font-family="Inter">L0</text>
+    <rect x="40" y="120" width="25" height="18" rx="3" fill="#1e293b" stroke="#475569"/><text x="52" y="133" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">H</text>
+    <line x1="65" y1="129" x2="72" y2="129" stroke="#334155" stroke-width="1"/>
+    <rect x="72" y="120" width="30" height="18" rx="3" fill="#14532d" stroke="#22c55e"/><text x="87" y="133" text-anchor="middle" fill="#86efac" font-size="9" font-weight="700" font-family="JetBrains Mono">3</text>
+    <line x1="102" y1="129" x2="107" y2="129" stroke="#334155" stroke-width="1"/>
+    <rect x="107" y="120" width="30" height="18" rx="3" fill="#14532d" stroke="#22c55e"/><text x="122" y="133" text-anchor="middle" fill="#86efac" font-size="9" font-weight="700" font-family="JetBrains Mono">6</text>
+    <line x1="137" y1="129" x2="142" y2="129" stroke="#334155" stroke-width="1"/>
+    <rect x="142" y="120" width="30" height="18" rx="3" fill="#14532d" stroke="#22c55e"/><text x="157" y="133" text-anchor="middle" fill="#86efac" font-size="9" font-weight="700" font-family="JetBrains Mono">7</text>
+    <line x1="172" y1="129" x2="175" y2="129" stroke="#334155" stroke-width="1"/>
+    <rect x="175" y="120" width="30" height="18" rx="3" fill="#14532d" stroke="#22c55e"/><text x="190" y="133" text-anchor="middle" fill="#86efac" font-size="9" font-weight="700" font-family="JetBrains Mono">9</text>
+    <text x="220" y="133" fill="#94a3b8" font-size="9" font-family="Inter">... 12, 17, 19, 21, 25, 26</text>
+
+    <text x="350" y="148" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">L0 包含所有节点 | 越高层节点越少 | 查找时从最高层开始，逐层下降</text>
+  </svg>
+</div>
+</section>
+
+<!-- Section 3: Demo -->
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">3</span> 交互式演示 / Interactive Demo</h2>
+
+<div class="demo">
+  <h4>🎮 跳表可视化</h4>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.5rem">
+    <input id="sl-input" type="number" placeholder="输入数字" style="width:100px">
+    <button id="sl-insert">插入</button>
+    <button id="sl-search" style="background:linear-gradient(135deg,#8b5cf6,#6366f1)">查找</button>
+    <button id="sl-reset" style="background:#334155">重置</button>
+  </div>
+  <div style="margin-bottom:.5rem">
+    <button id="sl-example" style="background:#1e293b;border:1px solid #334155;font-size:.8rem">示例：3, 6, 7, 9, 12, 17, 19, 21, 25, 26</button>
+  </div>
+  <svg id="sl-svg" viewBox="0 0 700 240" style="width:100%;height:240px;background:#0f172a;border-radius:8px"></svg>
+  <div id="sl-log" class="output">等待操作...</div>
+  <p style="font-size:.8rem;color:#64748b;margin-top:.5rem">🟢 L0 = 完整链表　🔵 高层 = 快速通道　每次插入随机决定层高</p>
+</div>
+</section>
+
+<!-- Section 4: Search -->
+<section id="sec-search">
+<h2 class="section-title"><span class="num">4</span> 查找过程 / Search</h2>
+
+<div class="flow">
+  <div class="step">从最高层<br>头节点出发</div>
+  <div class="arrow">→</div>
+  <div class="step">右边 ≤ 目标<br>→ 向右走</div>
+  <div class="arrow">→</div>
+  <div class="step">右边 > 目标<br>→ 下降一层</div>
+  <div class="arrow">→</div>
+  <div class="step">到达 L0<br>精确匹配</div>
+</div>
+
+<div class="box box-green">
+  <div class="title">⚡ 为什么是 O(log n)？</div>
+  <p>每下降一层，搜索范围大约减半（因为每层约有上层 2 倍的节点）。层数 = O(log n)，每层最多走常数步，总共 O(log n)。和二分查找的原理一样！</p>
+</div>
+</section>
+
+<!-- Section 5: Insert -->
+<section id="sec-insert">
+<h2 class="section-title"><span class="num">5</span> 插入与层高 / Insert</h2>
+
+<div class="box box-blue">
+  <div class="title">🎲 随机层高（抛硬币法）</div>
+  <p>插入新节点时，用"抛硬币"决定层高：正面（概率 p=1/2）就加一层，反面就停。平均层高 = 1/(1-p) = 2。这样无需复杂的平衡操作，概率上就能保持平衡。</p>
+</div>
+
+<pre><code>int randomLevel() {
+    int level = 0;
+    while (Math.random() < 0.5 && level < MAX_LEVEL)
+        level++;
+    return level;
+}</code></pre>
+</section>
+
+<!-- Section 6: Implementation -->
+<section id="sec-impl">
+<h2 class="section-title"><span class="num">6</span> 代码实现 / Implementation</h2>
+
+<pre><code>class SkipNode {
+    int val;
+    SkipNode[] next; // next[i] = 第 i 层的下一个节点
+    SkipNode(int val, int level) {
+        this.val = val;
+        this.next = new SkipNode[level + 1];
+    }
+}
+
+class SkipList {
+    int maxLevel = 16, level = 0;
+    SkipNode head = new SkipNode(Integer.MIN_VALUE, maxLevel);
+
+    void insert(int val) {
+        SkipNode[] update = new SkipNode[maxLevel + 1];
+        SkipNode curr = head;
+        for (int i = level; i >= 0; i--) {
+            while (curr.next[i] != null && curr.next[i].val < val)
+                curr = curr.next[i];
+            update[i] = curr; // 记录每层的前驱
+        }
+        int newLevel = randomLevel();
+        if (newLevel > level) {
+            for (int i = level + 1; i <= newLevel; i++)
+                update[i] = head;
+            level = newLevel;
+        }
+        SkipNode node = new SkipNode(val, newLevel);
+        for (int i = 0; i <= newLevel; i++) {
+            node.next[i] = update[i].next[i]; // 链表插入
+            update[i].next[i] = node;
+        }
+    }
+
+    boolean search(int val) {
+        SkipNode curr = head;
+        for (int i = level; i >= 0; i--)
+            while (curr.next[i] != null && curr.next[i].val < val)
+                curr = curr.next[i];
+        curr = curr.next[0];
+        return curr != null && curr.val == val;
+    }
+}</code></pre>
+</section>
+
+<!-- Section 7: Comparison -->
+<section id="sec-vs">
+<h2 class="section-title"><span class="num">7</span> 跳表 vs 平衡树 / Comparison</h2>
+
+<table>
+  <tr><th></th><th>跳表</th><th>红黑树</th><th>AVL 树</th></tr>
+  <tr><td>查找</td><td>O(log n) 期望</td><td>O(log n) 最坏</td><td>O(log n) 最坏</td></tr>
+  <tr><td>插入</td><td style="color:#86efac">简单（链表操作）</td><td>复杂（旋转+变色）</td><td>复杂（旋转）</td></tr>
+  <tr><td>范围查询</td><td style="color:#86efac">天然支持（L0 有序链表）</td><td>需中序遍历</td><td>需中序遍历</td></tr>
+  <tr><td>并发</td><td style="color:#86efac">容易加锁（分段锁）</td><td style="color:#fca5a5">难（旋转影响多节点）</td><td style="color:#fca5a5">难</td></tr>
+  <tr><td>实现难度</td><td style="color:#86efac">~100 行</td><td>~300 行</td><td>~200 行</td></tr>
+</table>
+</section>
+
+<!-- Section 8: Applications -->
+<section id="sec-apps">
+<h2 class="section-title"><span class="num">8</span> 实际应用 / Applications</h2>
+
+<div class="box box-green">
+  <div class="title">🌍 工业级应用</div>
+  <ul>
+    <li><strong>Redis</strong>：Sorted Set（有序集合）的底层实现就是跳表</li>
+    <li><strong>LevelDB / RocksDB</strong>：MemTable 使用跳表存储内存中的有序数据</li>
+    <li><strong>Java ConcurrentSkipListMap</strong>：JDK 内置的并发有序 Map</li>
+    <li><strong>Apache Lucene</strong>：倒排索引中的 posting list 合并</li>
+  </ul>
+</div>
+
+<div class="analogy">
+  <div class="emoji">💡</div>
+  <h4>为什么 Redis 选跳表而不是红黑树？</h4>
+  <p>Redis 作者 antirez 的回答：① 跳表实现更简单，bug 更少 ② 范围查询（ZRANGEBYSCORE）天然高效 ③ 通过调整 p 值可以灵活平衡时间和空间。</p>
+</div>
+</section>
+
+<!-- Section 9: Summary -->
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">9</span> 总结 / Summary</h2>
+
+<table>
+  <tr><th>操作</th><th>时间（期望）</th><th>说明</th></tr>
+  <tr><td>查找</td><td>O(log n)</td><td>从高层到低层逐步缩小范围</td></tr>
+  <tr><td>插入</td><td>O(log n)</td><td>随机层高 + 链表插入</td></tr>
+  <tr><td>删除</td><td>O(log n)</td><td>逐层链表删除</td></tr>
+  <tr><td>空间</td><td>O(n)</td><td>平均每节点 2 个指针（p=1/2）</td></tr>
+</table>
+
+<div class="box box-purple">
+  <div class="title">📚 延伸阅读</div>
+  <ul>
+    <li><a href="https://en.wikipedia.org/wiki/Skip_list" target="_blank">Wikipedia: Skip List</a></li>
+    <li><a href="http://uosis.mif.vu.lt/~ragaisis/ADS2006/skiplists.pdf" target="_blank">Pugh 原始论文 (1990)</a></li>
+    <li><a href="https://ocw.mit.edu/courses/6-046j-introduction-to-algorithms-sma-5503-fall-2005/resources/lecture-12-skip-lists/" target="_blank">MIT 算法公开课：Skip Lists</a></li>
+  </ul>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>基于左小田的文章及 Pugh 论文综合改编为交互式教程</p>
+  <p><a href="../">← 返回主页 / Back to Home</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+<script src="skiplist.js"></script>
+<script>
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => btn.classList.toggle('show', window.scrollY > 400));
+</script>
+
+<!-- Giscus Comments -->
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

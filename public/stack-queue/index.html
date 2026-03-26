@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>栈和队列图解教程 / Stack & Queue Visual Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>📚 <span>栈和队列</span>图解教程</h1>
+  <p class="subtitle">LIFO 与 FIFO —— 两种最基础的数据结构<br>
+  Stack (LIFO) &amp; Queue (FIFO): Fundamental Data Structures</p>
+  <span class="badge">📚 栈 / Stack</span>
+  <span class="badge">🚶 队列 / Queue</span>
+  <span class="badge">📉 单调栈</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-stack">栈基础 / Stack Basics (LIFO)</a></li>
+    <li><a href="#sec-queue">队列基础 / Queue Basics (FIFO)</a></li>
+    <li><a href="#sec-bracket">括号匹配 / Bracket Matching</a></li>
+    <li><a href="#sec-mono">单调栈 / Monotonic Stack</a></li>
+    <li><a href="#sec-minstack">最小栈 / Min Stack</a></li>
+    <li><a href="#sec-queue2stack">用两个栈实现队列 / Queue Using Two Stacks</a></li>
+    <li><a href="#sec-demo">交互式演示 / Interactive Demo</a></li>
+    <li><a href="#sec-summary">总结 / Summary</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1 -->
+<section id="sec-stack">
+<h2 class="section-title"><span class="num">1</span> 栈基础 / Stack Basics (LIFO)</h2>
+
+<div class="analogy">
+  <div class="emoji">🥞</div>
+  <h4>类比 / Analogy</h4>
+  <p>栈就像一摞<strong>煎饼</strong>：你只能从最上面放（push）和拿（pop）。最后放上去的煎饼最先被拿走——这就是 <strong>LIFO</strong>（Last In, First Out，后进先出）。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 160" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">栈的 Push 和 Pop 操作</text>
+    <!-- Stack visual -->
+    <rect x="120" y="30" width="80" height="110" rx="4" fill="none" stroke="#334155" stroke-width="2"/>
+    <text x="160" y="25" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">栈 / Stack</text>
+    <rect x="125" y="110" width="70" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="160" y="126" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">A</text>
+    <rect x="125" y="83" width="70" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="160" y="99" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">B</text>
+    <rect x="125" y="56" width="70" height="24" rx="3" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="160" y="72" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">C</text>
+    <text x="160" y="50" text-anchor="middle" fill="#22c55e" font-size="9" font-family="Inter">← top</text>
+    <!-- Push arrow -->
+    <text x="280" y="55" fill="#22c55e" font-size="12" font-family="Inter">push(D) →</text>
+    <!-- After push -->
+    <rect x="380" y="30" width="80" height="110" rx="4" fill="none" stroke="#334155" stroke-width="2"/>
+    <rect x="385" y="110" width="70" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="420" y="126" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="Inter">A</text>
+    <rect x="385" y="83" width="70" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="420" y="99" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="Inter">B</text>
+    <rect x="385" y="56" width="70" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="420" y="72" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="Inter">C</text>
+    <rect x="385" y="32" width="70" height="24" rx="3" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="420" y="48" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">D</text>
+    <text x="420" y="28" text-anchor="middle" fill="#22c55e" font-size="9" font-family="Inter">← new top</text>
+    <!-- Pop label -->
+    <text x="480" y="48" fill="#f87171" font-size="10" font-family="Inter">pop() → D</text>
+  </svg>
+  <div class="caption">Push 放到栈顶，Pop 从栈顶取出，都是 O(1)</div>
+</div>
+</section>
+
+<!-- Section 2 -->
+<section id="sec-queue">
+<h2 class="section-title"><span class="num">2</span> 队列基础 / Queue Basics (FIFO)</h2>
+
+<div class="analogy">
+  <div class="emoji">🚶‍♂️</div>
+  <h4>类比 / Analogy</h4>
+  <p>队列就像<strong>排队买奶茶</strong>：先来的人先买到（先进先出）。新来的人排到队尾（enqueue），买完的人从队头离开（dequeue）。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 100" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="aq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3b82f6"/></marker></defs>
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">队列的 Enqueue 和 Dequeue 操作</text>
+    <text x="30" y="55" fill="#f87171" font-size="10" font-family="Inter">dequeue ←</text>
+    <text x="30" y="68" fill="#f87171" font-size="9" font-family="Inter">(front)</text>
+    <rect x="110" y="38" width="55" height="30" rx="5" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="137" y="57" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">A</text>
+    <line x1="165" y1="53" x2="180" y2="53" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#aq)"/>
+    <rect x="185" y="38" width="55" height="30" rx="5" fill="#172554" stroke="#3b82f6"/><text x="212" y="57" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">B</text>
+    <line x1="240" y1="53" x2="255" y2="53" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#aq)"/>
+    <rect x="260" y="38" width="55" height="30" rx="5" fill="#172554" stroke="#3b82f6"/><text x="287" y="57" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">C</text>
+    <line x1="315" y1="53" x2="330" y2="53" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#aq)"/>
+    <rect x="335" y="38" width="55" height="30" rx="5" fill="#172554" stroke="#3b82f6"/><text x="362" y="57" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">D</text>
+    <text x="420" y="55" fill="#22c55e" font-size="10" font-family="Inter">← enqueue</text>
+    <text x="420" y="68" fill="#22c55e" font-size="9" font-family="Inter">(rear)</text>
+    <text x="300" y="88" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">FIFO: First In, First Out — A 先进，A 先出</text>
+  </svg>
+</div>
+</section>
+
+<!-- Section 3 -->
+<section id="sec-bracket">
+<h2 class="section-title"><span class="num">3</span> 括号匹配 / Bracket Matching</h2>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 130" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">验证 "({[]})" 是否合法</text>
+    <!-- Characters -->
+    <text x="60" y="45" text-anchor="middle" fill="#93c5fd" font-size="16" font-weight="700" font-family="JetBrains Mono">(</text>
+    <text x="110" y="45" text-anchor="middle" fill="#fbbf24" font-size="16" font-weight="700" font-family="JetBrains Mono">{</text>
+    <text x="160" y="45" text-anchor="middle" fill="#a78bfa" font-size="16" font-weight="700" font-family="JetBrains Mono">[</text>
+    <text x="210" y="45" text-anchor="middle" fill="#a78bfa" font-size="16" font-weight="700" font-family="JetBrains Mono">]</text>
+    <text x="260" y="45" text-anchor="middle" fill="#fbbf24" font-size="16" font-weight="700" font-family="JetBrains Mono">}</text>
+    <text x="310" y="45" text-anchor="middle" fill="#93c5fd" font-size="16" font-weight="700" font-family="JetBrains Mono">)</text>
+    <!-- Stack states -->
+    <text x="60" y="70" text-anchor="middle" fill="#22c55e" font-size="9" font-family="Inter">push (</text>
+    <text x="110" y="70" text-anchor="middle" fill="#22c55e" font-size="9" font-family="Inter">push {</text>
+    <text x="160" y="70" text-anchor="middle" fill="#22c55e" font-size="9" font-family="Inter">push [</text>
+    <text x="210" y="70" text-anchor="middle" fill="#f87171" font-size="9" font-family="Inter">pop [✓</text>
+    <text x="260" y="70" text-anchor="middle" fill="#f87171" font-size="9" font-family="Inter">pop {✓</text>
+    <text x="310" y="70" text-anchor="middle" fill="#f87171" font-size="9" font-family="Inter">pop (✓</text>
+    <!-- Stack visualization -->
+    <text x="60" y="90" text-anchor="middle" fill="#64748b" font-size="8" font-family="JetBrains Mono">[(]</text>
+    <text x="110" y="90" text-anchor="middle" fill="#64748b" font-size="8" font-family="JetBrains Mono">[(,{]</text>
+    <text x="160" y="90" text-anchor="middle" fill="#64748b" font-size="8" font-family="JetBrains Mono">[(,{,[</text>
+    <text x="210" y="90" text-anchor="middle" fill="#64748b" font-size="8" font-family="JetBrains Mono">[(,{]</text>
+    <text x="260" y="90" text-anchor="middle" fill="#64748b" font-size="8" font-family="JetBrains Mono">[(]</text>
+    <text x="310" y="90" text-anchor="middle" fill="#64748b" font-size="8" font-family="JetBrains Mono">[]</text>
+    <text x="380" y="90" fill="#86efac" font-size="11" font-family="Inter">栈空 → 合法 ✅</text>
+  </svg>
+  <div class="caption">左括号入栈，右括号与栈顶匹配则弹出，最终栈空 = 合法</div>
+</div>
+
+<pre><code>// 括号匹配 / Valid parentheses
+boolean isValid(String s) {
+    Deque&lt;Character&gt; stack = new ArrayDeque&lt;&gt;();
+    Map&lt;Character, Character&gt; map = Map.of(')', '(', '}', '{', ']', '[');
+    for (char c : s.toCharArray()) {
+        if (map.containsValue(c)) stack.push(c);
+        else if (stack.isEmpty() || stack.pop() != map.get(c)) return false;
+    }
+    return stack.isEmpty();
+}</code></pre>
+</section>
+
+<!-- Section 4 -->
+<section id="sec-mono">
+<h2 class="section-title"><span class="num">4</span> 单调栈 / Monotonic Stack</h2>
+
+<div class="box box-blue">
+  <div class="title">📐 什么是单调栈？</div>
+  <p>栈内元素始终保持<strong>单调递增或递减</strong>。新元素入栈前，弹出所有破坏单调性的元素。经典应用：<strong>下一个更大元素</strong>（Next Greater Element）。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 700 180" xmlns="http://www.w3.org/2000/svg">
+    <text x="350" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">单调递减栈求"下一个更大元素"：[2, 1, 4, 3, 5]</text>
+    <!-- Array -->
+    <rect x="50" y="30" width="40" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="70" y="46" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="Inter">2</text>
+    <rect x="95" y="30" width="40" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="115" y="46" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="Inter">1</text>
+    <rect x="140" y="30" width="40" height="24" rx="3" fill="#1c1917" stroke="#f59e0b" stroke-width="2"/><text x="160" y="46" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="700" font-family="Inter">4</text>
+    <rect x="185" y="30" width="40" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="205" y="46" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="Inter">3</text>
+    <rect x="230" y="30" width="40" height="24" rx="3" fill="#172554" stroke="#3b82f6"/><text x="250" y="46" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="Inter">5</text>
+
+    <!-- Process steps -->
+    <text x="50" y="80" fill="#94a3b8" font-size="10" font-family="Inter">遍历到 4 时：</text>
+    <text x="50" y="95" fill="#94a3b8" font-size="10" font-family="Inter">栈: [2, 1]</text>
+    <text x="50" y="110" fill="#f59e0b" font-size="10" font-family="Inter">4 > 1 → 弹出 1，1 的答案 = 4</text>
+    <text x="50" y="125" fill="#f59e0b" font-size="10" font-family="Inter">4 > 2 → 弹出 2，2 的答案 = 4</text>
+    <text x="50" y="140" fill="#22c55e" font-size="10" font-family="Inter">压入 4，栈: [4]</text>
+
+    <!-- Result -->
+    <text x="50" y="170" fill="#86efac" font-size="10" font-weight="600" font-family="Inter">结果: [4, 4, 5, 5, -1]</text>
+    <text x="350" y="170" fill="#64748b" font-size="10" font-family="Inter">每个元素最多入栈出栈各一次 → O(n)</text>
+  </svg>
+  <div class="caption">单调栈保证每个元素只被处理一次，总时间 O(n)</div>
+</div>
+
+<pre><code>// 下一个更大元素 / Next greater element
+int[] nextGreater(int[] nums) {
+    int n = nums.length;
+    int[] res = new int[n];
+    Arrays.fill(res, -1);
+    Deque&lt;Integer&gt; stack = new ArrayDeque&lt;&gt;(); // 存索引
+    for (int i = 0; i < n; i++) {
+        while (!stack.isEmpty() && nums[stack.peek()] < nums[i]) {
+            res[stack.pop()] = nums[i];
+        }
+        stack.push(i);
+    }
+    return res;
+}</code></pre>
+</section>
+
+<!-- Section 5 -->
+<section id="sec-minstack">
+<h2 class="section-title"><span class="num">5</span> 最小栈 / Min Stack</h2>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 140" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">用辅助栈同步记录当前最小值</text>
+    <!-- Main stack -->
+    <text x="120" y="35" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="600" font-family="Inter">主栈</text>
+    <rect x="90" y="100" width="60" height="22" rx="3" fill="#172554" stroke="#3b82f6"/><text x="120" y="115" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">5</text>
+    <rect x="90" y="75" width="60" height="22" rx="3" fill="#172554" stroke="#3b82f6"/><text x="120" y="90" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">3</text>
+    <rect x="90" y="50" width="60" height="22" rx="3" fill="#172554" stroke="#3b82f6"/><text x="120" y="65" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">7</text>
+    <rect x="90" y="38" width="60" height="12" rx="3" fill="#14532d" stroke="#22c55e"/><text x="120" y="48" text-anchor="middle" fill="#86efac" font-size="8" font-family="Inter">top→ 2</text>
+    <!-- Min stack -->
+    <text x="280" y="35" text-anchor="middle" fill="#fbbf24" font-size="10" font-weight="600" font-family="Inter">最小栈</text>
+    <rect x="250" y="100" width="60" height="22" rx="3" fill="#1c1917" stroke="#f59e0b"/><text x="280" y="115" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="Inter">5</text>
+    <rect x="250" y="75" width="60" height="22" rx="3" fill="#1c1917" stroke="#f59e0b"/><text x="280" y="90" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="Inter">3</text>
+    <rect x="250" y="50" width="60" height="22" rx="3" fill="#1c1917" stroke="#f59e0b"/><text x="280" y="65" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="Inter">3</text>
+    <rect x="250" y="38" width="60" height="12" rx="3" fill="#14532d" stroke="#22c55e"/><text x="280" y="48" text-anchor="middle" fill="#86efac" font-size="8" font-family="Inter">top→ 2</text>
+    <!-- Explanation -->
+    <text x="400" y="55" fill="#94a3b8" font-size="10" font-family="Inter">push 时：主栈正常 push</text>
+    <text x="400" y="70" fill="#94a3b8" font-size="10" font-family="Inter">最小栈 push min(val, 当前最小)</text>
+    <text x="400" y="90" fill="#86efac" font-size="10" font-family="Inter">getMin() = 最小栈栈顶 = O(1)</text>
+  </svg>
+  <div class="caption">两个栈同步操作，最小栈栈顶始终是当前最小值</div>
+</div>
+
+<pre><code>// 最小栈 / Min Stack - O(1) push, pop, getMin
+class MinStack {
+    Deque&lt;Integer&gt; stack = new ArrayDeque&lt;&gt;();
+    Deque&lt;Integer&gt; minStack = new ArrayDeque&lt;&gt;();
+
+    void push(int val) {
+        stack.push(val);
+        minStack.push(minStack.isEmpty() ? val : Math.min(val, minStack.peek()));
+    }
+    void pop() { stack.pop(); minStack.pop(); }
+    int top() { return stack.peek(); }
+    int getMin() { return minStack.peek(); }
+}</code></pre>
+</section>
+
+<!-- Section 6 -->
+<section id="sec-queue2stack">
+<h2 class="section-title"><span class="num">6</span> 用两个栈实现队列 / Queue Using Two Stacks</h2>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 130" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">两个栈模拟队列：in 栈负责入队，out 栈负责出队</text>
+    <!-- In stack -->
+    <text x="120" y="38" text-anchor="middle" fill="#22c55e" font-size="10" font-weight="600" font-family="Inter">in 栈 (入队)</text>
+    <rect x="90" y="90" width="60" height="22" rx="3" fill="#172554" stroke="#3b82f6"/><text x="120" y="105" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">A</text>
+    <rect x="90" y="65" width="60" height="22" rx="3" fill="#172554" stroke="#3b82f6"/><text x="120" y="80" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">B</text>
+    <rect x="90" y="42" width="60" height="22" rx="3" fill="#14532d" stroke="#22c55e"/><text x="120" y="57" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="Inter">C</text>
+    <!-- Transfer arrow -->
+    <text x="220" y="75" fill="#f59e0b" font-size="11" font-family="Inter">out 空时</text>
+    <text x="220" y="90" fill="#f59e0b" font-size="11" font-family="Inter">全部倒入 →</text>
+    <!-- Out stack -->
+    <text x="380" y="38" text-anchor="middle" fill="#f87171" font-size="10" font-weight="600" font-family="Inter">out 栈 (出队)</text>
+    <rect x="350" y="90" width="60" height="22" rx="3" fill="#172554" stroke="#3b82f6"/><text x="380" y="105" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">C</text>
+    <rect x="350" y="65" width="60" height="22" rx="3" fill="#172554" stroke="#3b82f6"/><text x="380" y="80" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">B</text>
+    <rect x="350" y="42" width="60" height="22" rx="3" fill="#14532d" stroke="#22c55e"/><text x="380" y="57" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="Inter">A</text>
+    <text x="430" y="57" fill="#f87171" font-size="10" font-family="Inter">← pop = A (先进先出!)</text>
+  </svg>
+  <div class="caption">倒入后顺序反转，实现 FIFO。均摊 O(1)</div>
+</div>
+
+<pre><code>// 用两个栈实现队列 / Queue using two stacks
+class MyQueue {
+    Deque&lt;Integer&gt; in = new ArrayDeque&lt;&gt;(), out = new ArrayDeque&lt;&gt;();
+
+    void push(int x) { in.push(x); }
+
+    int pop() { transfer(); return out.pop(); }
+
+    int peek() { transfer(); return out.peek(); }
+
+    private void transfer() {
+        if (out.isEmpty()) while (!in.isEmpty()) out.push(in.pop());
+    }
+}</code></pre>
+</section>
+
+<!-- Section 7 -->
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">7</span> 交互式演示 / Interactive Demo</h2>
+
+<div class="demo">
+  <h4>🎮 栈 &amp; 队列可视化</h4>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.5rem">
+    <input id="sq-input" type="text" placeholder="输入值" style="width:80px">
+    <button id="sq-push">Stack Push</button>
+    <button id="sq-pop" style="background:linear-gradient(135deg,#f59e0b,#d97706)">Stack Pop</button>
+    <button id="sq-enq" style="background:linear-gradient(135deg,#8b5cf6,#6366f1)">Queue Enqueue</button>
+    <button id="sq-deq" style="background:linear-gradient(135deg,#0891b2,#0e7490)">Queue Dequeue</button>
+    <button id="sq-reset" style="background:#334155">重置</button>
+  </div>
+  <svg id="sq-svg" viewBox="0 0 700 150" style="width:100%;height:150px;background:#0f172a;border-radius:8px"></svg>
+  <div id="sq-log" class="output">点击按钮操作栈和队列</div>
+</div>
+</section>
+
+<!-- Section 8 -->
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">8</span> 总结 / Summary</h2>
+
+<table>
+  <tr><th>问题</th><th>数据结构</th><th>核心思路</th><th>时间</th></tr>
+  <tr><td>括号匹配</td><td>栈</td><td>左括号入栈，右括号匹配弹出</td><td>O(n)</td></tr>
+  <tr><td>单调栈</td><td>栈</td><td>维护单调性，弹出时记录答案</td><td>O(n)</td></tr>
+  <tr><td>最小栈</td><td>双栈</td><td>辅助栈同步记录最小值</td><td>O(1)</td></tr>
+  <tr><td>栈实现队列</td><td>双栈</td><td>in 栈入队，out 栈出队</td><td>均摊 O(1)</td></tr>
+</table>
+
+<div class="box box-green">
+  <div class="title">🎯 栈和队列的选择</div>
+  <ul>
+    <li><strong>需要"最近"匹配</strong>（括号、标签）→ 栈</li>
+    <li><strong>需要"先来先服务"</strong>（BFS、任务调度）→ 队列</li>
+    <li><strong>需要"下一个更大/更小"</strong>→ 单调栈</li>
+    <li><strong>需要 O(1) 获取最值</strong>→ 辅助栈/单调队列</li>
+  </ul>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>栈和队列图解教程 — 基于 LeetCode 高频题综合整理</p>
+  <p><a href="../">← 返回主页 / Back to Home</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+<script src="stack-queue.js"></script>
+<script>
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => btn.classList.toggle('show', window.scrollY > 400));
+</script>
+
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>链表经典题图解 / Linked List Problems</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>🔗 <span>链表经典题</span>图解教程</h1>
+  <p class="subtitle">反转、排序、环检测、合并 —— 链表核心问题一网打尽<br>
+  Linked List Classics: Reverse, Sort, Cycle Detection &amp; Merge</p>
+  <span class="badge">🔗 链表</span>
+  <span class="badge">🔄 双指针</span>
+  <span class="badge">⚡ O(n)</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-what">什么是链表 / What is Linked List</a></li>
+    <li><a href="#sec-reverse">反转链表 / Reverse Linked List</a></li>
+    <li><a href="#sec-cycle">环检测 / Cycle Detection</a></li>
+    <li><a href="#sec-merge">合并两个有序链表 / Merge Two Sorted Lists</a></li>
+    <li><a href="#sec-sort">链表排序 / Sort Linked List</a></li>
+    <li><a href="#sec-demo">交互式演示 / Interactive Demo</a></li>
+    <li><a href="#sec-summary">总结 / Summary</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1 -->
+<section id="sec-what">
+<h2 class="section-title"><span class="num">1</span> 什么是链表 / What is Linked List</h2>
+
+<div class="analogy">
+  <div class="emoji">🚂</div>
+  <h4>类比 / Analogy</h4>
+  <p>链表就像一列<strong>火车</strong>：每节车厢（节点）装着货物（数据），并用挂钩（指针）连接下一节车厢。你只能从车头开始，沿着挂钩一节一节往后走，不能直接跳到第 5 节车厢。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 100" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3b82f6"/></marker></defs>
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">单链表结构 / Singly Linked List</text>
+    <text x="30" y="45" fill="#94a3b8" font-size="10" font-family="Inter">head</text>
+    <line x1="50" y1="42" x2="70" y2="42" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ar)"/>
+    <rect x="80" y="30" width="80" height="30" rx="6" fill="#172554" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="105" y="50" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="700" font-family="Inter">1</text>
+    <text x="145" y="50" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">→</text>
+    <line x1="160" y1="45" x2="190" y2="45" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ar)"/>
+    <rect x="200" y="30" width="80" height="30" rx="6" fill="#172554" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="225" y="50" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="700" font-family="Inter">2</text>
+    <text x="265" y="50" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">→</text>
+    <line x1="280" y1="45" x2="310" y2="45" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ar)"/>
+    <rect x="320" y="30" width="80" height="30" rx="6" fill="#172554" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="345" y="50" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="700" font-family="Inter">3</text>
+    <text x="385" y="50" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">→</text>
+    <line x1="400" y1="45" x2="430" y2="45" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ar)"/>
+    <rect x="440" y="30" width="80" height="30" rx="6" fill="#172554" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="465" y="50" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="700" font-family="Inter">4</text>
+    <text x="505" y="50" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">→</text>
+    <text x="540" y="50" fill="#f87171" font-size="11" font-weight="700" font-family="Inter">null</text>
+    <text x="300" y="85" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">每个节点包含 val 和 next 指针 / Each node has val + next pointer</text>
+  </svg>
+</div>
+
+<div class="box box-blue">
+  <div class="title">📐 链表 vs 数组</div>
+  <table>
+    <tr><th>操作</th><th>数组</th><th>链表</th></tr>
+    <tr><td>随机访问</td><td style="color:#86efac">O(1)</td><td style="color:#fca5a5">O(n)</td></tr>
+    <tr><td>头部插入/删除</td><td style="color:#fca5a5">O(n)</td><td style="color:#86efac">O(1)</td></tr>
+    <tr><td>中间插入/删除</td><td style="color:#fca5a5">O(n)</td><td style="color:#86efac">O(1)*</td></tr>
+  </table>
+  <p style="font-size:.85rem;color:#94a3b8">* 已知前驱节点时</p>
+</div>
+</section>
+
+<!-- Section 2 -->
+<section id="sec-reverse">
+<h2 class="section-title"><span class="num">2</span> 反转链表 / Reverse Linked List</h2>
+
+<div class="analogy">
+  <div class="emoji">🔄</div>
+  <h4>类比 / Analogy</h4>
+  <p>想象你在排队，每个人只记得<strong>前面那个人</strong>。现在要反转队伍：让每个人转身，改为记住<strong>后面那个人</strong>。你需要一个一个处理，用一只手（prev）记住已经转好的人，另一只手（curr）指向正在处理的人。</p>
+</div>
+
+<h3>迭代法 / Iterative</h3>
+<div class="flow">
+  <div class="step">prev = null<br>curr = head</div>
+  <div class="arrow">→</div>
+  <div class="step">保存 next<br>curr.next = prev</div>
+  <div class="arrow">→</div>
+  <div class="step">prev = curr<br>curr = next</div>
+  <div class="arrow">→</div>
+  <div class="step">重复直到<br>curr == null</div>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 700 220" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3b82f6"/></marker>
+    <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#f59e0b"/></marker></defs>
+    <text x="350" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">迭代反转过程 / Iterative Reversal Steps</text>
+
+    <!-- Step 1: Initial -->
+    <text x="20" y="48" fill="#94a3b8" font-size="10" font-family="Inter">初始:</text>
+    <text x="80" y="38" fill="#a78bfa" font-size="9" font-family="Inter">prev</text>
+    <text x="80" y="48" fill="#a78bfa" font-size="9" font-family="Inter">null</text>
+    <rect x="120" y="35" width="50" height="24" rx="4" fill="#172554" stroke="#f59e0b" stroke-width="2"/>
+    <text x="145" y="51" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">1</text>
+    <text x="135" y="32" fill="#f59e0b" font-size="9" font-family="Inter">curr</text>
+    <line x1="170" y1="47" x2="195" y2="47" stroke="#3b82f6" stroke-width="1" marker-end="url(#ar2)"/>
+    <rect x="200" y="35" width="50" height="24" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="225" y="51" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">2</text>
+    <line x1="250" y1="47" x2="275" y2="47" stroke="#3b82f6" stroke-width="1" marker-end="url(#ar2)"/>
+    <rect x="280" y="35" width="50" height="24" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="305" y="51" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">3</text>
+    <line x1="330" y1="47" x2="350" y2="47" stroke="#3b82f6" stroke-width="1"/>
+    <text x="358" y="51" fill="#f87171" font-size="10" font-family="Inter">null</text>
+
+    <!-- Step 2 -->
+    <text x="20" y="98" fill="#94a3b8" font-size="10" font-family="Inter">第1步:</text>
+    <rect x="120" y="85" width="50" height="24" rx="4" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="145" y="101" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">1</text>
+    <text x="135" y="82" fill="#a78bfa" font-size="9" font-family="Inter">prev</text>
+    <line x1="145" y1="109" x2="95" y2="109" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ar3)"/>
+    <text x="85" y="113" fill="#f87171" font-size="9" font-family="Inter">null</text>
+    <rect x="200" y="85" width="50" height="24" rx="4" fill="#172554" stroke="#f59e0b" stroke-width="2"/>
+    <text x="225" y="101" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">2</text>
+    <text x="215" y="82" fill="#f59e0b" font-size="9" font-family="Inter">curr</text>
+    <line x1="250" y1="97" x2="275" y2="97" stroke="#3b82f6" stroke-width="1" marker-end="url(#ar2)"/>
+    <rect x="280" y="85" width="50" height="24" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="305" y="101" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">3</text>
+
+    <!-- Step 3 -->
+    <text x="20" y="148" fill="#94a3b8" font-size="10" font-family="Inter">第2步:</text>
+    <rect x="120" y="135" width="50" height="24" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="145" y="151" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">1</text>
+    <rect x="200" y="135" width="50" height="24" rx="4" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="225" y="151" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">2</text>
+    <text x="215" y="132" fill="#a78bfa" font-size="9" font-family="Inter">prev</text>
+    <line x1="225" y1="159" x2="170" y2="159" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ar3)"/>
+    <rect x="280" y="135" width="50" height="24" rx="4" fill="#172554" stroke="#f59e0b" stroke-width="2"/>
+    <text x="305" y="151" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">3</text>
+    <text x="295" y="132" fill="#f59e0b" font-size="9" font-family="Inter">curr</text>
+
+    <!-- Result -->
+    <text x="20" y="198" fill="#94a3b8" font-size="10" font-family="Inter">结果:</text>
+    <text x="85" y="198" fill="#f87171" font-size="9" font-family="Inter">null</text>
+    <line x1="100" y1="195" x2="115" y2="195" stroke="#f59e0b" stroke-width="1" marker-end="url(#ar3)"/>
+    <rect x="120" y="185" width="50" height="24" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="145" y="201" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">3</text>
+    <line x1="170" y1="197" x2="195" y2="197" stroke="#f59e0b" stroke-width="1" marker-end="url(#ar3)"/>
+    <rect x="200" y="185" width="50" height="24" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="225" y="201" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">2</text>
+    <line x1="250" y1="197" x2="275" y2="197" stroke="#f59e0b" stroke-width="1" marker-end="url(#ar3)"/>
+    <rect x="280" y="185" width="50" height="24" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="305" y="201" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">1</text>
+    <line x1="330" y1="197" x2="350" y2="197" stroke="#334155" stroke-width="1"/>
+    <text x="358" y="201" fill="#f87171" font-size="9" font-family="Inter">null</text>
+  </svg>
+  <div class="caption">每一步：保存 next → 反转指针 → 移动 prev 和 curr</div>
+</div>
+
+<pre><code>// 迭代反转 / Iterative reversal - O(n) time, O(1) space
+ListNode reverse(ListNode head) {
+    ListNode prev = null, curr = head;
+    while (curr != null) {
+        ListNode next = curr.next;  // 保存下一个
+        curr.next = prev;           // 反转指针
+        prev = curr;                // prev 前进
+        curr = next;                // curr 前进
+    }
+    return prev;
+}
+
+// 递归反转 / Recursive reversal - O(n) time, O(n) space
+ListNode reverseRecursive(ListNode head) {
+    if (head == null || head.next == null) return head;
+    ListNode newHead = reverseRecursive(head.next);
+    head.next.next = head;  // 后继指向自己
+    head.next = null;       // 断开原指针
+    return newHead;
+}</code></pre>
+
+<div class="box box-green">
+  <div class="title">⚡ 复杂度对比</div>
+  <p><strong>迭代</strong>：时间 O(n)，空间 O(1) — 推荐<br>
+  <strong>递归</strong>：时间 O(n)，空间 O(n)（调用栈）— 更优雅但有栈溢出风险</p>
+</div>
+</section>
+
+<!-- Section 3 -->
+<section id="sec-cycle">
+<h2 class="section-title"><span class="num">3</span> 环检测 / Cycle Detection (Floyd's Algorithm)</h2>
+
+<div class="analogy">
+  <div class="emoji">🐢🐇</div>
+  <h4>类比 / Analogy</h4>
+  <p>想象一条环形跑道，<strong>乌龟</strong>每次走 1 步，<strong>兔子</strong>每次走 2 步。如果跑道有环，兔子一定会从后面追上乌龟（就像操场跑步被套圈）。如果没有环，兔子会先跑到终点（null）。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3b82f6"/></marker></defs>
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">Floyd 龟兔赛跑算法 / Floyd's Tortoise and Hare</text>
+    <!-- Straight part -->
+    <rect x="40" y="70" width="50" height="28" rx="5" fill="#172554" stroke="#3b82f6"/>
+    <text x="65" y="88" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">1</text>
+    <line x1="90" y1="84" x2="115" y2="84" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ar4)"/>
+    <rect x="120" y="70" width="50" height="28" rx="5" fill="#172554" stroke="#3b82f6"/>
+    <text x="145" y="88" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">2</text>
+    <line x1="170" y1="84" x2="195" y2="84" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ar4)"/>
+    <!-- Cycle part -->
+    <rect x="200" y="70" width="50" height="28" rx="5" fill="#172554" stroke="#f59e0b" stroke-width="2"/>
+    <text x="225" y="88" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700" font-family="Inter">3</text>
+    <text x="225" y="65" fill="#f59e0b" font-size="9" font-family="Inter">环入口</text>
+    <line x1="250" y1="84" x2="295" y2="84" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ar4)"/>
+    <rect x="300" y="70" width="50" height="28" rx="5" fill="#172554" stroke="#f59e0b"/>
+    <text x="325" y="88" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700" font-family="Inter">4</text>
+    <line x1="350" y1="90" x2="380" y2="120" stroke="#f59e0b" stroke-width="1.5"/>
+    <rect x="370" y="120" width="50" height="28" rx="5" fill="#172554" stroke="#f59e0b"/>
+    <text x="395" y="138" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700" font-family="Inter">5</text>
+    <line x1="370" y1="140" x2="290" y2="155" stroke="#f59e0b" stroke-width="1.5"/>
+    <rect x="240" y="145" width="50" height="28" rx="5" fill="#172554" stroke="#f59e0b"/>
+    <text x="265" y="163" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700" font-family="Inter">6</text>
+    <!-- Back arrow to 3 -->
+    <path d="M240 159 Q200 160 200 120 Q200 98 200 98" fill="none" stroke="#f87171" stroke-width="2" stroke-dasharray="4" marker-end="url(#ar4)"/>
+    <text x="180" y="135" fill="#f87171" font-size="9" font-family="Inter">回到 3</text>
+    <!-- Tortoise & Hare -->
+    <text x="65" y="115" text-anchor="middle" fill="#22c55e" font-size="16" font-family="Inter">🐢</text>
+    <text x="145" y="115" text-anchor="middle" fill="#f59e0b" font-size="16" font-family="Inter">🐇</text>
+    <text x="65" y="130" text-anchor="middle" fill="#22c55e" font-size="8" font-family="Inter">slow(+1)</text>
+    <text x="145" y="130" text-anchor="middle" fill="#f59e0b" font-size="8" font-family="Inter">fast(+2)</text>
+    <!-- Legend -->
+    <text x="480" y="80" fill="#94a3b8" font-size="10" font-family="Inter">如果有环：</text>
+    <text x="480" y="95" fill="#86efac" font-size="10" font-family="Inter">fast 一定追上 slow</text>
+    <text x="480" y="115" fill="#94a3b8" font-size="10" font-family="Inter">如果无环：</text>
+    <text x="480" y="130" fill="#fca5a5" font-size="10" font-family="Inter">fast 先到 null</text>
+  </svg>
+  <div class="caption">节点 3→4→5→6→3 形成环，快慢指针必在环内相遇</div>
+</div>
+
+<pre><code>// Floyd 环检测 / Floyd's cycle detection
+boolean hasCycle(ListNode head) {
+    ListNode slow = head, fast = head;
+    while (fast != null && fast.next != null) {
+        slow = slow.next;       // 🐢 走 1 步
+        fast = fast.next.next;  // 🐇 走 2 步
+        if (slow == fast) return true;  // 相遇 = 有环
+    }
+    return false;  // fast 到达 null = 无环
+}
+
+// 找环入口 / Find cycle entry point
+ListNode detectCycle(ListNode head) {
+    ListNode slow = head, fast = head;
+    while (fast != null && fast.next != null) {
+        slow = slow.next;
+        fast = fast.next.next;
+        if (slow == fast) {
+            slow = head;  // slow 回到起点
+            while (slow != fast) {
+                slow = slow.next;  // 同速前进
+                fast = fast.next;
+            }
+            return slow;  // 相遇点 = 环入口
+        }
+    }
+    return null;
+}</code></pre>
+
+<div class="box box-amber">
+  <div class="title">🧮 为什么 slow 回到 head 后能找到环入口？</div>
+  <p>设起点到环入口距离为 a，环入口到相遇点距离为 b，环长为 c。相遇时 slow 走了 a+b，fast 走了 a+b+nc。因为 fast = 2×slow，所以 a+b = nc，即 a = nc-b = (n-1)c + (c-b)。从 head 走 a 步 = 从相遇点走 (c-b) + 若干圈，两者在环入口相遇。</p>
+</div>
+</section>
+
+<!-- Section 4 -->
+<section id="sec-merge">
+<h2 class="section-title"><span class="num">4</span> 合并两个有序链表 / Merge Two Sorted Lists</h2>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 160" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="ar5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3b82f6"/></marker></defs>
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">合并过程 / Merge Process</text>
+    <!-- List A -->
+    <text x="20" y="48" fill="#93c5fd" font-size="10" font-weight="600" font-family="Inter">L1:</text>
+    <rect x="50" y="35" width="40" height="24" rx="4" fill="#172554" stroke="#3b82f6"/><text x="70" y="51" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">1</text>
+    <line x1="90" y1="47" x2="105" y2="47" stroke="#3b82f6" stroke-width="1" marker-end="url(#ar5)"/>
+    <rect x="110" y="35" width="40" height="24" rx="4" fill="#172554" stroke="#3b82f6"/><text x="130" y="51" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">3</text>
+    <line x1="150" y1="47" x2="165" y2="47" stroke="#3b82f6" stroke-width="1" marker-end="url(#ar5)"/>
+    <rect x="170" y="35" width="40" height="24" rx="4" fill="#172554" stroke="#3b82f6"/><text x="190" y="51" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">5</text>
+    <!-- List B -->
+    <text x="20" y="88" fill="#fbbf24" font-size="10" font-weight="600" font-family="Inter">L2:</text>
+    <rect x="50" y="75" width="40" height="24" rx="4" fill="#1c1917" stroke="#f59e0b"/><text x="70" y="91" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700" font-family="Inter">2</text>
+    <line x1="90" y1="87" x2="105" y2="87" stroke="#f59e0b" stroke-width="1"/>
+    <rect x="110" y="75" width="40" height="24" rx="4" fill="#1c1917" stroke="#f59e0b"/><text x="130" y="91" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700" font-family="Inter">4</text>
+    <line x1="150" y1="87" x2="165" y2="87" stroke="#f59e0b" stroke-width="1"/>
+    <rect x="170" y="75" width="40" height="24" rx="4" fill="#1c1917" stroke="#f59e0b"/><text x="190" y="91" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700" font-family="Inter">6</text>
+    <!-- Result -->
+    <text x="20" y="135" fill="#86efac" font-size="10" font-weight="600" font-family="Inter">结果:</text>
+    <rect x="50" y="122" width="35" height="24" rx="4" fill="#14532d" stroke="#22c55e"/><text x="67" y="138" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="Inter">1</text>
+    <line x1="85" y1="134" x2="95" y2="134" stroke="#22c55e" stroke-width="1"/>
+    <rect x="100" y="122" width="35" height="24" rx="4" fill="#14532d" stroke="#22c55e"/><text x="117" y="138" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="Inter">2</text>
+    <line x1="135" y1="134" x2="145" y2="134" stroke="#22c55e" stroke-width="1"/>
+    <rect x="150" y="122" width="35" height="24" rx="4" fill="#14532d" stroke="#22c55e"/><text x="167" y="138" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="Inter">3</text>
+    <line x1="185" y1="134" x2="195" y2="134" stroke="#22c55e" stroke-width="1"/>
+    <rect x="200" y="122" width="35" height="24" rx="4" fill="#14532d" stroke="#22c55e"/><text x="217" y="138" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="Inter">4</text>
+    <line x1="235" y1="134" x2="245" y2="134" stroke="#22c55e" stroke-width="1"/>
+    <rect x="250" y="122" width="35" height="24" rx="4" fill="#14532d" stroke="#22c55e"/><text x="267" y="138" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="Inter">5</text>
+    <line x1="285" y1="134" x2="295" y2="134" stroke="#22c55e" stroke-width="1"/>
+    <rect x="300" y="122" width="35" height="24" rx="4" fill="#14532d" stroke="#22c55e"/><text x="317" y="138" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="Inter">6</text>
+    <!-- Arrows showing picks -->
+    <text x="400" y="50" fill="#94a3b8" font-size="10" font-family="Inter">每次比较两个头节点</text>
+    <text x="400" y="65" fill="#94a3b8" font-size="10" font-family="Inter">取较小的接到结果链表</text>
+  </svg>
+  <div class="caption">双指针比较，每次取较小值，O(n+m) 时间</div>
+</div>
+
+<pre><code>// 合并两个有序链表 / Merge two sorted lists
+ListNode mergeTwoLists(ListNode l1, ListNode l2) {
+    ListNode dummy = new ListNode(0), curr = dummy;
+    while (l1 != null && l2 != null) {
+        if (l1.val <= l2.val) { curr.next = l1; l1 = l1.next; }
+        else                  { curr.next = l2; l2 = l2.next; }
+        curr = curr.next;
+    }
+    curr.next = (l1 != null) ? l1 : l2;
+    return dummy.next;
+}</code></pre>
+</section>
+
+<!-- Section 5 -->
+<section id="sec-sort">
+<h2 class="section-title"><span class="num">5</span> 链表排序 / Sort Linked List (Merge Sort)</h2>
+
+<div class="flow">
+  <div class="step">快慢指针<br>找中点</div>
+  <div class="arrow">→</div>
+  <div class="step">断开为<br>两半</div>
+  <div class="arrow">→</div>
+  <div class="step">递归排序<br>左右两半</div>
+  <div class="arrow">→</div>
+  <div class="step">合并两个<br>有序链表</div>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 150" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">归并排序链表 / Merge Sort on Linked List</text>
+    <!-- Level 0 -->
+    <rect x="180" y="30" width="240" height="22" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="300" y="45" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">4 → 2 → 1 → 3</text>
+    <!-- Split arrows -->
+    <line x1="250" y1="52" x2="180" y2="68" stroke="#f59e0b" stroke-width="1"/>
+    <line x1="350" y1="52" x2="420" y2="68" stroke="#f59e0b" stroke-width="1"/>
+    <text x="300" y="65" text-anchor="middle" fill="#f59e0b" font-size="9" font-family="Inter">split</text>
+    <!-- Level 1 -->
+    <rect x="120" y="70" width="120" height="22" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="180" y="85" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">4 → 2</text>
+    <rect x="360" y="70" width="120" height="22" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="420" y="85" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">1 → 3</text>
+    <!-- Sorted -->
+    <line x1="180" y1="92" x2="180" y2="108" stroke="#22c55e" stroke-width="1"/>
+    <line x1="420" y1="92" x2="420" y2="108" stroke="#22c55e" stroke-width="1"/>
+    <text x="300" y="105" text-anchor="middle" fill="#22c55e" font-size="9" font-family="Inter">sort + merge</text>
+    <rect x="120" y="110" width="120" height="22" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="180" y="125" text-anchor="middle" fill="#86efac" font-size="10" font-family="Inter">2 → 4</text>
+    <rect x="360" y="110" width="120" height="22" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="420" y="125" text-anchor="middle" fill="#86efac" font-size="10" font-family="Inter">1 → 3</text>
+    <!-- Final merge -->
+    <line x1="240" y1="125" x2="280" y2="140" stroke="#22c55e" stroke-width="1"/>
+    <line x1="360" y1="125" x2="320" y2="140" stroke="#22c55e" stroke-width="1"/>
+    <rect x="220" y="138" width="160" height="22" rx="4" fill="#14532d" stroke="#86efac" stroke-width="2"/>
+    <text x="300" y="153" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="Inter">1 → 2 → 3 → 4 ✓</text>
+  </svg>
+  <div class="caption">O(n log n) 时间，O(log n) 空间（递归栈）</div>
+</div>
+
+<pre><code>// 链表归并排序 / Merge sort for linked list
+ListNode sortList(ListNode head) {
+    if (head == null || head.next == null) return head;
+    // 快慢指针找中点
+    ListNode slow = head, fast = head.next;
+    while (fast != null && fast.next != null) {
+        slow = slow.next; fast = fast.next.next;
+    }
+    ListNode mid = slow.next;
+    slow.next = null;  // 断开
+    return mergeTwoLists(sortList(head), sortList(mid));
+}</code></pre>
+</section>
+
+<!-- Section 6 -->
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">6</span> 交互式演示 / Interactive Demo</h2>
+
+<div class="demo">
+  <h4>🎮 链表可视化</h4>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.5rem">
+    <input id="ll-input" type="text" placeholder="输入数字" style="width:100px">
+    <button id="ll-append">追加</button>
+    <button id="ll-prepend" style="background:linear-gradient(135deg,#8b5cf6,#6366f1)">头插</button>
+    <button id="ll-reverse" style="background:linear-gradient(135deg,#f59e0b,#d97706)">反转</button>
+    <button id="ll-cycle" style="background:linear-gradient(135deg,#0891b2,#0e7490)">检测环</button>
+    <button id="ll-make-cycle" style="background:#334155">制造环</button>
+    <button id="ll-reset" style="background:#334155">重置</button>
+  </div>
+  <svg id="ll-svg" viewBox="0 0 700 120" style="width:100%;height:120px;background:#0f172a;border-radius:8px"></svg>
+  <div id="ll-log" class="output">点击按钮操作链表</div>
+</div>
+</section>
+
+<!-- Section 7 -->
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">7</span> 总结 / Summary</h2>
+
+<table>
+  <tr><th>问题</th><th>核心技巧</th><th>时间</th><th>空间</th></tr>
+  <tr><td>反转链表</td><td>三指针迭代 / 递归</td><td>O(n)</td><td>O(1) / O(n)</td></tr>
+  <tr><td>环检测</td><td>Floyd 快慢指针</td><td>O(n)</td><td>O(1)</td></tr>
+  <tr><td>合并有序链表</td><td>双指针 + dummy 节点</td><td>O(n+m)</td><td>O(1)</td></tr>
+  <tr><td>链表排序</td><td>归并排序（找中点+合并）</td><td>O(n log n)</td><td>O(log n)</td></tr>
+</table>
+
+<div class="box box-green">
+  <div class="title">🎯 链表题通用技巧</div>
+  <ul>
+    <li><strong>dummy 节点</strong>：简化头节点处理，避免大量 null 判断</li>
+    <li><strong>快慢指针</strong>：找中点、检测环、找倒数第 k 个</li>
+    <li><strong>画图</strong>：指针操作容易出错，一定要画图理清顺序</li>
+    <li><strong>先保存再修改</strong>：修改 next 前先保存原值</li>
+  </ul>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>链表经典题图解教程 — 基于 LeetCode 高频题综合整理</p>
+  <p><a href="../">← 返回主页 / Back to Home</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+<script src="linked-list.js"></script>
+<script>
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => btn.classList.toggle('show', window.scrollY > 400));
+</script>
+
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
