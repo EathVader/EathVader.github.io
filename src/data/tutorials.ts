@@ -63,4 +63,28 @@ export const tutorials: Tutorial[] = [
       '前缀树 / 字典树，字符串检索利器。覆盖基本操作、交互式演示、敏感词过滤、IP 地址查询、双数组 Trie 压缩。',
     meta: '综合多篇文章 · 2026-03',
   },
+  {
+    slug: 'segment-tree',
+    tag: '🌲 Data Structure',
+    title: '线段树图解教程',
+    description:
+      '区间查询与修改的终极武器。覆盖建树、区间查询、单点更新、懒传播、交互式可视化、经典应用与方案对比。',
+    meta: '综合多篇文章 · 2026-03',
+  },
+  {
+    slug: 'radix-tree',
+    tag: '🌲 Data Structure',
+    title: 'Radix Tree 图解教程',
+    description:
+      '压缩前缀树，用更少节点存更多字符串。覆盖压缩原理、节点分裂、交互式可视化、Linux 内核页缓存、HTTP 路由、ART。',
+    meta: '综合多篇文章 · 2026-03',
+  },
+  {
+    slug: 'binary-tree',
+    tag: '🌲 Data Structure',
+    title: '二叉树面试题图解',
+    description:
+      '22 道经典面试题，递归思维一网打尽。覆盖四种遍历、深度计算、结构判断、LCA、BST 验证、卡特兰数、解题模式总结。',
+    meta: '综合多篇文章 · 2026-03',
+  },
 ];

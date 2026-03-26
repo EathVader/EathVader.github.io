@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二叉树面试题图解 / Binary Tree Interview Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>🌳 <span>二叉树</span>面试题图解</h1>
+  <p class="subtitle">22 道经典题目，递归思维一网打尽<br>
+  Binary Tree Interview: Master Recursive Thinking</p>
+  <span class="badge">🎯 面试高频</span>
+  <span class="badge">🔄 递归</span>
+  <span class="badge">📊 BFS/DFS</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-demo">交互式演示 / Interactive Demo</a></li>
+    <li><a href="#sec-traverse">四种遍历 / Traversals</a></li>
+    <li><a href="#sec-depth">深度与节点 / Depth & Nodes</a></li>
+    <li><a href="#sec-structure">结构判断 / Structure Checks</a></li>
+    <li><a href="#sec-transform">变换操作 / Transformations</a></li>
+    <li><a href="#sec-bst">BST 相关 / BST Problems</a></li>
+    <li><a href="#sec-hard">进阶题 / Advanced</a></li>
+    <li><a href="#sec-pattern">解题模式 / Patterns</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1: Interactive Demo -->
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">1</span> 交互式演示 / Interactive Demo</h2>
+
+<div class="demo">
+  <h4>🎮 二叉树可视化</h4>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
+    <label style="font-size:.85rem;color:#94a3b8">层序数组：</label>
+    <input id="bt-arr" type="text" value="1, 2, 3, 4, 5, 6, 7" style="width:220px" placeholder="逗号分隔，null表示空">
+    <button id="bt-build">构建</button>
+    <button id="bt-reset" style="background:#334155">重置</button>
+  </div>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
+    <button id="bt-pre">前序遍历</button>
+    <button id="bt-in" style="background:linear-gradient(135deg,#8b5cf6,#6366f1)">中序遍历</button>
+    <button id="bt-post" style="background:linear-gradient(135deg,#0891b2,#0e7490)">后序遍历</button>
+    <button id="bt-level" style="background:linear-gradient(135deg,#d97706,#b45309)">层序遍历</button>
+    <button id="bt-depth" style="background:#334155">最大深度</button>
+    <button id="bt-mirror" style="background:linear-gradient(135deg,#be185d,#9f1239)">镜像翻转</button>
+  </div>
+  <svg id="bt-svg" viewBox="0 0 700 280" style="width:100%;height:280px;background:#0f172a;border-radius:8px"></svg>
+  <div id="bt-log" class="output">等待操作...</div>
+  <p style="font-size:.8rem;color:#64748b;margin-top:.5rem">🟡 数字 = 遍历顺序　输入 null 表示空节点（如 1,2,3,null,5）</p>
+</div>
+</section>
+
+<!-- Section 2: Traversals -->
+<section id="sec-traverse">
+<h2 class="section-title"><span class="num">2</span> 四种遍历 / Traversals</h2>
+
+<div class="diagram">
+  <svg viewBox="0 0 700 100" xmlns="http://www.w3.org/2000/svg">
+    <rect x="10" y="10" width="160" height="80" rx="8" fill="#172554" stroke="#3b82f6"/>
+    <text x="90" y="35" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="700" font-family="Inter">前序 Pre-order</text>
+    <text x="90" y="55" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="JetBrains Mono">根 → 左 → 右</text>
+    <text x="90" y="75" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">用途：序列化、复制树</text>
+
+    <rect x="185" y="10" width="160" height="80" rx="8" fill="#172554" stroke="#8b5cf6"/>
+    <text x="265" y="35" text-anchor="middle" fill="#c4b5fd" font-size="12" font-weight="700" font-family="Inter">中序 In-order</text>
+    <text x="265" y="55" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="JetBrains Mono">左 → 根 → 右</text>
+    <text x="265" y="75" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">用途：BST 有序输出</text>
+
+    <rect x="360" y="10" width="160" height="80" rx="8" fill="#172554" stroke="#0891b2"/>
+    <text x="440" y="35" text-anchor="middle" fill="#67e8f9" font-size="12" font-weight="700" font-family="Inter">后序 Post-order</text>
+    <text x="440" y="55" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="JetBrains Mono">左 → 右 → 根</text>
+    <text x="440" y="75" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">用途：删除树、计算大小</text>
+
+    <rect x="535" y="10" width="160" height="80" rx="8" fill="#172554" stroke="#d97706"/>
+    <text x="615" y="35" text-anchor="middle" fill="#fbbf24" font-size="12" font-weight="700" font-family="Inter">层序 Level-order</text>
+    <text x="615" y="55" text-anchor="middle" fill="#e2e8f0" font-size="11" font-family="JetBrains Mono">BFS + 队列</text>
+    <text x="615" y="75" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">用途：逐层处理、最短路</text>
+  </svg>
+</div>
+
+<h3>前序遍历（递归 + 迭代）</h3>
+<pre><code>// 递归
+void preorder(TreeNode root, List&lt;Integer&gt; res) {
+    if (root == null) return;
+    res.add(root.val);        // 根
+    preorder(root.left, res); // 左
+    preorder(root.right, res);// 右
+}
+
+// 迭代（用栈模拟）
+List&lt;Integer&gt; preorderIterative(TreeNode root) {
+    List&lt;Integer&gt; res = new ArrayList&lt;&gt;();
+    Stack&lt;TreeNode&gt; stack = new Stack&lt;&gt;();
+    if (root != null) stack.push(root);
+    while (!stack.isEmpty()) {
+        TreeNode node = stack.pop();
+        res.add(node.val);
+        if (node.right != null) stack.push(node.right); // 先右后左
+        if (node.left != null) stack.push(node.left);
+    }
+    return res;
+}</code></pre>
+
+<h3>层序遍历</h3>
+<pre><code>List&lt;List&lt;Integer&gt;&gt; levelOrder(TreeNode root) {
+    List&lt;List&lt;Integer&gt;&gt; res = new ArrayList&lt;&gt;();
+    if (root == null) return res;
+    Queue&lt;TreeNode&gt; queue = new LinkedList&lt;&gt;();
+    queue.offer(root);
+    while (!queue.isEmpty()) {
+        int size = queue.size();
+        List&lt;Integer&gt; level = new ArrayList&lt;&gt;();
+        for (int i = 0; i &lt; size; i++) {
+            TreeNode node = queue.poll();
+            level.add(node.val);
+            if (node.left != null) queue.offer(node.left);
+            if (node.right != null) queue.offer(node.right);
+        }
+        res.add(level);
+    }
+    return res;
+}</code></pre>
+</section>
+<!-- Section 3: Depth & Nodes -->
+<section id="sec-depth">
+<h2 class="section-title"><span class="num">3</span> 深度与节点 / Depth & Nodes</h2>
+
+<h3>① 最大深度</h3>
+<pre><code>int maxDepth(TreeNode root) {
+    if (root == null) return 0;
+    return Math.max(maxDepth(root.left), maxDepth(root.right)) + 1;
+}</code></pre>
+
+<h3>② 最小深度</h3>
+<div class="box box-amber">
+  <div class="title">⚠️ 陷阱</div>
+  <p>最小深度是到<strong>最近叶节点</strong>的距离。如果一侧子树为空，不能返回 0，要走另一侧。</p>
+</div>
+<pre><code>int minDepth(TreeNode root) {
+    if (root == null) return 0;
+    if (root.left == null) return minDepth(root.right) + 1;
+    if (root.right == null) return minDepth(root.left) + 1;
+    return Math.min(minDepth(root.left), minDepth(root.right)) + 1;
+}</code></pre>
+
+<h3>③ 节点总数 / ④ 叶子节点数 / ⑤ 第 K 层节点数</h3>
+<pre><code>// 节点总数
+int countNodes(TreeNode root) {
+    if (root == null) return 0;
+    return countNodes(root.left) + countNodes(root.right) + 1;
+}
+
+// 叶子节点数
+int countLeaves(TreeNode root) {
+    if (root == null) return 0;
+    if (root.left == null && root.right == null) return 1;
+    return countLeaves(root.left) + countLeaves(root.right);
+}
+
+// 第 K 层节点数
+int countAtLevel(TreeNode root, int k) {
+    if (root == null || k < 1) return 0;
+    if (k == 1) return 1;
+    return countAtLevel(root.left, k-1) + countAtLevel(root.right, k-1);
+}</code></pre>
+
+<div class="box box-blue">
+  <div class="title">💡 递归三要素</div>
+  <p>所有这些题都遵循同一模式：<strong>① base case（null 返回）→ ② 递归左右子树 → ③ 合并结果</strong>。掌握这个模式，大部分二叉树题都能秒解。</p>
+</div>
+</section>
+
+<!-- Section 4: Structure Checks -->
+<section id="sec-structure">
+<h2 class="section-title"><span class="num">4</span> 结构判断 / Structure Checks</h2>
+
+<h3>⑥ 是否平衡二叉树</h3>
+<pre><code>boolean isBalanced(TreeNode root) {
+    return height(root) != -1;
+}
+int height(TreeNode root) {
+    if (root == null) return 0;
+    int l = height(root.left), r = height(root.right);
+    if (l == -1 || r == -1 || Math.abs(l - r) > 1) return -1;
+    return Math.max(l, r) + 1;
+}</code></pre>
+
+<h3>⑦ 是否完全二叉树</h3>
+<pre><code>// BFS：遇到 null 后不应再有非 null 节点
+boolean isComplete(TreeNode root) {
+    if (root == null) return true;
+    Queue&lt;TreeNode&gt; q = new LinkedList&lt;&gt;();
+    q.offer(root);
+    boolean seenNull = false;
+    while (!q.isEmpty()) {
+        TreeNode node = q.poll();
+        if (node == null) { seenNull = true; continue; }
+        if (seenNull) return false;
+        q.offer(node.left);
+        q.offer(node.right);
+    }
+    return true;
+}</code></pre>
+
+<h3>⑧ 两棵树是否相同 / ⑨ 是否镜像</h3>
+<pre><code>// 相同
+boolean isSame(TreeNode p, TreeNode q) {
+    if (p == null && q == null) return true;
+    if (p == null || q == null) return false;
+    return p.val == q.val && isSame(p.left, q.left) && isSame(p.right, q.right);
+}
+
+// 镜像
+boolean isMirror(TreeNode p, TreeNode q) {
+    if (p == null && q == null) return true;
+    if (p == null || q == null) return false;
+    return p.val == q.val && isMirror(p.left, q.right) && isMirror(p.right, q.left);
+}</code></pre>
+</section>
+
+<!-- Section 5: Transformations -->
+<section id="sec-transform">
+<h2 class="section-title"><span class="num">5</span> 变换操作 / Transformations</h2>
+
+<h3>⑩ 翻转二叉树（镜像）</h3>
+<pre><code>TreeNode invertTree(TreeNode root) {
+    if (root == null) return null;
+    TreeNode tmp = root.left;
+    root.left = invertTree(root.right);
+    root.right = invertTree(tmp);
+    return root;
+}</code></pre>
+
+<h3>⑪ 最低公共祖先 (LCA)</h3>
+<pre><code>TreeNode lowestCommonAncestor(TreeNode root, TreeNode p, TreeNode q) {
+    if (root == null || root == p || root == q) return root;
+    TreeNode left = lowestCommonAncestor(root.left, p, q);
+    TreeNode right = lowestCommonAncestor(root.right, p, q);
+    if (left != null && right != null) return root; // p, q 分居两侧
+    return left != null ? left : right;
+}</code></pre>
+
+<h3>⑫ 从前序 + 中序构建二叉树</h3>
+<pre><code>TreeNode buildTree(int[] pre, int[] in) {
+    Map&lt;Integer, Integer&gt; map = new HashMap&lt;&gt;();
+    for (int i = 0; i &lt; in.length; i++) map.put(in[i], i);
+    return build(pre, 0, pre.length-1, in, 0, in.length-1, map);
+}
+TreeNode build(int[] pre, int ps, int pe, int[] in, int is, int ie, Map&lt;Integer,Integer&gt; map) {
+    if (ps > pe) return null;
+    TreeNode root = new TreeNode(pre[ps]);
+    int idx = map.get(pre[ps]);
+    int leftLen = idx - is;
+    root.left = build(pre, ps+1, ps+leftLen, in, is, idx-1, map);
+    root.right = build(pre, ps+leftLen+1, pe, in, idx+1, ie, map);
+    return root;
+}</code></pre>
+</section>
+<!-- Section 6: BST -->
+<section id="sec-bst">
+<h2 class="section-title"><span class="num">6</span> BST 相关 / BST Problems</h2>
+
+<h3>⑬ 验证 BST</h3>
+<pre><code>// 中序遍历必须严格递增
+boolean isValidBST(TreeNode root) {
+    return validate(root, Long.MIN_VALUE, Long.MAX_VALUE);
+}
+boolean validate(TreeNode node, long min, long max) {
+    if (node == null) return true;
+    if (node.val <= min || node.val >= max) return false;
+    return validate(node.left, min, node.val)
+        && validate(node.right, node.val, max);
+}</code></pre>
+
+<h3>⑭ BST 插入节点</h3>
+<pre><code>TreeNode insertIntoBST(TreeNode root, int val) {
+    if (root == null) return new TreeNode(val);
+    if (val < root.val) root.left = insertIntoBST(root.left, val);
+    else root.right = insertIntoBST(root.right, val);
+    return root;
+}</code></pre>
+
+<h3>⑮ BST 搜索区间 [k1, k2]</h3>
+<pre><code>List&lt;Integer&gt; rangSearch(TreeNode root, int k1, int k2) {
+    List&lt;Integer&gt; res = new ArrayList&lt;&gt;();
+    inorder(root, k1, k2, res);
+    return res;
+}
+void inorder(TreeNode node, int k1, int k2, List&lt;Integer&gt; res) {
+    if (node == null) return;
+    if (node.val > k1) inorder(node.left, k1, k2, res);
+    if (node.val >= k1 && node.val <= k2) res.add(node.val);
+    if (node.val < k2) inorder(node.right, k1, k2, res);
+}</code></pre>
+</section>
+
+<!-- Section 7: Advanced -->
+<section id="sec-hard">
+<h2 class="section-title"><span class="num">7</span> 进阶题 / Advanced</h2>
+
+<h3>⑯ 路径总和（打印所有路径）</h3>
+<pre><code>void pathSum(TreeNode root, int target, List&lt;Integer&gt; path, List&lt;List&lt;Integer&gt;&gt; res) {
+    if (root == null) return;
+    path.add(root.val);
+    if (root.left == null && root.right == null && target == root.val)
+        res.add(new ArrayList&lt;&gt;(path));
+    pathSum(root.left, target - root.val, path, res);
+    pathSum(root.right, target - root.val, path, res);
+    path.remove(path.size() - 1); // 回溯
+}</code></pre>
+
+<h3>⑰ 二叉树最长距离（直径）</h3>
+<pre><code>int maxDist = 0;
+int diameter(TreeNode root) {
+    depth(root);
+    return maxDist;
+}
+int depth(TreeNode node) {
+    if (node == null) return 0;
+    int l = depth(node.left), r = depth(node.right);
+    maxDist = Math.max(maxDist, l + r); // 经过当前节点的最长路径
+    return Math.max(l, r) + 1;
+}</code></pre>
+
+<h3>⑱ 不同的 BST 数量（卡特兰数）</h3>
+<pre><code>// n 个节点能组成多少种不同的 BST？
+int numTrees(int n) {
+    int[] dp = new int[n + 1];
+    dp[0] = dp[1] = 1;
+    for (int i = 2; i <= n; i++)
+        for (int j = 0; j < i; j++)
+            dp[i] += dp[j] * dp[i - j - 1]; // 卡特兰数
+    return dp[n];
+}</code></pre>
+
+<div class="box box-purple">
+  <div class="title">🔢 卡特兰数</div>
+  <p>C(n) = C(0)×C(n-1) + C(1)×C(n-2) + ... + C(n-1)×C(0)。前几项：1, 1, 2, 5, 14, 42, 132...</p>
+</div>
+</section>
+
+<!-- Section 8: Patterns -->
+<section id="sec-pattern">
+<h2 class="section-title"><span class="num">8</span> 解题模式 / Patterns</h2>
+
+<table>
+  <tr><th>模式</th><th>适用题目</th><th>关键点</th></tr>
+  <tr><td>自顶向下递归</td><td>深度、路径和、验证 BST</td><td>参数传递状态</td></tr>
+  <tr><td>自底向上递归</td><td>平衡判断、LCA、直径</td><td>返回值携带信息</td></tr>
+  <tr><td>BFS 层序</td><td>层序遍历、完全二叉树、最小深度</td><td>队列 + size 分层</td></tr>
+  <tr><td>迭代 + 栈</td><td>前/中/后序迭代、BST 迭代器</td><td>模拟递归调用栈</td></tr>
+  <tr><td>分治构建</td><td>前序+中序建树、有序数组建 BST</td><td>找根 → 分左右 → 递归</td></tr>
+</table>
+
+<div class="box box-green">
+  <div class="title">🎯 面试技巧</div>
+  <ul>
+    <li>先问清楚：是普通二叉树还是 BST？有无重复值？</li>
+    <li>先写递归解法（简洁），再问面试官是否需要迭代版本</li>
+    <li>画图！在白板上画一棵 3~5 个节点的树，手动模拟</li>
+    <li>注意边界：空树、单节点、只有左/右子树</li>
+  </ul>
+</div>
+
+<div class="box box-purple">
+  <div class="title">📚 延伸阅读</div>
+  <ul>
+    <li><a href="https://leetcode.com/tag/binary-tree/" target="_blank">LeetCode Binary Tree 标签</a></li>
+    <li><a href="https://labuladong.online/algo/data-structure/binary-tree-part1/" target="_blank">labuladong：二叉树解题框架</a></li>
+  </ul>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>基于 IOExceptioner 的文章综合改编为交互式教程</p>
+  <p><a href="../">← 返回主页 / Back to Home</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+<script src="binary-tree.js"></script>
+<script>
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => btn.classList.toggle('show', window.scrollY > 400));
+</script>
+
+<!-- Giscus Comments -->
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

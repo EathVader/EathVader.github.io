@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radix Tree 图解教程 / Radix Tree Visual Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>🌿 <span>Radix Tree</span> 图解教程</h1>
+  <p class="subtitle">压缩前缀树 —— 用更少的节点存更多的字符串<br>
+  Patricia Trie / Compact Trie: Space-Efficient String Storage</p>
+  <span class="badge">🗜️ 压缩存储</span>
+  <span class="badge">🐧 Linux 内核</span>
+  <span class="badge">🌐 路由表</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-what">什么是 Radix Tree / What is Radix Tree</a></li>
+    <li><a href="#sec-demo">交互式演示 / Interactive Demo</a></li>
+    <li><a href="#sec-compress">压缩过程 / Compression</a></li>
+    <li><a href="#sec-ops">核心操作 / Core Operations</a></li>
+    <li><a href="#sec-split">节点分裂 / Node Splitting</a></li>
+    <li><a href="#sec-impl">代码实现 / Implementation</a></li>
+    <li><a href="#sec-vs">Trie vs Radix Tree</a></li>
+    <li><a href="#sec-apps">实际应用 / Applications</a></li>
+    <li><a href="#sec-summary">总结 / Summary</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1 -->
+<section id="sec-what">
+<h2 class="section-title"><span class="num">1</span> 什么是 Radix Tree / What is Radix Tree</h2>
+
+<div class="analogy">
+  <div class="emoji">📁</div>
+  <h4>类比 / Analogy</h4>
+  <p>普通 Trie 树就像文件路径 <code>/u/s/r/l/o/c/a/l</code>，每个字符一层目录。Radix Tree 则像 <code>/usr/local</code>，把没有分支的路径<strong>合并成一个节点</strong>。目录更少，查找更快。</p>
+</div>
+
+<div class="box box-blue">
+  <div class="title">📐 Radix Tree = 压缩 Trie</div>
+  <p>Radix Tree（又叫 Patricia Trie、Compact Trie）是 Trie 的空间优化版本。核心思想：<strong>将只有一个子节点的链式节点合并为一个节点</strong>，边上存储字符串而非单个字符。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 700 240" xmlns="http://www.w3.org/2000/svg">
+    <text x="175" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">普通 Trie（每字符一节点）</text>
+    <text x="525" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">Radix Tree（压缩后）</text>
+
+    <!-- Trie side: storing "test", "team", "toast" -->
+    <circle cx="175" cy="45" r="12" fill="#1e293b" stroke="#475569"/>
+    <text x="175" y="49" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">root</text>
+    <line x1="175" y1="57" x2="175" y2="72" stroke="#334155"/>
+    <circle cx="175" cy="82" r="11" fill="#172554" stroke="#3b82f6"/>
+    <text x="175" y="86" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="JetBrains Mono">t</text>
+    <line x1="163" y1="91" x2="105" y2="108" stroke="#334155"/>
+    <line x1="187" y1="91" x2="245" y2="108" stroke="#334155"/>
+    <circle cx="100" cy="116" r="11" fill="#172554" stroke="#3b82f6"/>
+    <text x="100" y="120" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="JetBrains Mono">e</text>
+    <circle cx="250" cy="116" r="11" fill="#172554" stroke="#3b82f6"/>
+    <text x="250" y="120" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="JetBrains Mono">o</text>
+    <line x1="88" y1="125" x2="60" y2="142" stroke="#334155"/>
+    <line x1="112" y1="125" x2="140" y2="142" stroke="#334155"/>
+    <circle cx="55" cy="150" r="11" fill="#172554" stroke="#3b82f6"/>
+    <text x="55" y="154" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="JetBrains Mono">s</text>
+    <circle cx="145" cy="150" r="11" fill="#172554" stroke="#3b82f6"/>
+    <text x="145" y="154" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="JetBrains Mono">a</text>
+    <line x1="55" y1="161" x2="55" y2="176" stroke="#334155"/>
+    <circle cx="55" cy="184" r="11" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="55" y="188" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="JetBrains Mono">t</text>
+    <line x1="145" y1="161" x2="145" y2="176" stroke="#334155"/>
+    <circle cx="145" cy="184" r="11" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="145" y="188" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="JetBrains Mono">m</text>
+    <line x1="250" y1="127" x2="250" y2="142" stroke="#334155"/>
+    <circle cx="250" cy="150" r="11" fill="#172554" stroke="#3b82f6"/>
+    <text x="250" y="154" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="JetBrains Mono">a</text>
+    <line x1="250" y1="161" x2="250" y2="176" stroke="#334155"/>
+    <circle cx="250" cy="184" r="11" fill="#172554" stroke="#3b82f6"/>
+    <text x="250" y="188" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="700" font-family="JetBrains Mono">s</text>
+    <line x1="250" y1="195" x2="250" y2="210" stroke="#334155"/>
+    <circle cx="250" cy="218" r="11" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="250" y="222" text-anchor="middle" fill="#86efac" font-size="10" font-weight="700" font-family="JetBrains Mono">t</text>
+    <text x="175" y="238" text-anchor="middle" fill="#fca5a5" font-size="10" font-family="Inter">11 个节点 😰</text>
+
+    <!-- Arrow -->
+    <text x="350" y="130" text-anchor="middle" fill="#f59e0b" font-size="24" font-family="Inter">→</text>
+    <text x="350" y="150" text-anchor="middle" fill="#f59e0b" font-size="10" font-family="Inter">压缩</text>
+
+    <!-- Radix side -->
+    <circle cx="525" cy="45" r="12" fill="#1e293b" stroke="#475569"/>
+    <text x="525" y="49" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">root</text>
+    <line x1="525" y1="57" x2="525" y2="78" stroke="#334155"/>
+    <rect x="505" y="82" width="40" height="22" rx="5" fill="#172554" stroke="#3b82f6"/>
+    <text x="525" y="97" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="JetBrains Mono">t</text>
+    <line x1="510" y1="104" x2="445" y2="130" stroke="#334155"/>
+    <line x1="540" y1="104" x2="610" y2="130" stroke="#334155"/>
+    <rect x="410" y="133" width="70" height="22" rx="5" fill="#172554" stroke="#3b82f6"/>
+    <text x="445" y="148" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="JetBrains Mono">e</text>
+    <rect x="575" y="133" width="70" height="22" rx="5" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="610" y="148" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="JetBrains Mono">oast</text>
+    <line x1="430" y1="155" x2="400" y2="180" stroke="#334155"/>
+    <line x1="460" y1="155" x2="490" y2="180" stroke="#334155"/>
+    <rect x="370" y="183" width="60" height="22" rx="5" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="400" y="198" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="JetBrains Mono">st</text>
+    <rect x="460" y="183" width="60" height="22" rx="5" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="490" y="198" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="JetBrains Mono">am</text>
+    <text x="525" y="230" text-anchor="middle" fill="#86efac" font-size="10" font-family="Inter">5 个节点 😎（存储 test, team, toast）</text>
+  </svg>
+</div>
+</section>
+
+<!-- Section 2: Interactive Demo -->
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">2</span> 交互式演示 / Interactive Demo</h2>
+
+<p>插入单词，观察 Radix Tree 如何自动压缩公共前缀。</p>
+
+<div class="demo">
+  <h4>🎮 Radix Tree 可视化</h4>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.5rem">
+    <input id="radix-input" type="text" placeholder="输入单词（小写字母）" style="width:180px">
+    <button id="radix-insert">插入</button>
+    <button id="radix-search" style="background:linear-gradient(135deg,#8b5cf6,#6366f1)">查找</button>
+    <button id="radix-reset" style="background:#334155">重置</button>
+  </div>
+  <div style="margin-bottom:.5rem">
+    <button id="radix-example" style="background:#1e293b;border:1px solid #334155;font-size:.8rem">示例：romane, romanus, romulus, rubens, ruber, rubicon, rubicundus</button>
+  </div>
+  <svg id="radix-svg" viewBox="0 0 700 340" style="width:100%;height:340px;background:#0f172a;border-radius:8px"></svg>
+  <div id="radix-log" class="output">等待操作... 试试点击"示例"按钮</div>
+  <p style="font-size:.8rem;color:#64748b;margin-top:.5rem">🟢 绿色 = 单词结尾　🔵 蓝色 = 中间节点　边上的字符串 = 压缩后的标签</p>
+</div>
+</section>
+<!-- Section 3: Compression -->
+<section id="sec-compress">
+<h2 class="section-title"><span class="num">3</span> 压缩过程 / Compression</h2>
+
+<p>Radix Tree 有两种压缩方式：</p>
+
+<h3>A. 尾部压缩 / Tail Compression</h3>
+<p>将没有分支的"尾巴"合并为一个节点。例如 <code>t→o→a→s→t</code> 压缩为 <code>toast</code>。</p>
+
+<h3>B. 路径压缩 / Path Compression</h3>
+<p>将所有没有分支的链式节点合并。这是更彻底的压缩，也是 Radix Tree 的标准形式。</p>
+
+<div class="box box-green">
+  <div class="title">🔑 压缩规则</div>
+  <p>如果一个内部节点<strong>只有一个子节点</strong>，就把它和子节点合并。合并后，边上存储的是字符串而非单个字符。重复此过程直到每个内部节点都有 ≥2 个子节点（或者是单词结尾）。</p>
+</div>
+
+<div class="flow">
+  <div class="step">构建普通 Trie</div>
+  <div class="arrow">→</div>
+  <div class="step">找到只有 1 个<br>子节点的内部节点</div>
+  <div class="arrow">→</div>
+  <div class="step">合并父子节点<br>拼接标签</div>
+  <div class="arrow">→</div>
+  <div class="step">重复直到<br>无法再压缩</div>
+</div>
+</section>
+
+<!-- Section 4: Core Operations -->
+<section id="sec-ops">
+<h2 class="section-title"><span class="num">4</span> 核心操作 / Core Operations</h2>
+
+<h3>查找 / Search</h3>
+<div class="flow">
+  <div class="step">从根节点出发</div>
+  <div class="arrow">→</div>
+  <div class="step">找到匹配前缀<br>的子边</div>
+  <div class="arrow">→</div>
+  <div class="step">消耗匹配部分<br>继续向下</div>
+  <div class="arrow">→</div>
+  <div class="step">字符串耗尽<br>且节点是终止 → ✅</div>
+</div>
+
+<p>查找时有三种情况：</p>
+<ol>
+  <li><strong>公共前缀为空</strong>：当前边不匹配，尝试兄弟边</li>
+  <li><strong>公共前缀 = 边标签</strong>：完全匹配，消耗后继续向下</li>
+  <li><strong>公共前缀 &lt; 边标签</strong>：部分匹配，查找失败</li>
+</ol>
+
+<h3>插入 / Insert</h3>
+<p>插入时如果发现<strong>部分匹配</strong>（公共前缀 &lt; 边标签），需要<strong>分裂节点</strong>。</p>
+
+<h3>删除 / Delete</h3>
+<p>删除后如果某个内部节点只剩一个子节点，需要<strong>合并节点</strong>（压缩的逆操作的逆操作）。</p>
+</section>
+
+<!-- Section 5: Node Splitting -->
+<section id="sec-split">
+<h2 class="section-title"><span class="num">5</span> 节点分裂 / Node Splitting</h2>
+
+<p>插入 <code>"team"</code> 到已有 <code>"test"</code> 的树中：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 700 180" xmlns="http://www.w3.org/2000/svg">
+    <!-- Before -->
+    <text x="120" y="16" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">插入前：只有 "test"</text>
+    <circle cx="120" cy="45" r="12" fill="#1e293b" stroke="#475569"/>
+    <text x="120" y="49" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">root</text>
+    <line x1="120" y1="57" x2="120" y2="78" stroke="#334155"/>
+    <rect x="80" y="82" width="80" height="22" rx="5" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="120" y="97" text-anchor="middle" fill="#86efac" font-size="12" font-weight="700" font-family="JetBrains Mono">test</text>
+
+    <!-- Arrow -->
+    <text x="280" y="80" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="600" font-family="Inter">插入 "team"</text>
+    <text x="280" y="100" text-anchor="middle" fill="#f59e0b" font-size="20" font-family="Inter">→</text>
+
+    <!-- Step 1: find common prefix "te" -->
+    <text x="430" y="16" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">Step 1: 公共前缀 "te"，分裂</text>
+    <circle cx="430" cy="45" r="12" fill="#1e293b" stroke="#475569"/>
+    <line x1="430" y1="57" x2="430" y2="78" stroke="#334155"/>
+    <rect x="400" y="82" width="60" height="22" rx="5" fill="#172554" stroke="#3b82f6"/>
+    <text x="430" y="97" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="700" font-family="JetBrains Mono">te</text>
+    <line x1="415" y1="104" x2="385" y2="128" stroke="#334155"/>
+    <line x1="445" y1="104" x2="475" y2="128" stroke="#334155"/>
+    <rect x="355" y="132" width="60" height="22" rx="5" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="385" y="147" text-anchor="middle" fill="#86efac" font-size="12" font-weight="700" font-family="JetBrains Mono">st</text>
+    <rect x="445" y="132" width="60" height="22" rx="5" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="475" y="147" text-anchor="middle" fill="#86efac" font-size="12" font-weight="700" font-family="JetBrains Mono">am</text>
+
+    <!-- Explanation -->
+    <text x="430" y="175" text-anchor="middle" fill="#f59e0b" font-size="10" font-family="Inter">"test" 分裂为 "te" + "st"，新增 "am" 分支</text>
+  </svg>
+</div>
+
+<pre><code>// 节点分裂伪代码
+function split(node, prefixLen):
+    // 1. 创建新的中间节点，标签 = 原标签的前 prefixLen 个字符
+    mid = new Node(label = node.label[0:prefixLen])
+    // 2. 原节点标签截断为剩余部分
+    node.label = node.label[prefixLen:]
+    // 3. 中间节点的子节点 = 原节点
+    mid.children[node.label[0]] = node
+    // 4. 返回中间节点（替换原节点在父节点中的位置）
+    return mid</code></pre>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 分裂是 Radix Tree 的核心难点</div>
+  <p>每次插入最多触发<strong>一次分裂</strong>。分裂后树仍然保持压缩状态。删除时可能需要反向操作——<strong>合并</strong>只有一个子节点的内部节点。</p>
+</div>
+</section>
+
+<!-- Section 6: Implementation -->
+<section id="sec-impl">
+<h2 class="section-title"><span class="num">6</span> 代码实现 / Implementation</h2>
+
+<pre><code>class RadixNode {
+    String label;
+    Map&lt;Character, RadixNode&gt; children = new HashMap&lt;&gt;();
+    boolean isEnd;
+
+    RadixNode(String label, boolean isEnd) {
+        this.label = label;
+        this.isEnd = isEnd;
+    }
+}
+
+class RadixTree {
+    RadixNode root = new RadixNode("", false);
+
+    void insert(String word) {
+        RadixNode node = root;
+        while (word.length() > 0) {
+            boolean found = false;
+            for (var entry : node.children.entrySet()) {
+                String key = entry.getValue().label;
+                int cp = commonPrefix(key, word);
+                if (cp == 0) continue;
+                found = true;
+                if (cp == key.length()) {
+                    // 完全匹配边标签，继续向下
+                    node = entry.getValue();
+                    word = word.substring(cp);
+                } else {
+                    // 部分匹配，需要分裂
+                    RadixNode child = entry.getValue();
+                    RadixNode mid = new RadixNode(key.substring(0, cp), false);
+                    child.label = key.substring(cp);
+                    mid.children.put(child.label.charAt(0), child);
+                    node.children.put(mid.label.charAt(0), mid);
+                    node = mid;
+                    word = word.substring(cp);
+                }
+                break;
+            }
+            if (!found) {
+                node.children.put(word.charAt(0),
+                    new RadixNode(word, true));
+                return;
+            }
+        }
+        node.isEnd = true;
+    }
+
+    int commonPrefix(String a, String b) {
+        int i = 0;
+        while (i < a.length() && i < b.length()
+               && a.charAt(i) == b.charAt(i)) i++;
+        return i;
+    }
+}</code></pre>
+</section>
+<!-- Section 7: Trie vs Radix Tree -->
+<section id="sec-vs">
+<h2 class="section-title"><span class="num">7</span> Trie vs Radix Tree</h2>
+
+<table>
+  <tr><th></th><th>Trie</th><th>Radix Tree</th></tr>
+  <tr><td>每条边存储</td><td>单个字符</td><td style="color:#86efac">字符串（多个字符）</td></tr>
+  <tr><td>节点数量</td><td style="color:#fca5a5">O(所有字符总数)</td><td style="color:#86efac">O(字符串个数)</td></tr>
+  <tr><td>查找时间</td><td>O(L)</td><td>O(L)</td></tr>
+  <tr><td>空间</td><td style="color:#fca5a5">大（大量单子节点）</td><td style="color:#86efac">紧凑</td></tr>
+  <tr><td>实现复杂度</td><td style="color:#86efac">简单</td><td>中等（需处理分裂/合并）</td></tr>
+  <tr><td>前缀搜索</td><td>✅</td><td>✅</td></tr>
+</table>
+
+<div class="box box-blue">
+  <div class="title">💡 何时选 Radix Tree</div>
+  <p><strong>字符串很长且有大量公共前缀</strong>时（如 URL、文件路径、IP 地址），Radix Tree 的空间优势非常明显。节点数从 O(所有字符总数) 降到 O(字符串个数)。</p>
+</div>
+</section>
+
+<!-- Section 8: Applications -->
+<section id="sec-apps">
+<h2 class="section-title"><span class="num">8</span> 实际应用 / Applications</h2>
+
+<h3>🐧 Linux 内核页缓存</h3>
+<p>Linux 内核使用 Radix Tree（现已演进为 <strong>XArray</strong>）管理页缓存（page cache）。每个文件的页面按偏移量索引，Radix Tree 提供 O(log n) 的查找。</p>
+<pre><code>// Linux 内核中的 Radix Tree（简化）
+// 文件 inode → radix_tree → 页面
+struct address_space {
+    struct xarray  i_pages;  // 原 radix_tree_root
+    ...
+};</code></pre>
+
+<h3>🌐 HTTP 路由器</h3>
+<p>Go 语言的 <code>net/http</code> 标准库和 <code>httprouter</code> 等高性能路由器使用 Radix Tree 匹配 URL 路径。</p>
+<pre><code>// httprouter 的路由注册
+// /api/users/:id  和  /api/users/list
+// 共享前缀 "/api/users/" 只存一次
+router.GET("/api/users/:id", getUser)
+router.GET("/api/users/list", listUsers)</code></pre>
+
+<h3>🔤 IP 路由表 (Longest Prefix Match)</h3>
+<p>网络路由器使用二进制 Radix Tree 进行最长前缀匹配。每个 IP 地址转为二进制后在树中查找，找到最长匹配的路由条目。</p>
+
+<h3>📦 其他应用</h3>
+<ul>
+  <li><strong>Redis</strong>：Cluster 模式的 slot 映射</li>
+  <li><strong>数据库索引</strong>：ART (Adaptive Radix Tree) 用于内存数据库</li>
+  <li><strong>自动补全</strong>：比普通 Trie 更省内存的实现</li>
+</ul>
+
+<div class="box box-purple">
+  <div class="title">🚀 ART: Adaptive Radix Tree</div>
+  <p>2013 年提出的 ART 是 Radix Tree 的现代演进。它根据子节点数量动态选择 4 种节点类型（Node4/16/48/256），在空间和速度之间取得最优平衡。被 HyPer、DuckDB 等内存数据库采用。</p>
+</div>
+</section>
+
+<!-- Section 9: Summary -->
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">9</span> 总结 / Summary</h2>
+
+<table>
+  <tr><th>操作</th><th>时间复杂度</th><th>说明</th></tr>
+  <tr><td>查找</td><td>O(L)</td><td>L = 字符串长度</td></tr>
+  <tr><td>插入</td><td>O(L)</td><td>最多一次分裂</td></tr>
+  <tr><td>删除</td><td>O(L)</td><td>可能触发合并</td></tr>
+  <tr><td>空间</td><td>O(N × L̄)</td><td>N = 字符串数，L̄ = 平均长度</td></tr>
+</table>
+
+<div class="box box-green">
+  <div class="title">🎯 一句话总结</div>
+  <p>Radix Tree = <strong>压缩版 Trie</strong>。通过合并无分支路径，用更少的节点存储相同的字符串集合。适合长字符串、大量公共前缀的场景（URL 路由、IP 查找、文件系统）。</p>
+</div>
+
+<div class="box box-purple">
+  <div class="title">📚 延伸阅读</div>
+  <ul>
+    <li><a href="https://en.wikipedia.org/wiki/Radix_tree" target="_blank">Wikipedia: Radix Tree</a></li>
+    <li><a href="https://db.in.tum.de/~leis/papers/ART.pdf" target="_blank">The Adaptive Radix Tree (ART) 论文</a></li>
+    <li><a href="https://lwn.net/Articles/175432/" target="_blank">LWN: Trees I — Radix trees</a> — Linux 内核中的实现</li>
+  </ul>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>基于 Nikolai Ershov 的文章及多篇资料综合改编为交互式教程</p>
+  <p><a href="../">← 返回主页 / Back to Home</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+<script src="radix-tree.js"></script>
+<script>
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => btn.classList.toggle('show', window.scrollY > 400));
+</script>
+
+<!-- Giscus Comments -->
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
