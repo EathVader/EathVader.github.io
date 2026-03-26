@@ -25,9 +25,11 @@
   <h2>📑 目录 / Table of Contents</h2>
   <ol>
     <li><a href="#sec-what">什么是 Trie 树 / What is Trie</a></li>
-    <li><a href="#sec-ops">基本操作 / Basic Operations</a></li>
-    <li><a href="#sec-impl">代码实现 / Implementation</a></li>
     <li><a href="#sec-demo">交互式演示 / Interactive Demo</a></li>
+    <li><a href="#sec-insert-steps">插入过程逐步图解 / Step-by-step Insert</a></li>
+    <li><a href="#sec-ops">基本操作 / Basic Operations</a></li>
+    <li><a href="#sec-vs">Trie vs HashMap</a></li>
+    <li><a href="#sec-impl">代码实现 / Implementation</a></li>
     <li><a href="#sec-app1">应用：敏感词过滤 / Sensitive Word Filter</a></li>
     <li><a href="#sec-app2">应用：IP 地址查询 / IP Lookup</a></li>
     <li><a href="#sec-dat">双数组 Trie / Double-Array Trie</a></li>
@@ -109,9 +111,136 @@
 </div>
 </section>
 
-<!-- Section 2 -->
+<!-- Section 2: Interactive Demo (moved up) -->
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">2</span> 交互式演示 / Interactive Demo</h2>
+
+<p>先玩一玩，再看原理。输入单词插入 Trie，观察树的结构变化。</p>
+
+<div class="demo">
+  <h4>🎮 Trie 树可视化</h4>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.5rem">
+    <input id="trie-input" type="text" placeholder="输入单词（小写字母）" style="width:180px">
+    <button id="trie-insert">插入</button>
+    <button id="trie-search" style="background:linear-gradient(135deg,#8b5cf6,#6366f1)">查找</button>
+    <button id="trie-prefix" style="background:linear-gradient(135deg,#0891b2,#0e7490)">前缀搜索</button>
+    <button id="trie-reset" style="background:#334155">重置</button>
+  </div>
+  <div style="margin-bottom:.5rem">
+    <button id="trie-example" style="background:#1e293b;border:1px solid #334155;font-size:.8rem">示例：tea, ten, to, in, inn, apple, app</button>
+  </div>
+  <svg id="trie-svg" viewBox="0 0 700 320" style="width:100%;height:320px;background:#0f172a;border-radius:8px"></svg>
+  <div id="trie-log" class="output">等待操作... 试试点击"示例"按钮</div>
+  <p style="font-size:.8rem;color:#64748b;margin-top:.5rem">🟢 绿色节点 = 单词结尾　🔵 蓝色节点 = 中间节点</p>
+</div>
+</section>
+
+<!-- Section 3: Step-by-step Insert -->
+<section id="sec-insert-steps">
+<h2 class="section-title"><span class="num">3</span> 插入过程逐步图解 / Step-by-step Insert</h2>
+
+<p>以插入 <code>"apple"</code> 为例，观察每一步如何沿路径创建节点：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 700 280" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#60a5fa"/></marker></defs>
+
+    <!-- Step labels -->
+    <text x="60" y="16" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">插入 "a"</text>
+    <text x="200" y="16" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">插入 "ap"</text>
+    <text x="360" y="16" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">插入 "app"</text>
+    <text x="530" y="16" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">插入 "appl"</text>
+    <text x="630" y="16" text-anchor="middle" fill="#f59e0b" font-size="10" font-family="Inter">完成 "apple" ✓</text>
+
+    <!-- Step 1: root -> a -->
+    <circle cx="60" cy="50" r="12" fill="#1e293b" stroke="#475569"/>
+    <text x="60" y="54" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">·</text>
+    <line x1="60" y1="62" x2="60" y2="82" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#ag)"/>
+    <text x="72" y="76" fill="#60a5fa" font-size="9" font-family="Inter">a</text>
+    <circle cx="60" cy="95" r="12" fill="#172554" stroke="#3b82f6" stroke-width="2"/>
+    <text x="60" y="99" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">a</text>
+
+    <!-- Step 2: root -> a -> p -->
+    <circle cx="200" cy="50" r="12" fill="#1e293b" stroke="#475569"/>
+    <text x="200" y="54" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">·</text>
+    <line x1="200" y1="62" x2="200" y2="82" stroke="#334155" stroke-width="1.5"/>
+    <text x="212" y="76" fill="#64748b" font-size="9" font-family="Inter">a</text>
+    <circle cx="200" cy="95" r="12" fill="#172554" stroke="#3b82f6"/>
+    <text x="200" y="99" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">a</text>
+    <line x1="200" y1="107" x2="200" y2="127" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#ag)"/>
+    <text x="212" y="121" fill="#60a5fa" font-size="9" font-family="Inter">p</text>
+    <circle cx="200" cy="140" r="12" fill="#172554" stroke="#3b82f6" stroke-width="2"/>
+    <text x="200" y="144" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">p</text>
+
+    <!-- Step 3: root -> a -> p -> p -->
+    <circle cx="360" cy="50" r="12" fill="#1e293b" stroke="#475569"/>
+    <text x="360" y="54" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">·</text>
+    <line x1="360" y1="62" x2="360" y2="82" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="360" cy="95" r="12" fill="#172554" stroke="#3b82f6"/>
+    <text x="360" y="99" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">a</text>
+    <line x1="360" y1="107" x2="360" y2="127" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="360" cy="140" r="12" fill="#172554" stroke="#3b82f6"/>
+    <text x="360" y="144" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">p</text>
+    <line x1="360" y1="152" x2="360" y2="172" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#ag)"/>
+    <text x="372" y="166" fill="#60a5fa" font-size="9" font-family="Inter">p</text>
+    <circle cx="360" cy="185" r="12" fill="#172554" stroke="#3b82f6" stroke-width="2"/>
+    <text x="360" y="189" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">p</text>
+
+    <!-- Step 4: + l -->
+    <circle cx="530" cy="50" r="12" fill="#1e293b" stroke="#475569"/>
+    <text x="530" y="54" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">·</text>
+    <line x1="530" y1="62" x2="530" y2="82" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="530" cy="95" r="12" fill="#172554" stroke="#3b82f6"/>
+    <text x="530" y="99" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">a</text>
+    <line x1="530" y1="107" x2="530" y2="127" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="530" cy="140" r="12" fill="#172554" stroke="#3b82f6"/>
+    <text x="530" y="144" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">p</text>
+    <line x1="530" y1="152" x2="530" y2="172" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="530" cy="185" r="12" fill="#172554" stroke="#3b82f6"/>
+    <text x="530" y="189" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">p</text>
+    <line x1="530" y1="197" x2="530" y2="217" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#ag)"/>
+    <text x="542" y="211" fill="#60a5fa" font-size="9" font-family="Inter">l</text>
+    <circle cx="530" cy="230" r="12" fill="#172554" stroke="#3b82f6" stroke-width="2"/>
+    <text x="530" y="234" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">l</text>
+
+    <!-- Step 5: complete + e (end node) -->
+    <circle cx="640" cy="50" r="12" fill="#1e293b" stroke="#475569"/>
+    <text x="640" y="54" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">·</text>
+    <line x1="640" y1="62" x2="640" y2="82" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="640" cy="95" r="12" fill="#172554" stroke="#3b82f6"/>
+    <text x="640" y="99" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">a</text>
+    <line x1="640" y1="107" x2="640" y2="127" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="640" cy="140" r="12" fill="#172554" stroke="#3b82f6"/>
+    <text x="640" y="144" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">p</text>
+    <line x1="640" y1="152" x2="640" y2="172" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="640" cy="185" r="12" fill="#172554" stroke="#3b82f6"/>
+    <text x="640" y="189" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">p</text>
+    <line x1="640" y1="197" x2="640" y2="217" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="640" cy="230" r="12" fill="#172554" stroke="#3b82f6"/>
+    <text x="640" y="234" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="700" font-family="Inter">l</text>
+    <line x1="640" y1="242" x2="640" y2="257" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ag)"/>
+    <circle cx="640" cy="268" r="12" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="640" y="272" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">e</text>
+    <text x="656" y="272" fill="#86efac" font-size="9" font-family="Inter">✓</text>
+
+    <!-- Blue highlight arrows -->
+    <text x="60" y="130" text-anchor="middle" fill="#60a5fa" font-size="9" font-family="Inter">新建节点</text>
+    <text x="200" y="175" text-anchor="middle" fill="#60a5fa" font-size="9" font-family="Inter">新建节点</text>
+    <text x="360" y="220" text-anchor="middle" fill="#60a5fa" font-size="9" font-family="Inter">新建节点</text>
+    <text x="530" y="265" text-anchor="middle" fill="#60a5fa" font-size="9" font-family="Inter">新建节点</text>
+  </svg>
+  <div class="caption">插入 "apple"：逐字符向下走，不存在则创建新节点，最后标记 e 为单词结尾（绿色）</div>
+</div>
+
+<div class="box box-blue">
+  <div class="title">💡 共享前缀的威力</div>
+  <p>再插入 "app" 时，a→p→p 这条路径<strong>已经存在</strong>，只需把第二个 p 标记为单词结尾，无需创建任何新节点。这就是 Trie 节省空间的核心：<strong>公共前缀只存一份</strong>。</p>
+</div>
+</section>
+
+<!-- Section 4 -->
 <section id="sec-ops">
-<h2 class="section-title"><span class="num">2</span> 基本操作 / Basic Operations</h2>
+<h2 class="section-title"><span class="num">4</span> 基本操作 / Basic Operations</h2>
 
 <h3>插入 / Insert</h3>
 <div class="flow">
@@ -141,9 +270,9 @@
 </div>
 </section>
 
-<!-- Section 3 -->
+<!-- Section 6 -->
 <section id="sec-impl">
-<h2 class="section-title"><span class="num">3</span> 代码实现 / Implementation</h2>
+<h2 class="section-title"><span class="num">5</span> 代码实现 / Implementation</h2>
 
 <pre><code>class TrieNode {
     TrieNode[] children = new TrieNode[26]; // a-z
@@ -196,30 +325,33 @@ class Trie {
 </div>
 </section>
 
-<!-- Section 4: Interactive Demo -->
-<section id="sec-demo">
-<h2 class="section-title"><span class="num">4</span> 交互式演示 / Interactive Demo</h2>
 
-<div class="demo">
-  <h4>🎮 Trie 树可视化</h4>
-  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.5rem">
-    <input id="trie-input" type="text" placeholder="输入单词（小写字母）" style="width:180px">
-    <button id="trie-insert">插入</button>
-    <button id="trie-search" style="background:linear-gradient(135deg,#8b5cf6,#6366f1)">查找</button>
-    <button id="trie-prefix" style="background:linear-gradient(135deg,#0891b2,#0e7490)">前缀搜索</button>
-    <button id="trie-reset" style="background:#334155">重置</button>
-  </div>
-  <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
-    <button id="trie-example" style="background:#1e293b;border:1px solid #334155;font-size:.8rem">示例：tea,ten,to,in,inn,apple,app</button>
-  </div>
-  <svg id="trie-svg" viewBox="0 0 700 320" style="width:100%;height:320px;background:#0f172a;border-radius:8px"></svg>
-  <div id="trie-log" class="output">等待操作...</div>
+<!-- Section 5: Trie vs HashMap -->
+<section id="sec-vs">
+<h2 class="section-title"><span class="num">6</span> Trie vs HashMap</h2>
+
+<p>初学者常问：为什么不直接用 HashMap 存所有单词？</p>
+
+<table>
+  <tr><th></th><th>Trie 树</th><th>HashMap</th></tr>
+  <tr><td>精确查找</td><td>O(L)</td><td>O(L)（计算哈希）</td></tr>
+  <tr><td>前缀搜索</td><td style="color:#86efac">✅ O(L + k)</td><td style="color:#fca5a5">❌ 需遍历所有键 O(N)</td></tr>
+  <tr><td>自动补全</td><td style="color:#86efac">✅ 天然支持</td><td style="color:#fca5a5">❌ 不支持</td></tr>
+  <tr><td>按字典序遍历</td><td style="color:#86efac">✅ DFS 即可</td><td style="color:#fca5a5">❌ 需排序</td></tr>
+  <tr><td>空间（大量公共前缀）</td><td style="color:#86efac">✅ 共享节点</td><td>每个词独立存储</td></tr>
+  <tr><td>空间（无公共前缀）</td><td style="color:#fca5a5">❌ 每字符一节点</td><td style="color:#86efac">✅ 更紧凑</td></tr>
+</table>
+
+<div class="box box-green">
+  <div class="title">🎯 选择原则</div>
+  <p><strong>用 Trie</strong>：需要前缀搜索、自动补全、按字典序遍历<br>
+  <strong>用 HashMap</strong>：只需精确查找，词之间没有公共前缀</p>
 </div>
 </section>
 
-<!-- Section 5 -->
+<!-- Section 7 -->
 <section id="sec-app1">
-<h2 class="section-title"><span class="num">5</span> 应用：敏感词过滤 / Sensitive Word Filter</h2>
+<h2 class="section-title"><span class="num">7</span> 应用：敏感词过滤 / Sensitive Word Filter</h2>
 
 <div class="analogy">
   <div class="emoji">🛡️</div>
@@ -264,9 +396,9 @@ List&lt;String&gt; filter(String text, Trie trie) {
 </div>
 </section>
 
-<!-- Section 6 -->
+<!-- Section 8 -->
 <section id="sec-app2">
-<h2 class="section-title"><span class="num">6</span> 应用：IP 地址查询 / IP Lookup</h2>
+<h2 class="section-title"><span class="num">8</span> 应用：IP 地址查询 / IP Lookup</h2>
 
 <p>给定一个 IP 地址，查询它属于哪个 ISP（中国移动/电信/联通）。</p>
 
@@ -301,9 +433,9 @@ List&lt;String&gt; filter(String text, Trie trie) {
 <p>优势：查询时间 O(32)（固定 32 步），与 ISP 数量无关，比遍历所有 IP 段快得多。</p>
 </section>
 
-<!-- Section 7 -->
+<!-- Section 9 -->
 <section id="sec-dat">
-<h2 class="section-title"><span class="num">7</span> 双数组 Trie / Double-Array Trie</h2>
+<h2 class="section-title"><span class="num">9</span> 双数组 Trie / Double-Array Trie</h2>
 
 <p>普通 Trie 树的问题：每个节点存一个 26 元素数组，空间浪费严重。<strong>双数组 Trie（DAT）</strong>用两个整数数组 <code>base[]</code> 和 <code>check[]</code> 压缩存储整棵树。</p>
 
@@ -323,9 +455,9 @@ check[s] = r         // 验证转移有效性</code></pre>
 </table>
 </section>
 
-<!-- Section 8 -->
+<!-- Section 10 -->
 <section id="sec-summary">
-<h2 class="section-title"><span class="num">8</span> 总结 / Summary</h2>
+<h2 class="section-title"><span class="num">10</span> 总结 / Summary</h2>
 
 <table>
   <tr><th>操作</th><th>时间复杂度</th><th>说明</th></tr>
