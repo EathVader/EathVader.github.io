@@ -133,6 +133,12 @@ tr:nth-child(even) td { background: rgba(30,41,59,.4); }
   font-size: .9rem; font-weight: 600; margin: .25rem 0;
 }
 .demo button:hover { opacity: .9; }
+.demo input, .demo select {
+  background: #0f172a; color: #e2e8f0; border: 1px solid #334155;
+  border-radius: 6px; padding: .4rem .6rem; font-size: .9rem;
+  font-family: 'JetBrains Mono', monospace; outline: none;
+}
+.demo input:focus, .demo select:focus { border-color: #3b82f6; }
 .demo .output {
   background: #0f172a; border-radius: 6px; padding: .75rem 1rem;
   margin-top: .75rem; font-family: 'JetBrains Mono', monospace; font-size: .85rem;

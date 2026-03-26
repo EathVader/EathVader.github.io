@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>排序算法图解大全 / Sorting Algorithms Visual Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>📊 <span>排序算法</span>图解大全</h1>
+  <p class="subtitle">十大排序算法，从原理到可视化一网打尽<br>
+  Sorting Algorithms: From Bubble Sort to Radix Sort</p>
+  <span class="badge">🔄 比较排序</span>
+  <span class="badge">📦 非比较排序</span>
+  <span class="badge">⚡ 交互演示</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-overview">总览 / Overview</a></li>
+    <li><a href="#sec-demo">交互式演示 / Interactive Demo</a></li>
+    <li><a href="#sec-bubble">冒泡排序 / Bubble Sort</a></li>
+    <li><a href="#sec-selection">选择排序 / Selection Sort</a></li>
+    <li><a href="#sec-insertion">插入排序 / Insertion Sort</a></li>
+    <li><a href="#sec-shell">希尔排序 / Shell Sort</a></li>
+    <li><a href="#sec-merge">归并排序 / Merge Sort</a></li>
+    <li><a href="#sec-quick">快速排序 / Quick Sort</a></li>
+    <li><a href="#sec-heap">堆排序 / Heap Sort</a></li>
+    <li><a href="#sec-counting">计数 · 桶 · 基数 / Non-comparison</a></li>
+    <li><a href="#sec-compare">全面对比 / Comparison</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1: Overview -->
+<section id="sec-overview">
+<h2 class="section-title"><span class="num">1</span> 总览 / Overview</h2>
+
+<table>
+  <tr><th>算法</th><th>平均</th><th>最好</th><th>最坏</th><th>空间</th><th>稳定</th></tr>
+  <tr><td>冒泡排序</td><td>O(n²)</td><td style="color:#86efac">O(n)</td><td>O(n²)</td><td>O(1)</td><td>✅</td></tr>
+  <tr><td>选择排序</td><td>O(n²)</td><td>O(n²)</td><td>O(n²)</td><td>O(1)</td><td>❌</td></tr>
+  <tr><td>插入排序</td><td>O(n²)</td><td style="color:#86efac">O(n)</td><td>O(n²)</td><td>O(1)</td><td>✅</td></tr>
+  <tr><td>希尔排序</td><td>O(n^1.3)</td><td>O(n)</td><td>O(n²)</td><td>O(1)</td><td>❌</td></tr>
+  <tr><td style="color:#86efac">归并排序</td><td style="color:#86efac">O(n log n)</td><td>O(n log n)</td><td>O(n log n)</td><td style="color:#fca5a5">O(n)</td><td>✅</td></tr>
+  <tr><td style="color:#86efac">快速排序</td><td style="color:#86efac">O(n log n)</td><td>O(n log n)</td><td style="color:#fca5a5">O(n²)</td><td>O(log n)</td><td>❌</td></tr>
+  <tr><td style="color:#86efac">堆排序</td><td style="color:#86efac">O(n log n)</td><td>O(n log n)</td><td>O(n log n)</td><td>O(1)</td><td>❌</td></tr>
+  <tr><td>计数排序</td><td style="color:#86efac">O(n+k)</td><td>O(n+k)</td><td>O(n+k)</td><td>O(k)</td><td>✅</td></tr>
+  <tr><td>基数排序</td><td style="color:#86efac">O(d·n)</td><td>O(d·n)</td><td>O(d·n)</td><td>O(n+k)</td><td>✅</td></tr>
+</table>
+
+<div class="box box-blue">
+  <div class="title">🎯 选择原则</div>
+  <p><strong>小数据 (n &lt; 50)</strong>：插入排序（常数小，对近乎有序数据极快）<br>
+  <strong>通用场景</strong>：快速排序（实践中最快，各语言标准库首选）<br>
+  <strong>需要稳定</strong>：归并排序（Java 的 Arrays.sort 对对象用 TimSort）<br>
+  <strong>内存受限</strong>：堆排序（原地 O(1) 空间）<br>
+  <strong>整数且范围小</strong>：计数/基数排序（线性时间）</p>
+</div>
+</section>
+
+<!-- Section 2: Interactive Demo -->
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">2</span> 交互式演示 / Interactive Demo</h2>
+
+<div class="demo">
+  <h4>🎮 排序可视化</h4>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
+    <input id="sort-arr" type="text" value="38, 27, 43, 3, 9, 82, 10, 15, 45, 21, 7, 33" style="width:300px">
+    <button id="sort-random">🎲 随机</button>
+    <button id="sort-reset" style="background:#334155">重置</button>
+    <label style="font-size:.8rem;color:#94a3b8">速度(ms):</label>
+    <input id="sort-speed" type="number" value="80" min="10" max="500" style="width:60px">
+  </div>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
+    <button id="sort-bubble">冒泡</button>
+    <button id="sort-selection" style="background:linear-gradient(135deg,#8b5cf6,#6366f1)">选择</button>
+    <button id="sort-insertion" style="background:linear-gradient(135deg,#0891b2,#0e7490)">插入</button>
+    <button id="sort-quick" style="background:linear-gradient(135deg,#d97706,#b45309)">快速</button>
+    <button id="sort-merge" style="background:linear-gradient(135deg,#be185d,#9f1239)">归并</button>
+    <button id="sort-heap" style="background:linear-gradient(135deg,#059669,#047857)">堆排序</button>
+  </div>
+  <svg id="sort-svg" viewBox="0 0 700 220" style="width:100%;height:220px;background:#0f172a;border-radius:8px"></svg>
+  <div id="sort-log" class="output">选择排序算法开始演示</div>
+  <p style="font-size:.8rem;color:#64748b;margin-top:.5rem">🔵 未排序　🟡 正在比较　🟢 已排序</p>
+</div>
+</section>
+<!-- Section 3: Bubble Sort -->
+<section id="sec-bubble">
+<h2 class="section-title"><span class="num">3</span> 冒泡排序 / Bubble Sort</h2>
+
+<div class="analogy">
+  <div class="emoji">🫧</div>
+  <h4>类比 / Analogy</h4>
+  <p>像水中的气泡一样，大的元素不断"浮"到数组末尾。每一轮把当前最大的元素冒泡到正确位置。</p>
+</div>
+
+<div class="flow">
+  <div class="step">相邻元素比较</div>
+  <div class="arrow">→</div>
+  <div class="step">逆序则交换</div>
+  <div class="arrow">→</div>
+  <div class="step">一轮后最大值<br>到达末尾</div>
+  <div class="arrow">→</div>
+  <div class="step">重复 n-1 轮</div>
+</div>
+
+<pre><code>void bubbleSort(int[] a) {
+    for (int i = 0; i < a.length - 1; i++) {
+        boolean swapped = false;
+        for (int j = 0; j < a.length - 1 - i; j++) {
+            if (a[j] > a[j + 1]) {
+                swap(a, j, j + 1);
+                swapped = true;
+            }
+        }
+        if (!swapped) break; // 优化：无交换说明已有序
+    }
+}</code></pre>
+
+<div class="diagram">
+  <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg">
+    <text x="350" y="16" text-anchor="middle" fill="#f8fafc" font-size="11" font-weight="600" font-family="Inter">冒泡排序逐轮演示：[5, 3, 8, 1]</text>
+    <!-- Round 0: original -->
+    <text x="30" y="45" fill="#94a3b8" font-size="9" font-family="Inter">原始</text>
+    <rect x="70" y="30" width="35" height="24" rx="4" fill="#172554" stroke="#3b82f6"/><text x="87" y="46" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="JetBrains Mono">5</text>
+    <rect x="110" y="30" width="35" height="24" rx="4" fill="#172554" stroke="#3b82f6"/><text x="127" y="46" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="JetBrains Mono">3</text>
+    <rect x="150" y="30" width="35" height="24" rx="4" fill="#172554" stroke="#3b82f6"/><text x="167" y="46" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="JetBrains Mono">8</text>
+    <rect x="190" y="30" width="35" height="24" rx="4" fill="#172554" stroke="#3b82f6"/><text x="207" y="46" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="JetBrains Mono">1</text>
+    <!-- Round 1 -->
+    <text x="30" y="80" fill="#f59e0b" font-size="9" font-family="Inter">第1轮</text>
+    <rect x="70" y="65" width="35" height="24" rx="4" fill="#172554" stroke="#3b82f6"/><text x="87" y="81" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="JetBrains Mono">3</text>
+    <rect x="110" y="65" width="35" height="24" rx="4" fill="#172554" stroke="#3b82f6"/><text x="127" y="81" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="JetBrains Mono">5</text>
+    <rect x="150" y="65" width="35" height="24" rx="4" fill="#172554" stroke="#3b82f6"/><text x="167" y="81" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="JetBrains Mono">1</text>
+    <rect x="190" y="65" width="35" height="24" rx="4" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="207" y="81" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="JetBrains Mono">8</text>
+    <text x="250" y="81" fill="#86efac" font-size="9" font-family="Inter">← 8 就位</text>
+    <!-- Round 2 -->
+    <text x="30" y="115" fill="#f59e0b" font-size="9" font-family="Inter">第2轮</text>
+    <rect x="70" y="100" width="35" height="24" rx="4" fill="#172554" stroke="#3b82f6"/><text x="87" y="116" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="JetBrains Mono">3</text>
+    <rect x="110" y="100" width="35" height="24" rx="4" fill="#172554" stroke="#3b82f6"/><text x="127" y="116" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="JetBrains Mono">1</text>
+    <rect x="150" y="100" width="35" height="24" rx="4" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="167" y="116" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="JetBrains Mono">5</text>
+    <rect x="190" y="100" width="35" height="24" rx="4" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="207" y="116" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="JetBrains Mono">8</text>
+    <text x="250" y="116" fill="#86efac" font-size="9" font-family="Inter">← 5 就位</text>
+    <!-- Final -->
+    <text x="30" y="148" fill="#86efac" font-size="9" font-family="Inter">完成</text>
+    <rect x="70" y="132" width="35" height="24" rx="4" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="87" y="148" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="JetBrains Mono">1</text>
+    <rect x="110" y="132" width="35" height="24" rx="4" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="127" y="148" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="JetBrains Mono">3</text>
+    <rect x="150" y="132" width="35" height="24" rx="4" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="167" y="148" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="JetBrains Mono">5</text>
+    <rect x="190" y="132" width="35" height="24" rx="4" fill="#14532d" stroke="#22c55e" stroke-width="2"/><text x="207" y="148" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="JetBrains Mono">8</text>
+    <text x="250" y="148" fill="#86efac" font-size="9" font-family="Inter">✓ 全部有序</text>
+
+    <!-- Explanation on right -->
+    <rect x="380" y="40" width="290" height="90" rx="8" fill="#1e293b" stroke="#334155"/>
+    <text x="525" y="62" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="Inter">每一轮，最大的元素"冒泡"到末尾</text>
+    <text x="525" y="82" text-anchor="middle" fill="#f59e0b" font-size="10" font-family="Inter">第1轮：比较3次，8到达末尾</text>
+    <text x="525" y="100" text-anchor="middle" fill="#f59e0b" font-size="10" font-family="Inter">第2轮：比较2次，5到达倒数第2</text>
+    <text x="525" y="118" text-anchor="middle" fill="#86efac" font-size="10" font-family="Inter">第3轮：比较1次，全部有序 ✓</text>
+  </svg>
+</div>
+</section>
+
+<!-- Section 4: Selection Sort -->
+<section id="sec-selection">
+<h2 class="section-title"><span class="num">4</span> 选择排序 / Selection Sort</h2>
+
+<div class="flow">
+  <div class="step">在未排序区<br>找最小值</div>
+  <div class="arrow">→</div>
+  <div class="step">与未排序区<br>第一个交换</div>
+  <div class="arrow">→</div>
+  <div class="step">有序区 +1<br>重复 n-1 轮</div>
+</div>
+
+<pre><code>void selectionSort(int[] a) {
+    for (int i = 0; i < a.length - 1; i++) {
+        int min = i;
+        for (int j = i + 1; j < a.length; j++)
+            if (a[j] < a[min]) min = j;
+        swap(a, i, min);
+    }
+}</code></pre>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 不稳定</div>
+  <p>选择排序是不稳定的。例如 [5a, 5b, 2]，第一轮把 2 和 5a 交换，5a 跑到了 5b 后面。</p>
+</div>
+</section>
+
+<!-- Section 5: Insertion Sort -->
+<section id="sec-insertion">
+<h2 class="section-title"><span class="num">5</span> 插入排序 / Insertion Sort</h2>
+
+<div class="analogy">
+  <div class="emoji">🃏</div>
+  <h4>类比 / Analogy</h4>
+  <p>像打扑克牌整理手牌：每摸一张新牌，从右往左找到合适位置插入。</p>
+</div>
+
+<pre><code>void insertionSort(int[] a) {
+    for (int i = 1; i < a.length; i++) {
+        int key = a[i], j = i - 1;
+        while (j >= 0 && a[j] > key) {
+            a[j + 1] = a[j]; j--;
+        }
+        a[j + 1] = key;
+    }
+}</code></pre>
+
+<div class="diagram">
+  <svg viewBox="0 0 700 120" xmlns="http://www.w3.org/2000/svg">
+    <text x="350" y="16" text-anchor="middle" fill="#f8fafc" font-size="11" font-weight="600" font-family="Inter">插入排序：像整理扑克牌 [5, 2, 4, 1]</text>
+    <text x="50" y="42" fill="#94a3b8" font-size="9" font-family="Inter">手牌 [5]</text>
+    <text x="50" y="62" fill="#f59e0b" font-size="9" font-family="Inter">插入 2</text>
+    <text x="50" y="82" fill="#f59e0b" font-size="9" font-family="Inter">插入 4</text>
+    <text x="50" y="102" fill="#f59e0b" font-size="9" font-family="Inter">插入 1</text>
+
+    <rect x="120" y="28" width="30" height="22" rx="3" fill="#14532d" stroke="#22c55e"/><text x="135" y="43" text-anchor="middle" fill="#86efac" font-size="10" font-family="JetBrains Mono">5</text>
+    <text x="170" y="43" fill="#94a3b8" font-size="9" font-family="Inter">| 待插入: 2, 4, 1</text>
+
+    <rect x="120" y="48" width="30" height="22" rx="3" fill="#451a03" stroke="#f59e0b"/><text x="135" y="63" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="JetBrains Mono">2</text>
+    <rect x="155" y="48" width="30" height="22" rx="3" fill="#14532d" stroke="#22c55e"/><text x="170" y="63" text-anchor="middle" fill="#86efac" font-size="10" font-family="JetBrains Mono">5</text>
+    <text x="200" y="63" fill="#f59e0b" font-size="9" font-family="Inter">← 2 插到 5 前面</text>
+
+    <rect x="120" y="68" width="30" height="22" rx="3" fill="#14532d" stroke="#22c55e"/><text x="135" y="83" text-anchor="middle" fill="#86efac" font-size="10" font-family="JetBrains Mono">2</text>
+    <rect x="155" y="68" width="30" height="22" rx="3" fill="#451a03" stroke="#f59e0b"/><text x="170" y="83" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="JetBrains Mono">4</text>
+    <rect x="190" y="68" width="30" height="22" rx="3" fill="#14532d" stroke="#22c55e"/><text x="205" y="83" text-anchor="middle" fill="#86efac" font-size="10" font-family="JetBrains Mono">5</text>
+    <text x="235" y="83" fill="#f59e0b" font-size="9" font-family="Inter">← 4 插到 2 和 5 之间</text>
+
+    <rect x="120" y="88" width="30" height="22" rx="3" fill="#451a03" stroke="#f59e0b"/><text x="135" y="103" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="JetBrains Mono">1</text>
+    <rect x="155" y="88" width="30" height="22" rx="3" fill="#14532d" stroke="#22c55e"/><text x="170" y="103" text-anchor="middle" fill="#86efac" font-size="10" font-family="JetBrains Mono">2</text>
+    <rect x="190" y="88" width="30" height="22" rx="3" fill="#14532d" stroke="#22c55e"/><text x="205" y="103" text-anchor="middle" fill="#86efac" font-size="10" font-family="JetBrains Mono">4</text>
+    <rect x="225" y="88" width="30" height="22" rx="3" fill="#14532d" stroke="#22c55e"/><text x="240" y="103" text-anchor="middle" fill="#86efac" font-size="10" font-family="JetBrains Mono">5</text>
+    <text x="270" y="103" fill="#86efac" font-size="9" font-family="Inter">← 1 插到最前面 ✓</text>
+  </svg>
+</div>
+
+<div class="box box-green">
+  <div class="title">💡 插入排序的优势</div>
+  <p>对<strong>近乎有序</strong>的数据，插入排序接近 O(n)。这就是为什么 TimSort（Python/Java 的默认排序）在小数组或部分有序时切换到插入排序。</p>
+</div>
+</section>
+
+<!-- Section 6: Shell Sort -->
+<section id="sec-shell">
+<h2 class="section-title"><span class="num">6</span> 希尔排序 / Shell Sort</h2>
+
+<p>插入排序的改进版：先用大步长分组排序，逐步缩小步长，最后步长为 1 时等价于插入排序，但此时数组已近乎有序。</p>
+
+<div class="flow">
+  <div class="step">gap = n/2</div>
+  <div class="arrow">→</div>
+  <div class="step">对每组做<br>插入排序</div>
+  <div class="arrow">→</div>
+  <div class="step">gap /= 2</div>
+  <div class="arrow">→</div>
+  <div class="step">gap=1 时<br>最终排序</div>
+</div>
+
+<pre><code>void shellSort(int[] a) {
+    for (int gap = a.length / 2; gap > 0; gap /= 2) {
+        for (int i = gap; i < a.length; i++) {
+            int key = a[i], j = i;
+            while (j >= gap && a[j - gap] > key) {
+                a[j] = a[j - gap]; j -= gap;
+            }
+            a[j] = key;
+        }
+    }
+}</code></pre>
+</section>
+
+<!-- Section 7: Merge Sort -->
+<section id="sec-merge">
+<h2 class="section-title"><span class="num">7</span> 归并排序 / Merge Sort</h2>
+
+<div class="analogy">
+  <div class="emoji">🪓</div>
+  <h4>分治思想</h4>
+  <p>把数组一分为二，分别排序，再合并两个有序数组。递归到底就是单个元素（天然有序）。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 700 160" xmlns="http://www.w3.org/2000/svg">
+    <text x="350" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">归并排序：分解 → 合并</text>
+    <!-- Level 0 -->
+    <rect x="200" y="25" width="300" height="22" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="350" y="40" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="JetBrains Mono">[38, 27, 43, 3, 9, 82, 10]</text>
+    <!-- Level 1 -->
+    <line x1="280" y1="47" x2="180" y2="58" stroke="#334155"/>
+    <line x1="420" y1="47" x2="520" y2="58" stroke="#334155"/>
+    <rect x="80" y="60" width="200" height="20" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="180" y="74" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="JetBrains Mono">[38, 27, 43, 3]</text>
+    <rect x="420" y="60" width="200" height="20" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="520" y="74" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="JetBrains Mono">[9, 82, 10]</text>
+    <!-- ... -->
+    <text x="350" y="100" text-anchor="middle" fill="#f59e0b" font-size="11" font-family="Inter">⬇ 递归分解到单个元素，然后自底向上合并 ⬇</text>
+    <!-- Merged -->
+    <rect x="200" y="115" width="300" height="22" rx="4" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="350" y="130" text-anchor="middle" fill="#86efac" font-size="10" font-family="JetBrains Mono">[3, 9, 10, 27, 38, 43, 82] ✓</text>
+    <text x="350" y="155" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">合并两个有序数组：双指针 O(n)，总共 O(n log n)</text>
+  </svg>
+</div>
+
+<pre><code>void mergeSort(int[] a, int lo, int hi) {
+    if (lo >= hi) return;
+    int mid = (lo + hi) / 2;
+    mergeSort(a, lo, mid);
+    mergeSort(a, mid + 1, hi);
+    merge(a, lo, mid, hi);
+}
+
+void merge(int[] a, int lo, int mid, int hi) {
+    int[] tmp = Arrays.copyOfRange(a, lo, hi + 1);
+    int i = 0, j = mid - lo + 1, k = lo;
+    while (i <= mid - lo && j <= hi - lo) {
+        a[k++] = tmp[i] <= tmp[j] ? tmp[i++] : tmp[j++];
+    }
+    while (i <= mid - lo) a[k++] = tmp[i++];
+    while (j <= hi - lo) a[k++] = tmp[j++];
+}</code></pre>
+</section>
+<!-- Section 8: Quick Sort -->
+<section id="sec-quick">
+<h2 class="section-title"><span class="num">8</span> 快速排序 / Quick Sort</h2>
+
+<div class="box box-blue">
+  <div class="title">🔑 核心思想：分区 (Partition)</div>
+  <p>选一个基准元素（pivot），把数组分成两部分：左边 ≤ pivot，右边 ≥ pivot。然后递归排序左右两部分。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 700 100" xmlns="http://www.w3.org/2000/svg">
+    <text x="350" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">Partition 过程（pivot = 43）</text>
+    <rect x="50" y="30" width="250" height="25" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="175" y="47" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="JetBrains Mono">[38, 27, 3, 9, 10]</text>
+    <text x="175" y="70" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">≤ pivot</text>
+    <rect x="310" y="30" width="50" height="25" rx="4" fill="#451a03" stroke="#f59e0b" stroke-width="2"/>
+    <text x="335" y="47" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700" font-family="JetBrains Mono">43</text>
+    <text x="335" y="70" text-anchor="middle" fill="#f59e0b" font-size="9" font-family="Inter">pivot</text>
+    <rect x="370" y="30" width="120" height="25" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="430" y="47" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="JetBrains Mono">[82, 45]</text>
+    <text x="430" y="70" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">≥ pivot</text>
+    <text x="350" y="92" text-anchor="middle" fill="#86efac" font-size="9" font-family="Inter">pivot 到达最终位置，左右分别递归</text>
+  </svg>
+</div>
+
+<pre><code>void quickSort(int[] a, int lo, int hi) {
+    if (lo >= hi) return;
+    int pivotIdx = partition(a, lo, hi);
+    quickSort(a, lo, pivotIdx - 1);
+    quickSort(a, pivotIdx + 1, hi);
+}
+
+int partition(int[] a, int lo, int hi) {
+    int pivot = a[hi], i = lo; // 选最后一个为 pivot
+    for (int j = lo; j < hi; j++) {
+        if (a[j] < pivot) swap(a, i++, j);
+    }
+    swap(a, i, hi);
+    return i;
+}</code></pre>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 最坏情况 O(n²)</div>
+  <p>当数组已有序且每次选第一个/最后一个为 pivot 时退化为 O(n²)。解决方案：<strong>随机选 pivot</strong> 或 <strong>三数取中</strong>。</p>
+</div>
+</section>
+
+<!-- Section 9: Heap Sort -->
+<section id="sec-heap">
+<h2 class="section-title"><span class="num">9</span> 堆排序 / Heap Sort</h2>
+
+<div class="box box-blue">
+  <div class="title">📐 堆的性质</div>
+  <p><strong>大根堆</strong>：每个节点 ≥ 其子节点。用数组存储：节点 i 的子节点为 2i+1 和 2i+2。</p>
+</div>
+
+<div class="flow">
+  <div class="step">建堆<br><small>O(n) 自底向上</small></div>
+  <div class="arrow">→</div>
+  <div class="step">堆顶（最大值）<br>与末尾交换</div>
+  <div class="arrow">→</div>
+  <div class="step">堆大小 -1<br>下沉调整</div>
+  <div class="arrow">→</div>
+  <div class="step">重复 n-1 次</div>
+</div>
+
+<pre><code>void heapSort(int[] a) {
+    int n = a.length;
+    // 建堆：从最后一个非叶节点开始下沉
+    for (int i = n / 2 - 1; i >= 0; i--) siftDown(a, i, n);
+    // 排序：每次取堆顶放到末尾
+    for (int i = n - 1; i > 0; i--) {
+        swap(a, 0, i);
+        siftDown(a, 0, i);
+    }
+}
+
+void siftDown(int[] a, int i, int size) {
+    while (2 * i + 1 < size) {
+        int child = 2 * i + 1;
+        if (child + 1 < size && a[child + 1] > a[child]) child++;
+        if (a[i] >= a[child]) break;
+        swap(a, i, child);
+        i = child;
+    }
+}</code></pre>
+
+<div class="box box-green">
+  <div class="title">💡 堆排序的优势</div>
+  <p>最坏情况也是 O(n log n)，且只需 O(1) 额外空间。缺点是缓存不友好（跳跃访问），实践中比快排慢。</p>
+</div>
+</section>
+
+<!-- Section 10: Non-comparison sorts -->
+<section id="sec-counting">
+<h2 class="section-title"><span class="num">10</span> 计数 · 桶 · 基数 / Non-comparison Sorts</h2>
+
+<p>比较排序的下界是 O(n log n)。要突破这个限制，需要利用数据的特殊性质。</p>
+
+<h3>计数排序 / Counting Sort</h3>
+<p>适用于整数且范围 k 不大的情况。统计每个值出现的次数，然后按顺序输出。</p>
+<pre><code>void countingSort(int[] a, int maxVal) {
+    int[] count = new int[maxVal + 1];
+    for (int v : a) count[v]++;
+    int idx = 0;
+    for (int v = 0; v <= maxVal; v++)
+        while (count[v]-- > 0) a[idx++] = v;
+}</code></pre>
+
+<h3>基数排序 / Radix Sort</h3>
+<p>从最低位到最高位，每一位用计数排序。适合整数或等长字符串。</p>
+<pre><code>void radixSort(int[] a) {
+    int max = Arrays.stream(a).max().orElse(0);
+    for (int exp = 1; max / exp > 0; exp *= 10)
+        countingSortByDigit(a, exp);
+}</code></pre>
+
+<h3>桶排序 / Bucket Sort</h3>
+<p>将数据分到若干个桶中，每个桶内部排序，最后合并。适合均匀分布的浮点数。</p>
+
+<div class="box box-purple">
+  <div class="title">🎯 非比较排序的适用条件</div>
+  <p><strong>计数排序</strong>：整数，范围 k = O(n)<br>
+  <strong>基数排序</strong>：整数/等长字符串，位数 d 较小<br>
+  <strong>桶排序</strong>：数据均匀分布在某个范围内</p>
+</div>
+</section>
+
+<!-- Section 11: Comparison -->
+<section id="sec-compare">
+<h2 class="section-title"><span class="num">11</span> 全面对比 / Comparison</h2>
+
+<table>
+  <tr><th>场景</th><th>推荐算法</th><th>原因</th></tr>
+  <tr><td>通用排序</td><td style="color:#86efac">快速排序</td><td>平均最快，缓存友好</td></tr>
+  <tr><td>需要稳定性</td><td style="color:#86efac">归并排序 / TimSort</td><td>稳定 O(n log n)</td></tr>
+  <tr><td>内存受限</td><td style="color:#86efac">堆排序</td><td>O(1) 额外空间</td></tr>
+  <tr><td>近乎有序</td><td style="color:#86efac">插入排序 / TimSort</td><td>接近 O(n)</td></tr>
+  <tr><td>小数组 (n &lt; 50)</td><td style="color:#86efac">插入排序</td><td>常数因子小</td></tr>
+  <tr><td>整数且范围小</td><td style="color:#86efac">计数/基数排序</td><td>线性时间</td></tr>
+  <tr><td>外部排序（磁盘）</td><td style="color:#86efac">归并排序</td><td>顺序访问，适合磁盘 IO</td></tr>
+</table>
+
+<div class="box box-green">
+  <div class="title">🌍 各语言标准库的选择</div>
+  <ul>
+    <li><strong>Java</strong>：基本类型用双轴快排，对象用 TimSort（归并+插入）</li>
+    <li><strong>Python</strong>：TimSort</li>
+    <li><strong>Go</strong>：pdqsort（Pattern-Defeating Quicksort）</li>
+    <li><strong>Rust</strong>：pdqsort（不稳定）/ TimSort（稳定）</li>
+    <li><strong>C++</strong>：Introsort（快排+堆排+插入排序混合）</li>
+  </ul>
+</div>
+
+<div class="box box-purple">
+  <div class="title">📚 延伸阅读</div>
+  <ul>
+    <li><a href="https://visualgo.net/en/sorting" target="_blank">VisuAlgo: Sorting</a> — 更多排序可视化</li>
+    <li><a href="https://en.wikipedia.org/wiki/Timsort" target="_blank">Wikipedia: TimSort</a> — 现代混合排序算法</li>
+  </ul>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>基于多篇排序算法文章综合改编为交互式教程</p>
+  <p><a href="../">← 返回主页 / Back to Home</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+<script src="sorting.js"></script>
+<script>
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => btn.classList.toggle('show', window.scrollY > 400));
+</script>
+
+<!-- Giscus Comments -->
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

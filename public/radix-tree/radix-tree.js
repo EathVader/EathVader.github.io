@@ -73,7 +73,7 @@ function renderRadixTree(tree, svgEl, highlightPath = null) {
 
   function layout(node, x, y, spread, depth) {
     const id = positions.length;
-    const displayLabel = node === tree.root ? 'root' : node.label.replace('$', '');
+    const displayLabel = node === tree.root ? 'root' : node.label.replace(/\$/g, '');
     const hasTerminal = node.label.endsWith('$') || node.isEnd;
     positions.push({ id, node, x, y, label: displayLabel, isEnd: hasTerminal, children: [] });
     const keys = Object.keys(node.children).sort();
