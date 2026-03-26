@@ -55,4 +55,12 @@ export const tutorials: Tutorial[] = [
       '为磁盘而生的多路平衡搜索树。覆盖磁盘 IO 原理、B 树性质、B+ 树索引优势、B* 树空间优化、三者对比。',
     meta: '综合多篇文章 · 2026-03',
   },
+  {
+    slug: 'trie',
+    tag: '🌲 Data Structure',
+    title: 'Trie 树图解教程',
+    description:
+      '前缀树 / 字典树，字符串检索利器。覆盖基本操作、交互式演示、敏感词过滤、IP 地址查询、双数组 Trie 压缩。',
+    meta: '综合多篇文章 · 2026-03',
+  },
 ];

@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trie 树图解教程 / Trie Tree Visual Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>🔤 <span>Trie 树</span>图解教程</h1>
+  <p class="subtitle">前缀树 / 字典树 —— 字符串检索的利器<br>
+  Trie (Prefix Tree): The Ultimate String Search Structure</p>
+  <span class="badge">🔤 字符串</span>
+  <span class="badge">🔍 前缀搜索</span>
+  <span class="badge">⚡ O(L) 查找</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-what">什么是 Trie 树 / What is Trie</a></li>
+    <li><a href="#sec-ops">基本操作 / Basic Operations</a></li>
+    <li><a href="#sec-impl">代码实现 / Implementation</a></li>
+    <li><a href="#sec-demo">交互式演示 / Interactive Demo</a></li>
+    <li><a href="#sec-app1">应用：敏感词过滤 / Sensitive Word Filter</a></li>
+    <li><a href="#sec-app2">应用：IP 地址查询 / IP Lookup</a></li>
+    <li><a href="#sec-dat">双数组 Trie / Double-Array Trie</a></li>
+    <li><a href="#sec-summary">总结 / Summary</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1 -->
+<section id="sec-what">
+<h2 class="section-title"><span class="num">1</span> 什么是 Trie 树 / What is Trie</h2>
+
+<div class="analogy">
+  <div class="emoji">📖</div>
+  <h4>类比 / Analogy</h4>
+  <p>Trie 树就像一本<strong>按字母排列的字典</strong>：所有以 "a" 开头的词在同一分支，以 "ab" 开头的在更深的分支。查找 "apple" 时，你只需沿着 a→p→p→l→e 走下去，不需要和其他单词比较。</p>
+</div>
+
+<div class="box box-blue">
+  <div class="title">📐 Trie 树的三条性质</div>
+  <ol>
+    <li>根节点不包含字符，其余每个节点包含一个字符</li>
+    <li>从根到某节点的路径上的字符连接起来 = 该节点对应的字符串</li>
+    <li>每个节点的所有子节点包含的字符<strong>互不相同</strong></li>
+  </ol>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 220" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#334155"/></marker></defs>
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">插入 "tea", "ten", "to", "in", "inn" 后的 Trie 树</text>
+    <!-- Root -->
+    <circle cx="300" cy="45" r="16" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+    <text x="300" y="50" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Inter">root</text>
+    <!-- t branch -->
+    <line x1="285" y1="58" x2="160" y2="88" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="150" cy="98" r="16" fill="#172554" stroke="#3b82f6" stroke-width="2"/>
+    <text x="150" y="103" text-anchor="middle" fill="#93c5fd" font-size="13" font-weight="700" font-family="Inter">t</text>
+    <!-- i branch -->
+    <line x1="315" y1="58" x2="440" y2="88" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="450" cy="98" r="16" fill="#172554" stroke="#3b82f6" stroke-width="2"/>
+    <text x="450" y="103" text-anchor="middle" fill="#93c5fd" font-size="13" font-weight="700" font-family="Inter">i</text>
+    <!-- t -> e, o -->
+    <line x1="136" y1="111" x2="80" y2="138" stroke="#334155" stroke-width="1"/>
+    <circle cx="70" cy="148" r="14" fill="#1e293b" stroke="#334155"/>
+    <text x="70" y="153" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="700" font-family="Inter">e</text>
+    <line x1="164" y1="111" x2="200" y2="138" stroke="#334155" stroke-width="1"/>
+    <circle cx="210" cy="148" r="14" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="210" y="153" text-anchor="middle" fill="#86efac" font-size="12" font-weight="700" font-family="Inter">o</text>
+    <text x="230" y="148" fill="#86efac" font-size="9" font-family="Inter">✓ "to"</text>
+    <!-- e -> a, n -->
+    <line x1="57" y1="160" x2="30" y2="183" stroke="#334155" stroke-width="1"/>
+    <circle cx="22" cy="193" r="13" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="22" y="197" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">a</text>
+    <text x="42" y="205" fill="#86efac" font-size="8" font-family="Inter">✓ "tea"</text>
+    <line x1="83" y1="160" x2="110" y2="183" stroke="#334155" stroke-width="1"/>
+    <circle cx="118" cy="193" r="13" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="118" y="197" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">n</text>
+    <text x="138" y="205" fill="#86efac" font-size="8" font-family="Inter">✓ "ten"</text>
+    <!-- i -> n -->
+    <line x1="450" y1="114" x2="450" y2="138" stroke="#334155" stroke-width="1"/>
+    <circle cx="450" cy="150" r="14" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="450" y="155" text-anchor="middle" fill="#86efac" font-size="12" font-weight="700" font-family="Inter">n</text>
+    <text x="470" y="150" fill="#86efac" font-size="9" font-family="Inter">✓ "in"</text>
+    <!-- n -> n -->
+    <line x1="450" y1="164" x2="450" y2="183" stroke="#334155" stroke-width="1"/>
+    <circle cx="450" cy="193" r="13" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+    <text x="450" y="197" text-anchor="middle" fill="#86efac" font-size="11" font-weight="700" font-family="Inter">n</text>
+    <text x="470" y="197" fill="#86efac" font-size="9" font-family="Inter">✓ "inn"</text>
+    <!-- Legend -->
+    <circle cx="490" cy="50" r="8" fill="#14532d" stroke="#22c55e"/>
+    <text x="505" y="54" fill="#86efac" font-size="9" font-family="Inter">= 单词结尾</text>
+  </svg>
+  <div class="caption">公共前缀共享节点：tea/ten 共享 t→e，in/inn 共享 i→n</div>
+</div>
+
+<div class="box box-green">
+  <div class="title">⚡ 时间复杂度</div>
+  <p>查找/插入/删除：<strong>O(L)</strong>，L 为字符串长度。与字典中有多少个词无关！比哈希表更适合前缀搜索。</p>
+</div>
+</section>
+
+<!-- Section 2 -->
+<section id="sec-ops">
+<h2 class="section-title"><span class="num">2</span> 基本操作 / Basic Operations</h2>
+
+<h3>插入 / Insert</h3>
+<div class="flow">
+  <div class="step">从根节点出发</div>
+  <div class="arrow">→</div>
+  <div class="step">逐字符向下走<br><small>不存在则创建</small></div>
+  <div class="arrow">→</div>
+  <div class="step">最后一个字符<br>标记为单词结尾</div>
+</div>
+
+<h3>查找 / Search</h3>
+<div class="flow">
+  <div class="step">从根节点出发</div>
+  <div class="arrow">→</div>
+  <div class="step">逐字符向下走<br><small>不存在则返回 false</small></div>
+  <div class="arrow">→</div>
+  <div class="step">检查最后节点<br>是否为单词结尾</div>
+</div>
+
+<h3>前缀搜索 / Prefix Search</h3>
+<div class="flow">
+  <div class="step">走到前缀末尾节点</div>
+  <div class="arrow">→</div>
+  <div class="step">DFS 遍历<br>所有子树</div>
+  <div class="arrow">→</div>
+  <div class="step">收集所有<br>单词结尾节点</div>
+</div>
+</section>
+
+<!-- Section 3 -->
+<section id="sec-impl">
+<h2 class="section-title"><span class="num">3</span> 代码实现 / Implementation</h2>
+
+<pre><code>class TrieNode {
+    TrieNode[] children = new TrieNode[26]; // a-z
+    boolean isEnd = false;
+    int count = 0; // 经过此节点的单词数
+}
+
+class Trie {
+    TrieNode root = new TrieNode();
+
+    // 插入单词
+    void insert(String word) {
+        TrieNode node = root;
+        for (char c : word.toCharArray()) {
+            int i = c - 'a';
+            if (node.children[i] == null)
+                node.children[i] = new TrieNode();
+            node = node.children[i];
+            node.count++;
+        }
+        node.isEnd = true;
+    }
+
+    // 精确查找
+    boolean search(String word) {
+        TrieNode node = root;
+        for (char c : word.toCharArray()) {
+            int i = c - 'a';
+            if (node.children[i] == null) return false;
+            node = node.children[i];
+        }
+        return node.isEnd;
+    }
+
+    // 前缀计数（有多少单词以 prefix 开头）
+    int countPrefix(String prefix) {
+        TrieNode node = root;
+        for (char c : prefix.toCharArray()) {
+            int i = c - 'a';
+            if (node.children[i] == null) return 0;
+            node = node.children[i];
+        }
+        return node.count;
+    }
+}</code></pre>
+
+<div class="box box-amber">
+  <div class="title">💾 空间优化</div>
+  <p>固定 26 个子节点数组简单但浪费空间（大量 null）。实际中常用 <code>HashMap&lt;Character, TrieNode&gt;</code> 代替数组，或使用双数组 Trie（见第 7 节）。</p>
+</div>
+</section>
+
+<!-- Section 4: Interactive Demo -->
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">4</span> 交互式演示 / Interactive Demo</h2>
+
+<div class="demo">
+  <h4>🎮 Trie 树可视化</h4>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.5rem">
+    <input id="trie-input" type="text" placeholder="输入单词（小写字母）" style="width:180px">
+    <button id="trie-insert">插入</button>
+    <button id="trie-search" style="background:linear-gradient(135deg,#8b5cf6,#6366f1)">查找</button>
+    <button id="trie-prefix" style="background:linear-gradient(135deg,#0891b2,#0e7490)">前缀搜索</button>
+    <button id="trie-reset" style="background:#334155">重置</button>
+  </div>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
+    <button id="trie-example" style="background:#1e293b;border:1px solid #334155;font-size:.8rem">示例：tea,ten,to,in,inn,apple,app</button>
+  </div>
+  <svg id="trie-svg" viewBox="0 0 700 320" style="width:100%;height:320px;background:#0f172a;border-radius:8px"></svg>
+  <div id="trie-log" class="output">等待操作...</div>
+</div>
+</section>
+
+<!-- Section 5 -->
+<section id="sec-app1">
+<h2 class="section-title"><span class="num">5</span> 应用：敏感词过滤 / Sensitive Word Filter</h2>
+
+<div class="analogy">
+  <div class="emoji">🛡️</div>
+  <h4>原理 / How it works</h4>
+  <p>把所有敏感词插入 Trie 树。对于待检测文本，从每个位置开始，沿 Trie 树走，看能否走到某个单词结尾。如果能，说明包含敏感词。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 130" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">敏感词过滤过程</text>
+    <!-- Text -->
+    <rect x="20" y="30" width="560" height="30" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="300" y="50" text-anchor="middle" fill="#e2e8f0" font-size="12" font-family="JetBrains Mono">行道树 芒果 引市民争相采摘</text>
+    <!-- Sliding window -->
+    <rect x="200" y="30" width="60" height="30" rx="4" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4"/>
+    <text x="230" y="75" text-anchor="middle" fill="#f59e0b" font-size="10" font-family="Inter">↑ 滑动窗口</text>
+    <!-- Trie check -->
+    <rect x="200" y="90" width="200" height="30" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="300" y="110" text-anchor="middle" fill="#86efac" font-size="11" font-family="Inter">Trie 匹配到 "芒果" ✅</text>
+  </svg>
+  <div class="caption">从每个位置开始在 Trie 中走，走到单词结尾即命中敏感词</div>
+</div>
+
+<pre><code>// 敏感词过滤（简化版）
+List&lt;String&gt; filter(String text, Trie trie) {
+    List&lt;String&gt; hits = new ArrayList&lt;&gt;();
+    for (int i = 0; i &lt; text.length(); i++) {
+        TrieNode node = trie.root;
+        for (int j = i; j &lt; text.length(); j++) {
+            int idx = text.charAt(j) - 'a';
+            if (node.children[idx] == null) break;
+            node = node.children[idx];
+            if (node.isEnd) hits.add(text.substring(i, j + 1));
+        }
+    }
+    return hits;
+}</code></pre>
+
+<div class="box box-amber">
+  <div class="title">🔧 去噪处理</div>
+  <p>用户可能用 "芒**果"、"芒 果" 绕过过滤。解决方案：过滤前先去除空格和特殊符号：<code>text = text.replaceAll("[\\s&%$@*]+", "")</code></p>
+</div>
+</section>
+
+<!-- Section 6 -->
+<section id="sec-app2">
+<h2 class="section-title"><span class="num">6</span> 应用：IP 地址查询 / IP Lookup</h2>
+
+<p>给定一个 IP 地址，查询它属于哪个 ISP（中国移动/电信/联通）。</p>
+
+<div class="box box-blue">
+  <div class="title">💡 核心思路</div>
+  <p>将 IP 地址转为 32 位二进制，构建一棵<strong>二叉 Trie 树</strong>（每个节点只有 0/1 两个子节点）。每个 ISP 的 IP 段（CIDR 格式）对应树中的一条路径。查询时沿二进制位走到叶节点即可。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 160" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="16" text-anchor="middle" fill="#f8fafc" font-size="12" font-weight="600" font-family="Inter">IP 二叉 Trie 查询示例</text>
+    <text x="300" y="35" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">查询 103.20.112.168 → 二进制：01100111 00010100 01110000 10101000</text>
+    <!-- Binary trie sketch -->
+    <circle cx="300" cy="60" r="12" fill="#1e293b" stroke="#334155"/>
+    <text x="300" y="64" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">root</text>
+    <line x1="292" y1="70" x2="240" y2="90" stroke="#334155" stroke-width="1"/>
+    <text x="262" y="85" fill="#64748b" font-size="9" font-family="Inter">0</text>
+    <line x1="308" y1="70" x2="360" y2="90" stroke="#334155" stroke-width="1"/>
+    <text x="338" y="85" fill="#64748b" font-size="9" font-family="Inter">1</text>
+    <circle cx="230" cy="100" r="12" fill="#1e293b" stroke="#334155"/>
+    <circle cx="370" cy="100" r="12" fill="#172554" stroke="#3b82f6"/>
+    <text x="370" y="104" text-anchor="middle" fill="#93c5fd" font-size="9" font-family="Inter">...</text>
+    <line x1="362" y1="110" x2="330" y2="130" stroke="#334155" stroke-width="1"/>
+    <line x1="378" y1="110" x2="410" y2="130" stroke="#334155" stroke-width="1"/>
+    <circle cx="320" cy="140" r="12" fill="#1e293b" stroke="#334155"/>
+    <circle cx="420" cy="140" r="12" fill="#14532d" stroke="#22c55e"/>
+    <text x="420" y="144" text-anchor="middle" fill="#86efac" font-size="8" font-family="Inter">移动</text>
+    <text x="300" y="158" text-anchor="middle" fill="#86efac" font-size="10" font-family="Inter">沿 32 位二进制走到叶节点 → 中国移动 ✅</text>
+  </svg>
+</div>
+
+<p>优势：查询时间 O(32)（固定 32 步），与 ISP 数量无关，比遍历所有 IP 段快得多。</p>
+</section>
+
+<!-- Section 7 -->
+<section id="sec-dat">
+<h2 class="section-title"><span class="num">7</span> 双数组 Trie / Double-Array Trie</h2>
+
+<p>普通 Trie 树的问题：每个节点存一个 26 元素数组，空间浪费严重。<strong>双数组 Trie（DAT）</strong>用两个整数数组 <code>base[]</code> 和 <code>check[]</code> 压缩存储整棵树。</p>
+
+<div class="box box-purple">
+  <div class="title">🔑 核心转移方程</div>
+  <pre style="background:transparent;border:none;padding:0;margin:.5rem 0"><code>base[r] + c = s      // 从状态 r 经字符 c 转移到状态 s
+check[s] = r         // 验证转移有效性</code></pre>
+  <p>其中 c 为字符的整数编码。两个数组就能表示整棵树的所有转移关系。</p>
+</div>
+
+<table>
+  <tr><th>实现方式</th><th>查询时间</th><th>空间</th><th>典型应用</th></tr>
+  <tr><td>数组 Trie</td><td>O(1)/字符</td><td style="color:#fca5a5">大（大量 null）</td><td>简单场景</td></tr>
+  <tr><td>HashMap Trie</td><td>O(1)/字符</td><td>中</td><td>mmseg4j</td></tr>
+  <tr><td>链表 Trie</td><td style="color:#fca5a5">O(n)/字符</td><td style="color:#86efac">小</td><td>内存受限</td></tr>
+  <tr><td style="color:#86efac;font-weight:700">双数组 Trie</td><td style="color:#86efac">O(1)/字符</td><td style="color:#86efac">最小</td><td style="color:#86efac">Ansj 分词、搜索引擎</td></tr>
+</table>
+</section>
+
+<!-- Section 8 -->
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">8</span> 总结 / Summary</h2>
+
+<table>
+  <tr><th>操作</th><th>时间复杂度</th><th>说明</th></tr>
+  <tr><td>插入</td><td>O(L)</td><td>L = 字符串长度</td></tr>
+  <tr><td>查找</td><td>O(L)</td><td>与字典大小无关</td></tr>
+  <tr><td>前缀搜索</td><td>O(L + k)</td><td>k = 结果数量</td></tr>
+  <tr><td>空间</td><td>O(N × Σ)</td><td>N = 节点数，Σ = 字符集大小</td></tr>
+</table>
+
+<div class="box box-green">
+  <div class="title">🌍 Trie 树的实际应用</div>
+  <ul>
+    <li><strong>搜索引擎</strong>：输入框自动补全（Google、百度）</li>
+    <li><strong>内容安全</strong>：敏感词/违禁词过滤</li>
+    <li><strong>网络路由</strong>：IP 路由表最长前缀匹配</li>
+    <li><strong>中文分词</strong>：Ansj、jieba 等分词工具的词典</li>
+    <li><strong>拼写检查</strong>：Word、IDE 的拼写纠错</li>
+  </ul>
+</div>
+
+<div class="box box-purple">
+  <div class="title">📚 延伸阅读</div>
+  <ul>
+    <li><a href="https://en.wikipedia.org/wiki/Trie" target="_blank">Wikipedia: Trie</a></li>
+    <li><a href="https://github.com/NLPchina/ansj_seg" target="_blank">Ansj 中文分词</a> — 使用 DAT 的实际项目</li>
+  </ul>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>基于多篇 Trie 树文章综合改编为交互式教程</p>
+  <p><a href="../">← 返回主页 / Back to Home</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+<script src="trie.js"></script>
+<script>
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => btn.classList.toggle('show', window.scrollY > 400));
+</script>
+
+<!-- Giscus Comments -->
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
