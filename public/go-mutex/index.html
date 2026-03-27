@@ -3,10 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Go Mutex从零实现教程，从自旋锁到Futex，理解互斥锁的实现原理，包含性能优化与自适应锁">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Go Mutex 从零实现">
+<meta property="og:description" content="Go Mutex从零实现教程，从自旋锁到Futex，理解互斥锁的实现原理，包含性能优化与自适应锁">
+<meta property="og:url" content="https://eathvader.github.io/go-mutex/">
+<meta property="og:image" content="">
 <title>Go Mutex 从零实现 / Writing Mutexes from Scratch in Go</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Go Mutex 从零实现",
+  "description": "Go Mutex从零实现教程，从自旋锁到Futex，理解互斥锁的实现原理，包含性能优化与自适应锁",
+  "author": {
+    "@type": "Person",
+    "name": "EathVader"
+  },
+  "datePublished": "2026-03-01",
+  "dateModified": "2026-03-27",
+  "url": "https://eathvader.github.io/go-mutex/"
+}
+</script>
 </head>
 <body>
 
@@ -567,6 +588,19 @@ func (m *FutexLock) Unlock() {
 <section id="sec-summary">
 <h2 class="section-title"><span class="num">8</span> 总结 / Summary</h2>
 
+<div class="demo">
+  <h4>🎮 交互演示：自旋锁可视化</h4>
+  <p>观察多个 goroutine 竞争锁的过程：</p>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
+    <input type="number" id="goroutine-count" value="4" min="2" max="8" style="width:60px">
+    <span style="font-size:.8rem;color:#94a3b8">线程数</span>
+    <button onclick="startSpinDemo()">▶️ 开始演示</button>
+    <button onclick="stopSpinDemo()" style="background:linear-gradient(135deg,#ef4444,#dc2626)">⏹ 停止</button>
+  </div>
+  <div id="spin-viz" style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin:1rem 0;min-height:100px"></div>
+  <div class="output" id="spin-output">点击"开始演示"观察线程竞争...</div>
+</div>
+
 <h3>锁的演进路线 / Evolution Path</h3>
 
 <div class="flow">
@@ -613,6 +647,110 @@ func (m *FutexLock) Unlock() {
 <a href="#" class="back-top" id="backTop">↑</a>
 
 <script>
+// ===== Spin Lock Visualization =====
+let spinTimer = null;
+let lockHeld = false;
+let waitingQueue = [];
+
+function startSpinDemo() {
+  const count = parseInt(document.getElementById('goroutine-count').value) || 4;
+  const container = document.getElementById('spin-viz');
+  const output = document.getElementById('spin-output');
+  
+  stopSpinDemo();
+  
+  container.innerHTML = Array.from({length: count}, (_, i) => 
+    `<div class="thread-box" id="thread-${i}">
+      <div class="thread-status" id="status-${i}">🟢 就绪</div>
+      <div class="thread-name">Thread ${i}</div>
+    </div>`
+  ).join('');
+  
+  waitingQueue = [];
+  lockHeld = false;
+  output.textContent = `已创建 ${count} 个线程，点击开始模拟竞争...`;
+  
+  let tick = 0;
+  spinTimer = setInterval(() => {
+    tick++;
+    
+    // Randomly spawn threads trying to acquire lock
+    if (Math.random() < 0.3 && waitingQueue.length < count) {
+      const idleThreads = [];
+      for (let i = 0; i < count; i++) {
+        if (!waitingQueue.includes(i) && document.getElementById(`status-${i}`).textContent.includes('就绪')) {
+          idleThreads.push(i);
+        }
+      }
+      if (idleThreads.length > 0) {
+        const tid = idleThreads[Math.floor(Math.random() * idleThreads.length)];
+        waitingQueue.push(tid);
+        document.getElementById(`status-${tid}`).textContent = '🔄 尝试获取锁';
+      }
+    }
+    
+    // Process waiting queue
+    waitingQueue.forEach(tid => {
+      const statusEl = document.getElementById(`status-${tid}`);
+      if (statusEl.textContent === '🔄 尝试获取锁') {
+        if (!lockHeld) {
+          lockHeld = true;
+          statusEl.textContent = '🔒 持有锁';
+          statusEl.style.background = '#14532d';
+          statusEl.style.borderColor = '#22c55e';
+          
+          // Hold for a bit then release
+          setTimeout(() => {
+            if (document.getElementById(`status-${tid}`)) {
+              lockHeld = false;
+              waitingQueue = waitingQueue.filter(q => q !== tid);
+              statusEl.textContent = '🟢 就绪';
+              statusEl.style.background = '';
+              statusEl.style.borderColor = '';
+              output.textContent = `Thread ${tid} 释放锁，Thread ${waitingQueue[0] || 'none'} 可获取`;
+            }
+          }, 1000 + Math.random() * 1000);
+        } else {
+          statusEl.textContent = '⏳ 等待中...';
+        }
+      }
+    });
+    
+  }, 500);
+}
+
+function stopSpinDemo() {
+  if (spinTimer) {
+    clearInterval(spinTimer);
+    spinTimer = null;
+  }
+}
+
+function renderStep() {
+  if (stepIdx >= steps.length) {
+    output.textContent = `✅ 找到第 ${k} 大的元素: ${result}`;
+    return;
+  }
+  
+  const step = steps[stepIdx];
+  container.innerHTML = step.nums.map((v, i) => {
+    let cls = 'num-box';
+    if (i === step.pivotIdx) cls += ' pivot';
+    else if (step.action === 'found') cls += ' result';
+    else if (i >= step.lo && i <= step.hi) cls += ' range';
+    return `<div class="${cls}">${v}</div>`;
+  }).join('');
+  
+  if (step.action === 'partition') {
+    output.textContent = `Step ${stepIdx + 1}: 以 ${step.nums[step.pivotIdx]} 为 pivot 进行 partition`;
+  } else if (step.action === 'found') {
+    output.textContent = `Step ${stepIdx + 1}: pivot 位置 = ${step.pivotIdx} = k，找到答案！`;
+  }
+  
+  stepIdx++;
+  setTimeout(renderStep, 800);
+}
+
 // Scroll to top button
 const btn = document.getElementById('backTop');
 window.addEventListener('scroll', () => {

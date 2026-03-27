@@ -54,7 +54,9 @@ EathVader.github.io/
     ├── binary-search/            # 二分法
     ├── top-k/                    # Top K 问题
     ├── linked-list/              # 链表反转
-    └── stack-queue/               # 栈和队列
+    ├── stack-queue/               # 栈和队列
+    ├── consistent-hash/          # 一致性哈希 + Jump Hash
+    └── randomized-bst/            # 随机化搜索树 (Treap)
 ```
 
 ---
@@ -92,11 +94,11 @@ npm run preview
 
 ## 📚 教程进度总览
 
-### 已完成 (22个)
+### 已完成 (24个)
 
 | 分类 | 教程 |
 |------|------|
-| 🌲 树结构 (7) | 红黑树、AVL、B树、Trie、线段树、Radix Tree、二叉树面试题 |
+| 🌲 树结构 (8) | 红黑树、AVL、B树、Trie、线段树、Radix Tree、二叉树面试题、随机化搜索树 |
 | 🔢 排序 (4) | 排序算法大全、堆与堆排序、链表排序、磁盘多路归并 |
 | 📐 动态规划 (4) | 动态规划入门、背包问题、最长公共子序列、最长回文子串 |
 | 🔍 查找与过滤 (5) | Bloom Filter、Cuckoo Filter、Skip List、二分法、Top K |
@@ -105,6 +107,7 @@ npm run preview
 | 🧠 深度学习 (1) | MicroGPT |
 | 🔒 并发 (1) | Go Mutex |
 | 🗄️ 数据库 (1) | B+树并发 |
+| 🌍 分布式 (2) | 一致性哈希、LRU Cache |
 
 ---
 
@@ -162,8 +165,6 @@ npm run preview
 1. **og:image** - 需要为每个教程制作分享图片
 2. **骨架屏** - 首屏加载优化
 3. **单元测试** - 交互演示的测试覆盖
-4. **Jump Consistent Hash** - 尚未制作
-5. **Randomized BST** - 尚未制作
 
 ---
 

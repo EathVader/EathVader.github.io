@@ -3,10 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="B+树并发控制教程，从粗粒度锁到Lock-Free，包含Safe Node、 SX锁、Blink树、OLFIT树等40年演进">
+<meta property="og:type" content="article">
+<meta property="og:title" content="B+树并发控制的前世今生">
+<meta property="og:description" content="B+树并发控制教程，从粗粒度锁到Lock-Free，包含Safe Node、 SX锁、Blink树、OLFIT树等40年演进">
+<meta property="og:url" content="https://eathvader.github.io/btree-concurrency/">
+<meta property="og:image" content="">
 <title>B+树并发控制的前世今生 / B+ Tree Concurrency Control</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "B+树并发控制的前世今生",
+  "description": "B+树并发控制教程，从粗粒度锁到Lock-Free，包含Safe Node、 SX锁、Blink树、OLFIT树等40年演进",
+  "author": {
+    "@type": "Person",
+    "name": "EathVader"
+  },
+  "datePublished": "2026-03-01",
+  "dateModified": "2026-03-27",
+  "url": "https://eathvader.github.io/btree-concurrency/"
+}
+</script>
 </head>
 <body>
 
@@ -248,6 +269,22 @@
 <!-- Section 5: SX Lock -->
 <section id="sec-sx">
 <h2 class="section-title"><span class="num">5</span> SX 锁横空出世 / SX Lock</h2>
+
+<div class="demo">
+  <h4>🎮 交互演示：锁模式可视化</h4>
+  <p>观察不同操作获取的锁类型：</p>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
+    <select id="lock-op">
+      <option value="read">🔍 读取 Read</option>
+      <option value="insert">➕ 插入 Insert</option>
+      <option value="delete">➖ 删除 Delete</option>
+      <option value="split">📊 分裂 Split</option>
+    </select>
+    <button onclick="showLockDemo()">查看锁类型</button>
+  </div>
+  <div id="lock-tree" style="margin:1rem 0;min-height:150px"></div>
+  <div class="output" id="lock-output">选择操作类型查看锁...</div>
+</div>
 
 <p>1977 年，Rudolf Bayer 教授提出了介于 S 锁和 X 锁之间的 <strong>SX 锁</strong>：</p>
 
@@ -576,6 +613,77 @@ func scanNode(node, v) {
 <script>
 const btn = document.getElementById('backTop');
 window.addEventListener('scroll', () => btn.classList.toggle('show', window.scrollY > 400));
+</script>
+
+<script>
+// ===== Lock Mode Visualization =====
+function showLockDemo() {
+  const op = document.getElementById('lock-op').value;
+  const container = document.getElementById('lock-tree');
+  const output = document.getElementById('lock-output');
+  
+  const lockInfo = {
+    read: {
+      title: '🔍 读取操作 Read',
+      desc: '从根到叶，只加 S 锁（共享锁）',
+      locks: [
+        { node: '根节点 Root', lock: 'S 锁', color: '#3b82f6' },
+        { node: '内部节点 Internal', lock: 'S 锁', color: '#3b82f6' },
+        { node: '叶节点 Leaf', lock: 'S 锁', color: '#3b82f6' },
+      ],
+      detail: '读取时加 S 锁，多个 reader 可以同时访问同一节点'
+    },
+    insert: {
+      title: '➕ 插入操作 Insert',
+      desc: '沿路径加 S 锁，到叶节点后升级为 X 锁',
+      locks: [
+        { node: '根节点 Root', lock: 'S 锁', color: '#3b82f6' },
+        { node: '内部节点 Internal', lock: 'S 锁', color: '#3b82f6' },
+        { node: '叶节点 Leaf', lock: 'X 锁 (排他)', color: '#ef4444' },
+      ],
+      detail: '叶节点需要 X 锁来修改数据'
+    },
+    delete: {
+      title: '➖ 删除操作 Delete',
+      desc: '与插入类似，到叶节点加 X 锁',
+      locks: [
+        { node: '根节点 Root', lock: 'S 锁', color: '#3b82f6' },
+        { node: '内部节点 Internal', lock: 'S 锁', color: '#3b82f6' },
+        { node: '叶节点 Leaf', lock: 'X 锁 (排他)', color: '#ef4444' },
+      ],
+      detail: '删除需要排他访问来修改或删除数据'
+    },
+    split: {
+      title: '📊 分裂操作 Split',
+      desc: '沿路径加 S 锁，修改时需要 SX 锁',
+      locks: [
+        { node: '根节点 Root', lock: 'S 锁', color: '#3b82f6' },
+        { node: '内部节点 Internal', lock: 'SX 锁', color: '#f59e0b' },
+        { node: '叶节点 Leaf (分裂)', lock: 'X 锁', color: '#ef4444' },
+      ],
+      detail: 'SX 锁允许其他 S 锁进入，但阻止其他写入'
+    },
+  };
+  
+  const info = lockInfo[op];
+  output.textContent = info.detail;
+  
+  container.innerHTML = `
+    <div style="text-align:center;margin-bottom:1rem;color:#f8fafc;font-weight:600">${info.title}</div>
+    <div style="text-align:center;margin-bottom:1rem;color:#94a3b8;font-size:.9rem">${info.desc}</div>
+    <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+      ${info.locks.map(l => `
+        <div style="text-align:center">
+          <div style="width:100px;height:50px;background:${l.color}22;border:2px solid ${l.color};border-radius:8px;display:flex;align-items:center;justify-content:center;color:${l.color};font-weight:600;font-size:.85rem">${l.lock}</div>
+          <div style="margin-top:.5rem;font-size:.8rem;color:#94a3b8">${l.node}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+// Initialize
+document.getElementById('lock-tree').innerHTML = '<div style="text-align:center;color:#64748b;padding:2rem">选择操作查看锁类型</div>';
 </script>
 
 <!-- Giscus Comments -->

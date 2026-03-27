@@ -3,10 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Top K问题图解教程，堆与快速选择算法，海量数据中找最大或最小的K个元素，包含交互演示与代码实现">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Top K 问题图解">
+<meta property="og:description" content="Top K问题图解教程，堆与快速选择算法，海量数据中找最大或最小的K个元素，包含交互演示与代码实现">
+<meta property="og:url" content="https://eathvader.github.io/top-k/">
+<meta property="og:image" content="">
 <title>Top K 问题图解 / Top K Problems Visual Guide</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Top K 问题图解",
+  "description": "Top K问题图解教程，堆与快速选择算法，海量数据中找最大或最小的K个元素，包含交互演示与代码实现",
+  "author": {
+    "@type": "Person",
+    "name": "EathVader"
+  },
+  "datePublished": "2026-03-01",
+  "dateModified": "2026-03-27",
+  "url": "https://eathvader.github.io/top-k/"
+}
+</script>
 </head>
 <body>
 
@@ -198,6 +219,20 @@ int quickSelect(int[] nums, int lo, int hi, int k) {
 <section id="sec-compare">
 <h2 class="section-title"><span class="num">4</span> 方法对比 / Comparison</h2>
 
+<div class="demo">
+  <h4>🎮 交互演示：Quick Select 可视化</h4>
+  <p>输入数组和 K 值，观察 Quick Select 如何找到第 K 大的元素：</p>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
+    <input type="text" id="qs-array" value="3,1,5,2,8,4,7" placeholder="数组 (逗号分隔)" style="width:180px">
+    <input type="number" id="qs-k" value="3" min="1" max="10" style="width:60px">
+    <span style="font-size:.8rem;color:#94a3b8">K =</span>
+    <button onclick="runQuickSelect()">▶️ 运行 Quick Select</button>
+    <button onclick="resetDemo()" style="background:#334155">重置</button>
+  </div>
+  <div id="qs-visualization" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:1rem 0;min-height:80px"></div>
+  <div class="output" id="qs-output">点击"运行 Quick Select"开始演示...</div>
+</div>
+
 <table>
   <tr><th>方法</th><th>时间</th><th>空间</th><th>优点</th><th>缺点</th></tr>
   <tr><td>排序</td><td>O(n log n)</td><td>O(1)*</td><td>简单直接</td><td style="color:#fca5a5">最慢</td></tr>
@@ -288,6 +323,95 @@ int quickSelect(int[] nums, int lo, int hi, int k) {
 
 <a href="#" class="back-top" id="backTop">↑</a>
 <script>
+// ===== Quick Select Visualization =====
+function runQuickSelect() {
+  const arrStr = document.getElementById('qs-array').value;
+  const k = parseInt(document.getElementById('qs-k').value);
+  const arr = arrStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+  
+  if (arr.length === 0) {
+    document.getElementById('qs-output').textContent = '请输入有效数组';
+    return;
+  }
+  if (k < 1 || k > arr.length) {
+    document.getElementById('qs-output').textContent = `K 必须在 1~${arr.length} 之间`;
+    return;
+  }
+  
+  const container = document.getElementById('qs-visualization');
+  const output = document.getElementById('qs-output');
+  const steps = [];
+  
+  // Quick Select with step recording
+  function quickSelect(nums, lo, hi, k, depth = 0) {
+    if (lo === hi) return nums[lo];
+    
+    const pivotIdx = partition(nums, lo, hi, depth);
+    steps.push({ nums: [...nums], pivotIdx, lo, hi, k, action: 'partition' });
+    
+    if (pivotIdx === k) {
+      steps.push({ nums: [...nums], pivotIdx, lo, hi, k, action: 'found', result: nums[pivotIdx] });
+      return nums[pivotIdx];
+    } else if (pivotIdx < k) {
+      return quickSelect(nums, pivotIdx + 1, hi, k, depth + 1);
+    } else {
+      return quickSelect(nums, lo, pivotIdx - 1, k, depth + 1);
+    }
+  }
+  
+  function partition(nums, lo, hi, depth) {
+    const pivot = nums[hi];
+    let i = lo;
+    for (let j = lo; j < hi; j++) {
+      if (nums[j] <= pivot) {
+        [nums[i], nums[j]] = [nums[j], nums[i]];
+        i++;
+      }
+    }
+    [nums[i], nums[hi]] = [nums[hi], nums[i]];
+    return i;
+  }
+  
+  const targetIdx = arr.length - k;
+  const result = quickSelect(arr, 0, arr.length - 1, targetIdx);
+  
+  // Animate steps
+  let stepIdx = 0;
+  container.innerHTML = '';
+  
+  function renderStep() {
+    if (stepIdx >= steps.length) {
+      output.textContent = `✅ 找到第 ${k} 大的元素: ${result}`;
+      return;
+    }
+    
+    const step = steps[stepIdx];
+    container.innerHTML = step.nums.map((v, i) => {
+      let cls = 'num-box';
+      if (i === step.pivotIdx) cls += ' pivot';
+      else if (step.action === 'found') cls += ' result';
+      else if (i >= step.lo && i <= step.hi) cls += ' range';
+      return `<div class="${cls}">${v}</div>`;
+    }).join('');
+    
+    if (step.action === 'partition') {
+      output.textContent = `Step ${stepIdx + 1}: 以 ${step.nums[step.pivotIdx]} 为 pivot 进行 partition`;
+    } else if (step.action === 'found') {
+      output.textContent = `Step ${stepIdx + 1}: pivot 位置 = ${step.pivotIdx} = k，找到答案！`;
+    }
+    
+    stepIdx++;
+    setTimeout(renderStep, 800);
+  }
+  
+  renderStep();
+}
+
+function resetDemo() {
+  document.getElementById('qs-visualization').innerHTML = '';
+  document.getElementById('qs-output').textContent = '点击"运行 Quick Select"开始演示...';
+}
+
 const btn = document.getElementById('backTop');
 window.addEventListener('scroll', () => btn.classList.toggle('show', window.scrollY > 400));
 </script>

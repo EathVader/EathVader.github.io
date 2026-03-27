@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="随机化搜索树(Randomized BST/Treap)教程 - 结合二叉搜索树与堆的特性，通过随机优先级实现均摊O(log n)的性能，包含交互式演示">
+<meta property="og:type" content="article">
+<meta property="og:title" content="随机化搜索树 / Randomized BST (Treap) Tutorial">
+<meta property="og:description" content="随机化搜索树(Randomized BST/Treap)教程 - 结合二叉搜索树与堆的特性，通过随机优先级实现均摊O(log n)的性能">
+<meta property="og:url" content="https://eathvader.github.io/randomized-bst/">
+<meta property="og:image" content="">
+<title>随机化搜索树 / Randomized BST (Treap) Tutorial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "随机化搜索树 / Randomized BST (Treap) Tutorial",
+  "description": "随机化搜索树(Randomized BST/Treap)教程 - 结合二叉搜索树与堆的特性，通过随机优先级实现均摊O(log n)的性能",
+  "author": {
+    "@type": "Person",
+    "name": "EathVader"
+  },
+  "datePublished": "2026-03-27",
+  "dateModified": "2026-03-27",
+  "url": "https://eathvader.github.io/randomized-bst/"
+}
+</script>
+</head>
+<body>
+
+<!-- Hero -->
+<header class="hero">
+  <h1>🎲 <span>随机化搜索树</span></h1>
+  <p class="subtitle">Treap — 结合二叉搜索树与堆，通过随机优先级实现自平衡<br>
+  Randomized Search Tree — BST meets Heap with random priorities</p>
+  <span class="badge">🎯 自平衡 / Self-Balancing</span>
+  <span class="badge">🎲 随机化 / Randomized</span>
+  <span class="badge">⚡ O(log n) / O(log n)</span>
+</header>
+
+<!-- TOC -->
+<div class="container">
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-intro">什么是 Treap？/ What is Treap?</a></li>
+    <li><a href="#sec-why">为什么需要随机化？/ Why Randomization?</a></li>
+    <li><a href="#sec-structure">核心结构 / Core Structure</a></li>
+    <li><a href="#sec-insert">插入操作 / Insertion</a></li>
+    <li><a href="#sec-delete">删除操作 / Deletion</a></li>
+    <li><a href="#sec-rotate">旋转操作 / Rotations</a></li>
+    <li><a href="#sec-demo">交互演示 / Interactive Demo</a></li>
+    <li><a href="#sec-compare">对比其他平衡树 / Comparison</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1: Introduction -->
+<section id="sec-intro">
+<h2 class="section-title"><span class="num">1</span> 什么是 Treap？/ What is Treap?</h2>
+
+<p><strong>Treap</strong> = <strong>T</strong>ree + <strong>Heap</strong>，是一种同时满足以下两个条件的二叉搜索树：</p>
+
+<div class="box box-blue">
+<div class="title">🔑 两个不变式 / Two Invariants</div>
+1. <strong>BST 性质</strong>：左子树所有节点 < 根节点 < 右子树所有节点<br>
+2. <strong>堆性质</strong>：根节点优先级 > 所有子节点优先级（最大堆）
+</div>
+
+<p>每个节点包含两个属性：<code>key</code>（键值，用于 BST 排序）和 <code>priority</code>（随机优先级，用于维持平衡）。</p>
+
+<div class="diagram" id="diagram-intro"></div>
+
+<p class="caption">图 1: Treap 示例 — key 按 BST 排列，priority 按堆排列</p>
+
+<div class="box box-purple">
+<div class="title">📊 历史 / History</div>
+Treap 由 <strong>Conrado Martínez</strong> 和 <strong>Salvador Roura</strong> 于 1997 年在论文 <em>"Randomized Binary Search Trees"</em> 中提出。<br>
+它是最简单的自平衡 BST 之一，只需几行代码即可实现。
+</div>
+</section>
+
+<!-- Section 2: Why Randomization -->
+<section id="sec-why">
+<h2 class="section-title"><span class="num">2</span> 为什么需要随机化？/ Why Randomization?</h2>
+
+<p>传统 BST 的问题：<strong>最坏情况</strong>可能退化成链表！</p>
+
+<pre><code># 按顺序插入 1,2,3,4,5...
+    1           1           1           1           1
+     \           \           \           \           \
+      2           2           2           2           2
+       \         \         \         \         \
+        3         3         3         3         3
+# 时间复杂度从 O(log n) 退化到 O(n)!</code></pre>
+
+<div class="box box-amber">
+<div class="title">⚠️ 传统解决方案的代价</div>
+<table>
+<tr><th>方案</th><th>额外存储</th><th>实现复杂度</th></tr>
+<tr><td>AVL 树</td><td>每个节点存平衡因子</td><td>高（4种旋转）</td></tr>
+<tr><td>红黑树</td><td>每个节点存颜色</td><td>很高（5种情况）</td></tr>
+<tr><td><strong>Treap</strong></td><td><strong>每个节点存随机数</strong></td><td><strong>低（2种旋转）</strong></td></tr>
+</table>
+</div>
+
+<p>Treap 的核心思想：<strong>用随机性换取确定性</strong>。只要随机数是独立的，树的期望高度就是 O(log n)。</p>
+
+<div class="box box-green">
+<div class="title">🎲 概率保证 / Probability Guarantee</div>
+对于任意输入序列，Treap 的<strong>期望高度</strong>为 <code>O(log n)</code>。<br>
+也就是说，经过足够多的操作后，Treap 几乎肯定会保持平衡！
+</div>
+</section>
+
+<!-- Section 3: Core Structure -->
+<section id="sec-structure">
+<h2 class="section-title"><span class="num">3</span> 核心结构 / Core Structure</h2>
+
+<pre><code>class TreapNode:
+    key:      # 键值（用于 BST 排序）
+    priority: # 随机优先级（用于堆性质）
+    left:     # 左子节点
+    right:    # 右子节点
+    
+    def __init__(self, key):
+        self.key = key
+        self.priority = random.random()  # 生成 0~1 之间的随机数
+        self.left = None
+        self.right = None</code></pre>
+
+<p>Treap 本质上是一棵 <strong>笛卡尔树</strong>（Cartesian Tree），即：</p>
+<ul>
+  <li>按 key 索引：中序遍历得到有序序列</li>
+  <li>按 priority 建堆：根节点优先级最大</li>
+</ul>
+
+<div class="diagram" id="diagram-structure"></div>
+
+<p class="caption">图 2: Treap 与笛卡尔树的关系</p>
+</section>
+
+<!-- Section 4: Insertion -->
+<section id="sec-insert">
+<h2 class="section-title"><span class="num">4</span> 插入操作 / Insertion</h2>
+
+<p>插入分为两步：</p>
+
+<ol>
+  <li><strong>按 key 找到插入位置</strong>（与普通 BST 相同）</li>
+  <li><strong>检查优先级，执行旋转</strong>（维护堆性质）</li>
+</ol>
+
+<pre><code>def treap_insert(root, key):
+    # 1. 普通 BST 插入
+    if root is None:
+        return TreapNode(key)
+    
+    if key < root.key:
+        root.left = treap_insert(root.left, key)
+    else:
+        root.right = treap_insert(root.right, key)
+    
+    # 2. 如果子节点优先级更高，旋转
+    if root.left and root.left.priority > root.priority:
+        root = rotate_right(root)
+    elif root.right and root.right.priority > root.priority:
+        root = rotate_left(root)
+    
+    return root</code></pre>
+
+<div class="diagram" id="diagram-insert"></div>
+
+<p class="caption">图 3: 插入节点 25 — 右旋转维护堆性质</p>
+
+<div class="box box-amber">
+<div class="title">🔑 插入要点</div>
+• 新节点的优先级是<strong>随机生成</strong>的<br>
+• 插入后可能需要<strong>向上回溯</strong>执行旋转<br>
+• 期望时间复杂度：<strong>O(log n)</strong>
+</div>
+</section>
+
+<!-- Section 5: Deletion -->
+<section id="sec-delete">
+<h2 class="section-title"><span class="num">5</span> 删除操作 / Deletion</h2>
+
+<p>删除操作同样利用旋转，将待删除节点<strong>旋转向下</strong>直到变成叶子节点：</p>
+
+<pre><code>def treap_delete(root, key):
+    if root is None:
+        return None
+    
+    if key < root.key:
+        root.left = treap_delete(root.left, key)
+    elif key > root.key:
+        root.right = treap_delete(root.right, key)
+    else:
+        # 找到目标节点
+        if root.left is None:
+            return root.right
+        elif root.right is None:
+            return root.left
+        else:
+            # 两个子节点都存在，向下旋转
+            if root.left.priority > root.right.priority:
+                root = rotate_right(root)
+                root.right = treap_delete(root.right, key)
+            else:
+                root = rotate_left(root)
+                root.left = treap_delete(root.left, key)
+    
+    return root</code></pre>
+
+<div class="diagram" id="diagram-delete"></div>
+
+<p class="caption">图 4: 删除节点 30 — 左右旋转将其下沉为叶子节点</p>
+</section>
+
+<!-- Section 6: Rotations -->
+<section id="sec-rotate">
+<h2 class="section-title"><span class="num">6</span> 旋转操作 / Rotations</h2>
+
+<p>Treap 只需两种基本旋转：</p>
+
+<h3>右旋转 / Right Rotation</h3>
+<pre><code>def rotate_right(y):
+    x = y.left
+    y.left = x.right
+    x.right = y
+    return x</code></pre>
+
+<div class="diagram" id="diagram-rotate-r"></div>
+<p class="caption">图 5: 右旋转 — 将左子节点提升为根</p>
+
+<h3>左旋转 / Left Rotation</h3>
+<pre><code>def rotate_left(x):
+    y = x.right
+    x.right = y.left
+    y.left = x
+    return y</code></pre>
+
+<div class="diagram" id="diagram-rotate-l"></div>
+<p class="caption">图 6: 左旋转 — 将右子节点提升为根</p>
+
+<div class="box box-green">
+<div class="title">✅ 旋转不会改变</div>
+• 中序遍历顺序（BST 性质保持）<br>
+• 每个节点的相对层级（只是位置交换）
+</div>
+</section>
+
+<!-- Section 7: Interactive Demo -->
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">7</span> 交互演示 / Interactive Demo</h2>
+
+<div class="demo">
+<h4>🎮 Treap 交互演示</h4>
+<p>插入或删除节点，观察 Treap 如何通过随机优先级自平衡：</p>
+
+<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
+  <input type="number" id="key-input" value="42" min="1" max="100" style="width:80px" placeholder="键值">
+  <button onclick="insertKey()">➕ 插入</button>
+  <button onclick="deleteKey()" style="background:linear-gradient(135deg,#ef4444,#dc2626)">➖ 删除</button>
+  <button onclick="randomInsert()" style="background:linear-gradient(135deg,#22c55e,#16a34a)">🎲 随机插入10个</button>
+  <button onclick="clearTree()" style="background:linear-gradient(135deg,#64748b,#475569)">🗑️ 清空</button>
+</div>
+
+<div id="tree-canvas"></div>
+<div class="output" id="demo-output">点击"随机插入10个"开始...</div>
+</div>
+</section>
+
+<!-- Section 8: Comparison -->
+<section id="sec-compare">
+<h2 class="section-title"><span class="num">8</span> 对比其他平衡树 / Comparison</h2>
+
+<table>
+<tr><th>特性</th><th>Treap</th><th>AVL 树</th><th>红黑树</th></tr>
+<tr><td>平衡方式</td><td>随机优先级</td><td>严格平衡</td><td>近似平衡</td></tr>
+<tr><td>额外存储</td><td>1个随机数</td><td>1个平衡因子</td><td>1位颜色</td></tr>
+<tr><td>旋转次数</td><td>最坏 O(log n)</td><td>最多2次</td><td>最多3次</td></tr>
+<tr><td>实现难度</td><td>⭐ 简单</td><td>⭐⭐ 中等</td><td>⭐⭐⭐ 困难</td></tr>
+<tr><td>查找性能</td><td>平均 O(log n)</td><td>O(log n)</td><td>O(log n)</td></tr>
+<tr><td>应用场景</td><td>简单平衡需求</td><td>查询频繁</td><td>插入/删除频繁</td></tr>
+</table>
+
+<div class="box box-purple">
+<div class="title">🏭 实际应用</div>
+• <strong>Linux 内核</strong> — CFS 调度器使用红黑树<br>
+• <strong>Redis</strong> — 有序集合使用跳表<br>
+• <strong>数据库</strong> — B+树（磁盘存储）<br>
+• <strong>Treap</strong> — 适用于内存中的简单平衡需求
+</div>
+
+<h3>总结 / Summary</h3>
+<div class="box box-blue">
+<div class="title">🎯 什么时候用 Treap？</div>
+• 需要自平衡 BST 但不想写复杂代码<br>
+• 对随机性有信心（期望 O(log n)）<br>
+• 内存受限，需要最小的额外存储
+</div>
+</section>
+
+</div><!-- end container -->
+
+<footer>
+  <p>随机化搜索树教程 / Randomized BST (Treap) Tutorial</p>
+  <p>基于 Martinez & Roura (1997) · 教程由 AI 辅助生成</p>
+</footer>
+
+<a href="#" class="back-top" id="back-top" title="回到顶部">↑</a>
+
+<script src="randomized-bst.js"></script>
+<script>
+document.getElementById('diagram-intro').innerHTML = createIntroDiagram();
+document.getElementById('diagram-structure').innerHTML = createStructureDiagram();
+document.getElementById('diagram-insert').innerHTML = createInsertDiagram();
+document.getElementById('diagram-delete').innerHTML = createDeleteDiagram();
+document.getElementById('diagram-rotate-r').innerHTML = createRotateRDiagram();
+document.getElementById('diagram-rotate-l').innerHTML = createRotateLDiagram();
+initDemo();
+</script>
+
+<!-- Giscus Comments -->
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

@@ -183,4 +183,12 @@ export const tutorials: Tutorial[] = [
       '海量数据排序经典方案。覆盖归并段生成、K 路归并、最小堆优先队列、I/O 缓冲优化、败者树对比，含交互式可视化。',
     meta: '基于老钱的文章 · 2026-03',
   },
+  {
+    slug: 'randomized-bst',
+    tag: '🌲 树结构',
+    title: '随机化搜索树 (Treap)',
+    description:
+      '结合二叉搜索树与堆的特性，通过随机优先级实现自平衡。覆盖 Treap 原理、插入删除旋转、交互式演示，与 AVL/红黑树对比。',
+    meta: '基于 Martinez & Roura (1997) · 2026-03',
+  },
 ];

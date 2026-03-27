@@ -3,10 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="布隆过滤器图解教程，用极少内存判断元素是否存在，包含误判率分析、Python实现、Cuckoo Filter对比">
+<meta property="og:type" content="article">
+<meta property="og:title" content="布隆过滤器图解教程">
+<meta property="og:description" content="布隆过滤器图解教程，用极少内存判断元素是否存在，包含误判率分析、Python实现、Cuckoo Filter对比">
+<meta property="og:url" content="https://eathvader.github.io/bloom-filter/">
+<meta property="og:image" content="">
 <title>布隆过滤器图解教程 / Bloom Filter Visual Guide</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "布隆过滤器图解教程",
+  "description": "布隆过滤器图解教程，用极少内存判断元素是否存在，包含误判率分析、Python实现、Cuckoo Filter对比",
+  "author": {
+    "@type": "Person",
+    "name": "EathVader"
+  },
+  "datePublished": "2026-03-01",
+  "dateModified": "2026-03-27",
+  "url": "https://eathvader.github.io/bloom-filter/"
+}
+</script>
 </head>
 <body>
 
@@ -168,6 +189,19 @@
 <section id="sec-math">
 <h2 class="section-title"><span class="num">5</span> 误判率分析 / False Positive Rate</h2>
 
+<div class="demo">
+  <h4>🎮 误判率计算器</h4>
+  <p>输入参数计算最优配置：</p>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
+    <label style="font-size:.8rem;color:#94a3b8">元素数量 n:</label>
+    <input type="number" id="calc-n" value="1000000" min="1" style="width:100px">
+    <label style="font-size:.8rem;color:#94a3b8">位数 m:</label>
+    <input type="number" id="calc-m" value="10000000" min="1" style="width:100px">
+    <button onclick="calcBloom()">计算</button>
+  </div>
+  <div id="calc-result" class="output">输入参数点击计算...</div>
+</div>
+
 <div class="box box-purple">
   <div class="title">📐 误判率公式</div>
   <p>插入 n 个元素后，误判率约为：<br>
@@ -294,6 +328,44 @@
 <a href="#" class="back-top" id="backTop">↑</a>
 <script src="bloom.js"></script>
 <script>
+// ===== False Positive Rate Calculator =====
+function calcBloom() {
+  const n = parseInt(document.getElementById('calc-n').value) || 1000000;
+  const m = parseInt(document.getElementById('calc-m').value) || 10000000;
+  const result = document.getElementById('calc-result');
+  
+  if (n <= 0 || m <= 0) {
+    result.textContent = '请输入有效的正整数';
+    return;
+  }
+  
+  const k = Math.round((m / n) * Math.LN2);
+  const p = Math.pow(1 - Math.exp(-k * n / m), k);
+  const pPercent = (p * 100).toFixed(4);
+  const memoryMB = (m / 8 / 1024 / 1024).toFixed(2);
+  const memoryGB = (memoryMB / 1024).toFixed(2);
+  
+  result.innerHTML = `
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center">
+      <div style="text-align:center;padding:1rem;background:#1e293b;border-radius:8px">
+        <div style="color:#94a3b8;font-size:.8rem">最优哈希函数数 k</div>
+        <div style="color:#3b82f6;font-size:1.5rem;font-weight:700">${k}</div>
+      </div>
+      <div style="text-align:center;padding:1rem;background:#1e293b;border-radius:8px">
+        <div style="color:#94a3b8;font-size:.8rem">误判率</div>
+        <div style="color:#f59e0b;font-size:1.5rem;font-weight:700">${pPercent}%</div>
+      </div>
+      <div style="text-align:center;padding:1rem;background:#1e293b;border-radius:8px">
+        <div style="color:#94a3b8;font-size:.8rem">内存占用</div>
+        <div style="color:#22c55e;font-size:1.5rem;font-weight:700">${memoryMB} MB</div>
+        <div style="color:#64748b;font-size:.75rem">(${memoryGB} GB for 10亿)</div>
+      </div>
+    </div>
+  `;
+}
+
+document.getElementById('calc-result').innerHTML = '<div style="text-align:center;color:#64748b;padding:1rem">输入参数点击计算...</div>';
+
 const btn = document.getElementById('backTop');
 window.addEventListener('scroll', () => btn.classList.toggle('show', window.scrollY > 400));
 </script>

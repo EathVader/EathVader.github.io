@@ -8,6 +8,14 @@ body {
 a { color: #60a5fa; text-decoration: none; }
 a:hover { text-decoration: underline; }
 
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
 /* ===== Layout ===== */
 .container { max-width: 900px; margin: 0 auto; padding: 0 1.5rem; }
 
@@ -192,3 +200,14 @@ footer {
   text-decoration: none; opacity: 0; transition: opacity .3s; z-index: 99;
 }
 .back-top.show { opacity: 1; }
+
+/* ===== Spin Lock Demo Styles ===== */
+.thread-box {
+  width: 90px; padding: .75rem; background: #1e293b; border: 2px solid #334155;
+  border-radius: 10px; text-align: center;
+}
+.thread-status {
+  background: #172554; padding: .4rem .5rem; border-radius: 6px; font-size: .8rem;
+  color: #93c5fd; margin-bottom: .4rem;
+}
+.thread-name { font-size: .85rem; color: #94a3b8; }

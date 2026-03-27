@@ -3,10 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="一致性哈希算法教程，从取模到哈希环，理解分布式系统负载均衡的首选算法，包含虚拟节点、Python实现与交互演示">
+<meta property="og:type" content="article">
+<meta property="og:title" content="一致性哈希算法 / Consistent Hashing Tutorial">
+<meta property="og:description" content="一致性哈希算法教程，从取模到哈希环，理解分布式系统负载均衡的首选算法，包含虚拟节点、Python实现与交互演示">
+<meta property="og:url" content="https://eathvader.github.io/consistent-hash/">
+<meta property="og:image" content="">
 <title>一致性哈希算法 / Consistent Hashing Tutorial</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "一致性哈希算法 / Consistent Hashing Tutorial",
+  "description": "一致性哈希算法教程，从取模到哈希环，理解分布式系统负载均衡的首选算法，包含虚拟节点、Python实现与交互演示",
+  "author": {
+    "@type": "Person",
+    "name": "EathVader"
+  },
+  "datePublished": "2026-03-01",
+  "dateModified": "2026-03-27",
+  "url": "https://eathvader.github.io/consistent-hash/"
+}
+</script>
 </head>
 <body>
 
@@ -33,6 +54,7 @@
     <li><a href="#sec-code">Python 实现 / Python Implementation</a></li>
     <li><a href="#sec-demo">交互演示 / Interactive Demo</a></li>
     <li><a href="#sec-summary">总结与应用 / Summary & Applications</a></li>
+    <li><a href="#sec-jump">Jump Consistent Hash / 跳跃哈希</a></li>
   </ol>
 </nav>
 
@@ -300,7 +322,138 @@ print(ring.get_node('another_key'))  # → '192.168.0.249:11212'</code></pre>
 • <a href="https://en.wikipedia.org/wiki/Consistent_hashing" target="_blank">Wikipedia: Consistent Hashing</a><br>
 • <a href="https://www.toptal.com/big-data/consistent-hashing" target="_blank">A Guide to Consistent Hashing (Toptal)</a><br>
 • <a href="https://arxiv.org/abs/1406.2294" target="_blank">Jump Consistent Hash (Google)</a> — 更高效的一致性哈希变体<br>
-• <a href="http://xiaorui.cc/2014/09/20/%e4%bd%bf%e7%94%a8hashring%e5%ae%9e%e7%8e%b0python%e4%b8%8b%e7%9a%84%e4%b8%80%e8%87%b4%e6%80%a7hash/" target="_blank">峰云就她了：使用 HashRing 实现 Python 下的一致性 Hash</a>
+• <a href="http://xiaorui.cc/2014/09/20/%e4%bd%bf%e7%94%a8hashring%e5%ae%9e%e7%8e%b0python%e4%b8%8b%e7%9a%84%e4%b8%80%e8%87%b4%e6%80%a7hash/" target="_blank">峰云就了她了：使用 HashRing 实现 Python 下的一致性 Hash</a>
+</div>
+</section>
+
+<!-- Section 9: Jump Consistent Hash -->
+<section id="sec-jump">
+<h2 class="section-title"><span class="num">9</span> Jump Consistent Hash / 跳跃一致性哈希</h2>
+
+<p>Google 提出的一种极速、最小内存的一致性哈希算法，只需 <strong>5 行代码</strong> 即可实现。</p>
+
+<h3>9.1 为什么需要 Jump Hash？</h3>
+<div class="box box-purple">
+<div class="title">⚡ 传统哈希环的问题</div>
+• 需要维护完整的哈希环结构<br>
+• 增删节点需要遍历环找到新位置<br>
+• 虚拟节点越多，环越大，内存占用越高<br><br>
+<strong>Jump Hash 解决：无需存储环，O(k) 时间复杂度！</strong>
+</div>
+
+<h3>9.2 核心算法 / Core Algorithm</h3>
+<pre><code>def jump_hash(key, num_buckets):
+    random_state = random.Random(key)  # 种子随机数
+    b = -1
+    j = 0
+    while j < num_buckets:
+        if random_state.random() < 1.0/(j+1):
+            b = j
+        j += 1
+    return b</code></pre>
+
+<div class="box box-amber">
+<div class="title">🔑 核心原理</div>
+• 第 j 轮：如果 <code>random() &lt; 1/(j+1)</code>，则 bucket = j<br>
+• 增删节点时，只影响约 1/(n+1) 的 key<br>
+• <strong>关键洞察</strong>：不需要存储环，只需一个伪随机数生成器！
+</div>
+
+<h3>9.3 性能对比 / Performance Comparison</h3>
+<table>
+<tr><th>特性</th><th>传统哈希环</th><th>Jump Hash</th></tr>
+<tr><td>空间复杂度</td><td>O(VN)</td><td>O(1)</td></tr>
+<tr><td>时间复杂度</td><td>O(log VN)</td><td>O(k)</td></tr>
+<tr><td>需要存储</td><td>完整环</td><td>无</td></tr>
+<tr><td>数据迁移</td><td>~1/N</td><td>~1/N</td></tr>
+</table>
+
+<p>其中 V=虚拟节点数, N=物理节点数, k=num_buckets</p>
+
+<h3>9.4 交互演示 / Interactive Demo</h3>
+<div class="demo">
+<h4>🎮 Jump Hash vs 传统哈希环</h4>
+<p>观察节点数量变化时，两种算法的数据迁移情况：</p>
+
+<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
+  <label>节点数:</label>
+  <input type="range" id="jump-buckets" value="4" min="1" max="16" oninput="updateJumpDemo()">
+  <span id="bucket-display">4</span>
+</div>
+
+<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
+  <button onclick="runJumpDemo()">▶️ 运行测试</button>
+  <button onclick="runCompareDemo()">⚖️ 对比迁移</button>
+</div>
+
+<div id="jump-demo-output" class="output">点击"运行测试"开始...</div>
+</div>
+</section>
+
+</div>
+</section>
+
+<!-- Section 9: Jump Consistent Hash -->
+<section id="sec-jump">
+<h2 class="section-title"><span class="num">9</span> Jump Consistent Hash / 跳跃一致性哈希</h2>
+
+<p>Google 提出的一种极速、最小内存的一致性哈希算法，只需 <strong>5 行代码</strong> 即可实现。</p>
+
+<h3>9.1 为什么需要 Jump Hash？</h3>
+<div class="box box-purple">
+<div class="title">⚡ 传统哈希环的问题</div>
+• 需要维护完整的哈希环结构<br>
+• 增删节点需要遍历环找到新位置<br>
+• 虚拟节点越多，环越大，内存占用越高<br><br>
+<strong>Jump Hash 解决：无需存储环，O(k) 时间复杂度！</strong>
+</div>
+
+<h3>9.2 核心算法 / Core Algorithm</h3>
+<pre><code>def jump_hash(key, num_buckets):
+    random_state = random.Random(key)  # 种子随机数
+    b = -1
+    j = 0
+    while j < num_buckets:
+        if random_state.random() < 1.0/(j+1):
+            b = j
+        j += 1
+    return b</code></pre>
+
+<div class="box box-amber">
+<div class="title">🔑 核心原理</div>
+• 第 j 轮：如果 <code>random() &lt; 1/(j+1)</code>，则 bucket = j<br>
+• 增删节点时，只影响约 1/(n+1) 的 key<br>
+• <strong>关键洞察</strong>：不需要存储环，只需一个伪随机数生成器！
+</div>
+
+<h3>9.3 性能对比 / Performance Comparison</h3>
+<table>
+<tr><th>特性</th><th>传统哈希环</th><th>Jump Hash</th></tr>
+<tr><td>空间复杂度</td><td>O(VN)</td><td>O(1)</td></tr>
+<tr><td>时间复杂度</td><td>O(log VN)</td><td>O(k)</td></tr>
+<tr><td>需要存储</td><td>完整环</td><td>无</td></tr>
+<tr><td>数据迁移</td><td>~1/N</td><td>~1/N</td></tr>
+</table>
+
+<p>其中 V=虚拟节点数, N=物理节点数, k=num_buckets</p>
+
+<h3>9.4 交互演示 / Interactive Demo</h3>
+<div class="demo">
+<h4>🎮 Jump Hash vs 传统哈希环</h4>
+<p>观察节点数量变化时，两种算法的数据迁移情况：</p>
+
+<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
+  <label>节点数:</label>
+  <input type="range" id="jump-buckets" value="4" min="1" max="16" oninput="updateJumpDemo()">
+  <span id="bucket-display">4</span>
+</div>
+
+<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
+  <button onclick="runJumpDemo()">▶️ 运行测试</button>
+  <button onclick="runCompareDemo()">⚖️ 对比迁移</button>
+</div>
+
+<div id="jump-demo-output" class="output">点击"运行测试"开始...</div>
 </div>
 </section>
 

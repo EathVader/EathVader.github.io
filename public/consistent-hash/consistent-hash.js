@@ -402,3 +402,99 @@ window.addEventListener('scroll', () => {
   const btn = document.getElementById('back-top');
   if (btn) btn.classList.toggle('show', window.scrollY > 400);
 });
+
+// ===== Jump Consistent Hash =====
+function jumpHash(key, numBuckets) {
+  let randomState = xmur3(key);
+  let b = -1;
+  let j = 0;
+  while (j < numBuckets) {
+    if (randomState() < 1.0 / (j + 1)) {
+      b = j;
+    }
+    j++;
+  }
+  return b;
+}
+
+// Simple hash function for string keys
+function xmur3(str) {
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = h << 13 | h >>> 19;
+  }
+  return function() {
+    h = Math.imul(h ^ h >>> 16, 2246822507);
+    h = Math.imul(h ^ h >>> 13, 3266489909);
+    return (h ^ h >>> 16) >>> 0;
+  };
+}
+
+function updateJumpDemo() {
+  const buckets = document.getElementById('jump-buckets').value;
+  document.getElementById('bucket-display').textContent = buckets;
+}
+
+function runJumpDemo() {
+  const numBuckets = parseInt(document.getElementById('jump-buckets').value);
+  const keys = ['user:1001', 'user:1002', 'user:1003', 'product:201', 'order:301', 'session:401'];
+  
+  let output = `<h4>🔍 Jump Hash 结果 (${numBuckets} 个节点)</h4><table style="width:100%;max-width:400px">
+    <tr><th>Key</th><th>映射到节点</th></tr>`;
+  
+  keys.forEach(key => {
+    const bucket = jumpHash(key, numBuckets);
+    output += `<tr><td>${key}</td><td style="color:#22c55e">Node ${bucket}</td></tr>`;
+  });
+  output += '</table>';
+  
+  // Test with 10000 random keys
+  const counts = {};
+  for (let i = 0; i < numBuckets; i++) counts[i] = 0;
+  for (let i = 0; i < 10000; i++) {
+    const bucket = jumpHash(`key-${i}`, numBuckets);
+    counts[bucket]++;
+  }
+  
+  output += '<p style="margin-top:1rem">📊 10000 个 key 的分布:</p><div style="display:flex;gap:.25rem;flex-wrap:wrap">';
+  for (let i = 0; i < numBuckets; i++) {
+    const pct = (counts[i] / 100).toFixed(1);
+    const color = pct > 8 || pct < 4 ? '#f59e0b' : '#22c55e';
+    output += `<div style="flex:1;min-width:40px;background:${color};padding:.25rem;text-align:center;font-size:.75rem;border-radius:4px">N${i}<br>${pct}%</div>`;
+  }
+  output += '</div>';
+  
+  document.getElementById('jump-demo-output').innerHTML = output;
+}
+
+function runCompareDemo() {
+  const oldBuckets = 4;
+  const newBuckets = parseInt(document.getElementById('jump-buckets').value);
+  const testKeys = Array.from({length: 1000}, (_, i) => `key-${i}`);
+  
+  // Jump Hash
+  let jumpChanged = 0;
+  testKeys.forEach(key => {
+    if (jumpHash(key, oldBuckets) !== jumpHash(key, newBuckets)) jumpChanged++;
+  });
+  
+  // Traditional (simple mod)
+  let tradChanged = 0;
+  testKeys.forEach(key => {
+    const oldHash = (xmur3(key)() % oldBuckets + oldBuckets) % oldBuckets;
+    const newHash = (xmur3(key)() % newBuckets + newBuckets) % newBuckets;
+    if (oldHash !== newHash) tradChanged++;
+  });
+  
+  const output = `<h4>⚖️ 数据迁移对比</h4>
+<p>节点数从 ${oldBuckets} 变更为 ${newBuckets}:</p>
+<table style="width:100%;max-width:400px">
+  <tr><th>算法</th><th>迁移比例</th></tr>
+  <tr><td>传统取模</td><td style="color:#ef4444">${(tradChanged / 10).toFixed(1)}%</td></tr>
+  <tr><td>Jump Hash</td><td style="color:#22c55e">${(jumpChanged / 10).toFixed(1)}%</td></tr>
+</table>
+<p style="font-size:.875rem;color:#94a3b8">两者迁移比例相近，但 Jump Hash 无需维护环结构！</p>`;
+  
+  document.getElementById('jump-demo-output').innerHTML = output;
+}
