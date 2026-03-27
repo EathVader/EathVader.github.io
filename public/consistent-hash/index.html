@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>一致性哈希算法 / Consistent Hashing Tutorial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Hero -->
+<header class="hero">
+  <h1>🌐 <span>一致性哈希</span>算法</h1>
+  <p class="subtitle">从取模到哈希环，理解分布式系统负载均衡的首选算法<br>
+  Consistent Hashing — The go-to algorithm for distributed load balancing</p>
+  <span class="badge">🌐 分布式 / Distributed</span>
+  <span class="badge">🔑 负载均衡 / Load Balancing</span>
+  <span class="badge">🎯 虚拟节点 / Virtual Nodes</span>
+</header>
+
+<!-- TOC -->
+<div class="container">
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-problem">问题：传统哈希的致命缺陷 / The Problem</a></li>
+    <li><a href="#sec-idea">核心思想：哈希环 / The Hash Ring</a></li>
+    <li><a href="#sec-mapping">节点映射与数据路由 / Node Mapping</a></li>
+    <li><a href="#sec-vnodes">虚拟节点：解决倾斜 / Virtual Nodes</a></li>
+    <li><a href="#sec-change">节点增删的影响 / Adding & Removing Servers</a></li>
+    <li><a href="#sec-code">Python 实现 / Python Implementation</a></li>
+    <li><a href="#sec-demo">交互演示 / Interactive Demo</a></li>
+    <li><a href="#sec-summary">总结与应用 / Summary & Applications</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1: Problem -->
+<section id="sec-problem">
+<h2 class="section-title"><span class="num">1</span> 问题：传统哈希的致命缺陷 / The Problem</h2>
+
+<p>假设你有 N 台缓存服务器，最简单的负载均衡方式是：</p>
+
+<pre><code>server = hash(key) % N</code></pre>
+
+<p>这在服务器数量固定时工作得很好。但当一台服务器宕机（N → N-1）：</p>
+
+<div class="box box-amber">
+<div class="title">⚠️ 致命问题 / Fatal Problem</div>
+<strong>(N-1)/N</strong> 的缓存数据需要重新映射！<br>
+• 3 台服务器挂 1 台 → <strong>66.7%</strong> 缓存失效<br>
+• 10 台服务器挂 1 台 → <strong>90%</strong> 缓存失效<br>
+• 100 台服务器挂 1 台 → <strong>99%</strong> 缓存失效<br><br>
+这意味着几乎所有请求都会穿透缓存，直接打到数据库 —— <strong>缓存雪崩</strong>！
+</div>
+
+<div class="diagram" id="diagram-problem"></div>
+
+<p>同样，新增一台服务器（N → N+1）也会导致 <strong>N/(N+1)</strong> 的数据需要迁移。</p>
+
+<div class="box box-blue">
+<div class="title">🎯 我们需要什么？</div>
+一种哈希策略，使得增减服务器时，<strong>只影响相邻节点的数据</strong>，而不是全局重新分配。<br>
+这就是一致性哈希（Consistent Hashing）要解决的问题。
+</div>
+</section>
+
+<!-- Section 2: Hash Ring -->
+<section id="sec-idea">
+<h2 class="section-title"><span class="num">2</span> 核心思想：哈希环 / The Hash Ring</h2>
+
+<div class="box box-purple">
+<div class="title">🧥 类比：环形衣柜 / Analogy: Circular Closet</div>
+<strong>一致性哈希就像分配钥匙到环形衣柜。</strong><br><br>
+想象一个圆形的衣柜，上面标着 0 到 360 度的刻度：<br>
+• 每个<strong>衣柜管理员</strong>（服务器）站在环上的某个位置<br>
+• 每把<strong>钥匙</strong>（数据）也被哈希到环上的某个位置<br>
+• 钥匙交给<strong>顺时针方向遇到的第一个管理员</strong>保管<br><br>
+如果一个管理员离开了，他的钥匙只需要交给下一个管理员 —— 其他人完全不受影响！
+</div>
+
+<p>一致性哈希的核心是将哈希值空间组织成一个<strong>环</strong>（0 ~ 2³²-1）：</p>
+
+<div class="diagram" id="diagram-ring"></div>
+
+<p>关键步骤：</p>
+<ol>
+  <li>将哈希值空间 [0, 2³²-1] 首尾相连，形成一个环</li>
+  <li>将服务器节点通过哈希函数映射到环上</li>
+  <li>将数据 key 通过同一哈希函数映射到环上</li>
+  <li>数据沿<strong>顺时针</strong>方向找到的第一个服务器节点，就是它的归属</li>
+</ol>
+</section>
+
+<!-- Section 3: Node Mapping -->
+<section id="sec-mapping">
+<h2 class="section-title"><span class="num">3</span> 节点映射与数据路由 / Node Mapping</h2>
+
+<div class="diagram" id="diagram-mapping"></div>
+
+<pre><code># Mapping example
+hash("ServerA") → position 100 on ring
+hash("ServerB") → position 200 on ring
+hash("ServerC") → position 300 on ring
+
+hash("key1") → position 150  → routes to ServerB (next clockwise)
+hash("key2") → position 250  → routes to ServerC
+hash("key3") → position 350  → routes to ServerA (wraps around)</code></pre>
+
+<div class="box box-green">
+<div class="title">💡 为什么这样有效？</div>
+当 ServerB 宕机时：<br>
+• <code>key1</code>（原本在 ServerB）→ 现在顺时针找到 ServerC<br>
+• <code>key2</code>（原本在 ServerC）→ <strong>不受影响</strong><br>
+• <code>key3</code>（原本在 ServerA）→ <strong>不受影响</strong><br><br>
+只有原本映射到 ServerB 的数据需要迁移，影响范围 ≈ <strong>1/N</strong>！
+</div>
+</section>
+
+<!-- Section 4: Virtual Nodes -->
+<section id="sec-vnodes">
+<h2 class="section-title"><span class="num">4</span> 虚拟节点：解决倾斜 / Virtual Nodes</h2>
+
+<p>如果只有 3 个物理节点，它们在环上的分布可能很不均匀，导致<strong>数据倾斜</strong>（某台服务器承担大部分请求）。</p>
+
+<div class="diagram" id="diagram-vnodes"></div>
+
+<p>解决方案：为每个物理节点创建多个<strong>虚拟节点</strong>（Virtual Nodes），均匀分布在环上：</p>
+
+<pre><code># Without virtual nodes: 3 points on ring → uneven distribution
+# With 150 virtual nodes per server: 450 points → much more even!
+
+hash("ServerA#1") → position 30
+hash("ServerA#2") → position 120
+hash("ServerA#3") → position 250
+...
+hash("ServerA#150") → position 340</code></pre>
+
+<div class="box box-blue">
+<div class="title">🔑 虚拟节点的好处</div>
+• <strong>负载均衡</strong>：虚拟节点越多，数据分布越均匀<br>
+• <strong>异构支持</strong>：性能强的服务器可以分配更多虚拟节点<br>
+• <strong>平滑迁移</strong>：增删节点时，数据迁移更均匀<br><br>
+通常每个物理节点分配 <strong>100~200</strong> 个虚拟节点。
+</div>
+</section>
+
+<!-- Section 5: Server Changes -->
+<section id="sec-change">
+<h2 class="section-title"><span class="num">5</span> 节点增删的影响 / Adding & Removing Servers</h2>
+
+<div class="diagram" id="diagram-change"></div>
+
+<h3>5.1 删除节点 / Removing a Server</h3>
+<p>当 ServerB 宕机时，只有 ServerB 负责的数据（ServerA → ServerB 之间的区间）需要迁移到 ServerC。</p>
+
+<h3>5.2 添加节点 / Adding a Server</h3>
+<p>当新增 ServerD 时，只有 ServerD 前一个节点到 ServerD 之间的数据需要从原节点迁移到 ServerD。</p>
+
+<div class="box box-green">
+<div class="title">💡 影响范围对比 / Impact Comparison</div>
+<table>
+<tr><th>操作</th><th>传统取模 hash%N</th><th>一致性哈希</th></tr>
+<tr><td>删除 1 个节点 (N=10)</td><td>~90% 数据迁移</td><td>~10% 数据迁移</td></tr>
+<tr><td>添加 1 个节点 (N=10)</td><td>~91% 数据迁移</td><td>~10% 数据迁移</td></tr>
+<tr><td>删除 1 个节点 (N=100)</td><td>~99% 数据迁移</td><td>~1% 数据迁移</td></tr>
+</table>
+</div>
+</section>
+
+<!-- Section 6: Python Implementation -->
+<section id="sec-code">
+<h2 class="section-title"><span class="num">6</span> Python 实现 / Python Implementation</h2>
+
+<h3>6.1 从零实现 / From Scratch</h3>
+<pre><code>import hashlib
+import bisect
+
+class ConsistentHash:
+    def __init__(self, nodes=None, replicas=150):
+        self.replicas = replicas  # virtual nodes per physical node
+        self.ring = {}            # hash → node mapping
+        self.sorted_keys = []     # sorted hash values for binary search
+        for node in (nodes or []):
+            self.add_node(node)
+
+    def _hash(self, key):
+        return int(hashlib.md5(key.encode()).hexdigest(), 16)
+
+    def add_node(self, node):
+        for i in range(self.replicas):
+            vnode_key = f"{node}#{i}"
+            h = self._hash(vnode_key)
+            self.ring[h] = node
+            bisect.insort(self.sorted_keys, h)
+
+    def remove_node(self, node):
+        for i in range(self.replicas):
+            h = self._hash(f"{node}#{i}")
+            del self.ring[h]
+            self.sorted_keys.remove(h)
+
+    def get_node(self, key):
+        if not self.ring:
+            return None
+        h = self._hash(key)
+        idx = bisect.bisect_right(self.sorted_keys, h)
+        if idx == len(self.sorted_keys):
+            idx = 0  # wrap around
+        return self.ring[self.sorted_keys[idx]]</code></pre>
+
+<h3>6.2 使用示例 / Usage</h3>
+<pre><code>ch = ConsistentHash(["ServerA", "ServerB", "ServerC"])
+
+# Route keys
+print(ch.get_node("user:1001"))  # → ServerB
+print(ch.get_node("user:1002"))  # → ServerA
+print(ch.get_node("session:x")) # → ServerC
+
+# Remove a server — only ~1/3 keys remap
+ch.remove_node("ServerB")
+print(ch.get_node("user:1001"))  # → ServerC (remapped)
+print(ch.get_node("user:1002"))  # → ServerA (unchanged!)
+
+# Add a server — only ~1/4 keys remap
+ch.add_node("ServerD")
+print(ch.get_node("session:x")) # might remap to ServerD</code></pre>
+
+<h3>6.3 使用 hash_ring 库 / Using hash_ring Library</h3>
+<pre><code>from hash_ring import HashRing
+
+servers = ['192.168.0.246:11212',
+           '192.168.0.247:11212',
+           '192.168.0.249:11212']
+
+ring = HashRing(servers)
+print(ring.get_node('my_key'))       # → '192.168.0.247:11212'
+print(ring.get_node('another_key'))  # → '192.168.0.249:11212'</code></pre>
+
+<div class="box box-amber">
+<div class="title">📦 安装 / Install</div>
+<code>pip install hash_ring</code>
+</div>
+</section>
+
+<!-- Section 7: Interactive Demo -->
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">7</span> 交互演示 / Interactive Demo</h2>
+
+<div class="demo">
+<h4>🎮 一致性哈希环可视化 / Hash Ring Visualization</h4>
+<p>添加/删除服务器节点，输入 key 观察路由变化：</p>
+
+<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
+  <input type="text" id="node-input" value="ServerD" placeholder="节点名称">
+  <input type="number" id="vnode-count" value="8" min="1" max="50" style="width:70px" title="虚拟节点数">
+  <span style="font-size:.8rem;color:#94a3b8">vnodes</span>
+  <button onclick="addNode()">➕ 添加节点</button>
+  <button onclick="removeNode()" style="background:linear-gradient(135deg,#ef4444,#dc2626)">➖ 删除节点</button>
+</div>
+<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
+  <input type="text" id="key-input" value="user:1001" placeholder="输入 key">
+  <button onclick="lookupKey()">🔍 查找节点</button>
+  <button onclick="batchLookup()">📊 分布统计</button>
+</div>
+
+<div id="ring-canvas" style="display:flex;justify-content:center;margin:1rem 0"></div>
+<div class="output" id="demo-output">初始化中...</div>
+</div>
+</section>
+
+<!-- Section 8: Summary -->
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">8</span> 总结与应用 / Summary & Applications</h2>
+
+<h3>8.1 核心要点</h3>
+<table>
+<tr><th>概念</th><th>说明</th></tr>
+<tr><td>哈希环</td><td>将哈希空间 [0, 2³²-1] 首尾相连形成环</td></tr>
+<tr><td>顺时针路由</td><td>数据沿顺时针找到第一个服务器节点</td></tr>
+<tr><td>虚拟节点</td><td>每个物理节点映射 100~200 个虚拟节点，解决数据倾斜</td></tr>
+<tr><td>最小迁移</td><td>增删节点只影响 ~1/N 的数据</td></tr>
+</table>
+
+<h3>8.2 实际应用 / Real-World Applications</h3>
+<div class="box box-purple">
+<div class="title">🏭 工业应用</div>
+• <strong>Memcached</strong> — 分布式缓存的经典实现<br>
+• <strong>Amazon DynamoDB</strong> — 使用一致性哈希进行数据分区<br>
+• <strong>Apache Cassandra</strong> — 数据分片与副本放置<br>
+• <strong>Nginx</strong> — upstream 一致性哈希负载均衡<br>
+• <strong>Redis Cluster</strong> — 使用哈希槽（类似思想）<br>
+• <strong>BitTorrent DHT</strong> — 分布式哈希表
+</div>
+
+<h3>8.3 延伸阅读 / Further Reading</h3>
+<div class="box box-blue">
+<div class="title">📚 推荐资料</div>
+• <a href="https://en.wikipedia.org/wiki/Consistent_hashing" target="_blank">Wikipedia: Consistent Hashing</a><br>
+• <a href="https://www.toptal.com/big-data/consistent-hashing" target="_blank">A Guide to Consistent Hashing (Toptal)</a><br>
+• <a href="https://arxiv.org/abs/1406.2294" target="_blank">Jump Consistent Hash (Google)</a> — 更高效的一致性哈希变体<br>
+• <a href="http://xiaorui.cc/2014/09/20/%e4%bd%bf%e7%94%a8hashring%e5%ae%9e%e7%8e%b0python%e4%b8%8b%e7%9a%84%e4%b8%80%e8%87%b4%e6%80%a7hash/" target="_blank">峰云就她了：使用 HashRing 实现 Python 下的一致性 Hash</a>
+</div>
+</section>
+
+</div><!-- end container -->
+
+<footer>
+  <p>一致性哈希算法教程 / Consistent Hashing Tutorial</p>
+  <p>基于峰云就她了博客 · 教程由 AI 辅助生成</p>
+</footer>
+
+<a href="#" class="back-top" id="back-top" title="回到顶部">↑</a>
+
+<script src="consistent-hash.js"></script>
+<script>
+// Init diagrams
+document.getElementById('diagram-problem').innerHTML = createProblemDiagram() + '<div class="caption">图 1: 传统取模哈希 — 删除一台服务器导致大量数据重新映射</div>';
+document.getElementById('diagram-ring').innerHTML = createRingDiagram() + '<div class="caption">图 2: 哈希环 — 将哈希空间组织成环形结构</div>';
+document.getElementById('diagram-mapping').innerHTML = createMappingDiagram() + '<div class="caption">图 3: 节点映射 — 数据沿顺时针找到第一个服务器</div>';
+document.getElementById('diagram-vnodes').innerHTML = createVnodesDiagram() + '<div class="caption">图 4: 虚拟节点 — 每个物理节点映射多个虚拟节点到环上</div>';
+document.getElementById('diagram-change').innerHTML = createChangeDiagram() + '<div class="caption">图 5: 节点增删 — 只影响相邻区间的数据</div>';
+
+// Init interactive demo
+initDemo();
+</script>
+
+<!-- Giscus Comments -->
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SimHash 与 MinHash 文档去重</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Hero -->
+<header class="hero">
+  <h1>🔍 <span>SimHash 与 MinHash</span> 文档去重</h1>
+  <p class="subtitle">海量文档的近似查重：从指纹识别到集合相似度<br>
+  Locality Sensitive Hashing for Near-Duplicate Detection at Scale</p>
+  <span class="badge">🔍 相似度算法</span>
+  <span class="badge">📐 海明距离</span>
+  <span class="badge">🎯 Jaccard 系数</span>
+</header>
+
+<!-- TOC -->
+<div class="container">
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-problem">问题背景：为什么需要文档去重？</a></li>
+    <li><a href="#sec-simhash">SimHash：指纹识别文档</a></li>
+    <li><a href="#sec-hamming">海明距离与相似度判定</a></li>
+    <li><a href="#sec-lookup">海量数据中的高效查找</a></li>
+    <li><a href="#sec-minhash">MinHash：集合相似度</a></li>
+    <li><a href="#sec-compare">SimHash vs MinHash 对比</a></li>
+    <li><a href="#sec-summary">总结与延伸</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1: Problem -->
+<section id="sec-problem">
+<h2 class="section-title"><span class="num">1</span> 问题背景：为什么需要文档去重？</h2>
+
+<p>互联网上充斥着大量近似重复的内容——镜像网站、内容复制、嵌入广告、少量修改。对搜索引擎来说，收录重复网页只会浪费存储和计算资源。</p>
+
+<div class="box box-blue">
+<div class="title">🎯 核心挑战</div>
+Google 收录了数十亿网页，每天新增数百万。如果每条新数据都和库中每条记录计算余弦相似度，计算量是天文数字。<br>
+我们需要一种方法：<strong>把文档压缩成"指纹"，通过比较指纹快速判断相似度</strong>。
+</div>
+
+<p>传统 hash（如 MD5）的问题：输入哪怕只变一个字节，hash 就完全不同。我们需要的是<strong>局部敏感哈希（LSH）</strong>——相似的输入产生相似的 hash。</p>
+
+<div class="box box-green">
+<div class="title">💡 两种思路</div>
+• <strong>SimHash</strong>（指纹识别文档）：把文档压缩成一个 64-bit 指纹，通过海明距离判断相似度<br>
+• <strong>MinHash</strong>（集合相似度）：通过随机哈希估算两个集合的 Jaccard 相似系数
+</div>
+</section>
+
+<!-- Section 2: SimHash -->
+<section id="sec-simhash">
+<h2 class="section-title"><span class="num">2</span> SimHash：指纹识别文档</h2>
+
+<p>SimHash 由 Moses Charikar 提出，Google 用它实现网页去重。核心思想：<strong>把高维特征向量降维成一个 f-bit 的指纹</strong>，相似文档的指纹也相似。</p>
+
+<h3>2.1 算法流程</h3>
+
+<p>整个过程分为 5 步：分词 → Hash → 加权 → 合并 → 降维</p>
+
+<!-- Diagram: Feature Extraction -->
+<div class="diagram" id="diagram-feature"></div>
+
+<h4>Step 1: 特征提取（分词 + 权重）</h4>
+<pre><code># Extract features with weights (e.g., TF-IDF)
+doc = "the cat sat on the mat"
+features = {"the": 2, "cat": 1, "sat": 1, "on": 1, "mat": 1}
+# Or use n-gram: {"th": 1, "he": 1, "e ": 1, " c": 1, ...}</code></pre>
+
+<h4>Step 2-3: Hash 并加权</h4>
+
+<!-- Diagram: Hash Weighting -->
+<div class="diagram" id="diagram-hash-weight"></div>
+
+<pre><code># For each feature, compute hash and apply weight
+# hash("cat") = 100110  (example 6-bit)
+# weight = 1
+# bit=1 → +weight, bit=0 → -weight
+# result: [+1, -1, -1, +1, +1, -1]</code></pre>
+
+<h4>Step 4-5: 合并向量 → 生成指纹</h4>
+<pre><code># Sum all weighted hash vectors
+# V = [+13, +108, -22, -5, -32, +55]
+# Positive → 1, Negative → 0
+# SimHash = 110001</code></pre>
+
+<h3>2.2 Python 实现</h3>
+<pre><code>class SimHash:
+    def __init__(self, tokens, hashbits=64):
+        self.hashbits = hashbits
+        self.hash = self._simhash(tokens)
+
+    def _simhash(self, tokens):
+        v = [0] * self.hashbits
+        for t in tokens:
+            h = self._string_hash(t)
+            for i in range(self.hashbits):
+                bitmask = 1 << i
+                if h & bitmask:
+                    v[i] += 1   # bit=1 → +1
+                else:
+                    v[i] -= 1   # bit=0 → -1
+        fingerprint = 0
+        for i in range(self.hashbits):
+            if v[i] >= 0:
+                fingerprint |= (1 << i)
+        return fingerprint
+
+    def _string_hash(self, source):
+        if not source:
+            return 0
+        x = ord(source[0]) << 7
+        m, mask = 1000003, (1 << self.hashbits) - 1
+        for c in source:
+            x = ((x * m) ^ ord(c)) & mask
+        return x ^ len(source)
+
+    def hamming_distance(self, other):
+        x = (self.hash ^ other.hash) & ((1 << self.hashbits) - 1)
+        d = 0
+        while x:
+            d += 1
+            x &= x - 1
+        return d</code></pre>
+
+<div class="box box-purple">
+<div class="title">🧩 SimHash 的直觉：指纹识别文档</div>
+就像人的指纹——每个人的指纹独一无二，但双胞胎的指纹会非常相似。<br>
+SimHash 为每篇文档生成一个"数字指纹"，相似文档的指纹只有少数几位不同。<br><br>
+<strong>关键性质：</strong><br>
+• 它是一个 hash 函数（能压缩任意长度文档为固定位数）<br>
+• 相似文档的 hash 值也相似（局部敏感性）
+</div>
+
+<h3>🎮 交互演示：SimHash 指纹计算</h3>
+<div class="demo">
+<h4>输入两段文本，观察 SimHash 指纹和海明距离</h4>
+<p>文本 A：</p>
+<input type="text" id="sh-input-a" value="the cat sat on the mat" style="width:100%">
+<p style="margin-top:.5rem">文本 B：</p>
+<input type="text" id="sh-input-b" value="the cat sat on a mat" style="width:100%">
+<button onclick="runSimHashDemo()">计算 SimHash →</button>
+<div class="output" id="sh-output"></div>
+</div>
+</section>
+
+<!-- Section 3: Hamming Distance -->
+<section id="sec-hamming">
+<h2 class="section-title"><span class="num">3</span> 海明距离与相似度判定</h2>
+
+<p>两个二进制串的<strong>海明距离</strong> = 不同位的数量。SimHash 通过海明距离判断文档相似度。</p>
+
+<!-- Diagram: Fingerprint XOR -->
+<div class="diagram" id="diagram-xor"></div>
+
+<pre><code># Hamming distance via XOR
+A = 0b110001
+B = 0b110100
+xor = A ^ B  # 0b000101 → two 1-bits → distance = 2
+
+def hamming_distance(a, b):
+    x = a ^ b
+    d = 0
+    while x:
+        d += 1
+        x &= x - 1   # clear lowest set bit (Brian Kernighan's trick)
+    return d</code></pre>
+
+<!-- Diagram: Hamming Distance Comparison -->
+<div class="diagram" id="diagram-hamming"></div>
+
+<div class="box box-green">
+<div class="title">💡 经验阈值</div>
+Google 的实践：<strong>64-bit SimHash，海明距离 ≤ 3 即认为是近似重复文档</strong>。<br>
+具体阈值需要根据业务场景和数据集调整。
+</div>
+
+<table>
+<tr><th>海明距离</th><th>含义</th><th>示例</th></tr>
+<tr><td>0</td><td>完全相同</td><td>同一篇文章</td></tr>
+<tr><td>1-3</td><td>近似重复</td><td>少量修改、嵌入广告</td></tr>
+<tr><td>4-10</td><td>部分相似</td><td>同一话题不同文章</td></tr>
+<tr><td>>10</td><td>不相似</td><td>完全不同的内容</td></tr>
+</table>
+</section>
+
+<!-- Section 4: Lookup -->
+<section id="sec-lookup">
+<h2 class="section-title"><span class="num">4</span> 海量数据中的高效查找</h2>
+
+<p>有了 SimHash 指纹，如何在 80 亿指纹中快速找到海明距离 ≤ 3 的记录？</p>
+
+<h3>4.1 朴素方法的问题</h3>
+<table>
+<tr><th>方法</th><th>思路</th><th>问题</th></tr>
+<tr><td>方法 1</td><td>枚举目标指纹所有 3 位变化组合，逐一查找</td><td>C(64,3) = 41664 次查询</td></tr>
+<tr><td>方法 2</td><td>预生成库中所有指纹的 3 位变化组合</td><td>存储膨胀 41664 倍</td></tr>
+</table>
+
+<h3>4.2 分块索引（抽屉原理）</h3>
+
+<div class="box box-blue">
+<div class="title">🔑 核心思想：抽屉原理</div>
+将 64-bit 指纹分成 4 块（每块 16 位）。如果两个指纹的海明距离 ≤ 3，那么<strong>至少有一块是完全相同的</strong>。<br><br>
+因为 3 个不同的 bit 最多分布在 3 个块中，第 4 个块必然完全匹配。
+</div>
+
+<pre><code># Split 64-bit fingerprint into 4 blocks of 16 bits
+# Build 4 sorted tables, each with a different block as prefix
+# For query F:
+#   1. In each table, binary search for matching 16-bit prefix
+#   2. For candidates, check full 64-bit hamming distance ≤ 3
+
+# With 2^34 (~8 billion) fingerprints:
+# Each table returns ~2^(34-16) = 262144 candidates
+# Much cheaper than 8 billion full comparisons!</code></pre>
+
+<div class="box box-amber">
+<div class="title">📊 时空权衡</div>
+<table>
+<tr><th>表数量</th><th>每表前缀位数</th><th>候选数量</th><th>存储倍数</th></tr>
+<tr><td>4</td><td>16</td><td>2^(d-16)</td><td>4×</td></tr>
+<tr><td>16</td><td>28</td><td>2^(d-28)</td><td>16×</td></tr>
+</table>
+表越多 → 候选越少（更快），但存储越大。这就是时间与空间的权衡。
+</div>
+</section>
+
+<!-- Section 5: MinHash -->
+<section id="sec-minhash">
+<h2 class="section-title"><span class="num">5</span> MinHash：集合相似度</h2>
+
+<p>MinHash 是另一种 LSH 方法，由 Andrei Broder 提出，用于快速估算两个集合的 <strong>Jaccard 相似系数</strong>。</p>
+
+<h3>5.1 Jaccard 系数</h3>
+<pre><code># Jaccard similarity = |A ∩ B| / |A ∪ B|
+A = {"the", "cat", "sat", "on", "mat"}
+B = {"the", "cat", "sat", "on", "a", "mat"}
+# A ∩ B = {"the", "cat", "sat", "on", "mat"} → 5
+# A ∪ B = {"the", "cat", "sat", "on", "mat", "a"} → 6
+# J(A, B) = 5/6 ≈ 0.833</code></pre>
+
+<h3>5.2 MinHash 原理</h3>
+
+<div class="box box-purple">
+<div class="title">🧩 MinHash 的直觉：集合相似度</div>
+想象把两个集合的所有元素放进一个袋子里，随机抽一个。<br>
+如果两个集合越相似，随机抽到的"最小元素"相同的概率就越大。<br><br>
+数学上：<code>Pr[h_min(A) = h_min(B)] = J(A, B)</code><br>
+即两个集合经过 hash 后最小值相同的概率 = Jaccard 系数。
+</div>
+
+<h3>5.3 两种实现方式</h3>
+
+<h4>方法 1：多个 Hash 函数</h4>
+<pre><code># Use K hash functions, get K min-hash values per set
+# Similarity ≈ number of matching min-values / K
+import hashlib
+
+def minhash_multi(tokens, num_hashes=100):
+    """Generate MinHash signature using multiple hash functions."""
+    signature = []
+    for i in range(num_hashes):
+        min_val = float('inf')
+        for token in tokens:
+            h = hash(f"{i}_{token}") & 0xFFFFFFFF
+            min_val = min(min_val, h)
+        signature.append(min_val)
+    return signature
+
+def minhash_similarity(sig_a, sig_b):
+    """Estimate Jaccard similarity from MinHash signatures."""
+    matches = sum(1 for a, b in zip(sig_a, sig_b) if a == b)
+    return matches / len(sig_a)</code></pre>
+
+<h4>方法 2：单个 Hash 函数取 K 个最小值</h4>
+<pre><code># Hash all elements once, keep K smallest values
+def minhash_single(tokens, k=100):
+    """Generate MinHash signature using single hash, K smallest."""
+    hashes = sorted(hash(t) & 0xFFFFFFFF for t in tokens)
+    return hashes[:k]
+
+# Similarity = |min_k(A) ∩ min_k(B)| / |min_k(A) ∪ min_k(B)|</code></pre>
+
+<h3>5.4 MinHash 矩阵降维</h3>
+
+<p>MinHash 的真正威力在于海量文档的场景。假设有 n 个文档，每个文档的词表维度为 m：</p>
+
+<table>
+<tr><th></th><th>原始矩阵</th><th>MinHash 签名矩阵</th></tr>
+<tr><td>维度</td><td>n × m</td><td>n × k</td></tr>
+<tr><td>示例</td><td>100万 × 50万</td><td>100万 × 200</td></tr>
+<tr><td>比较代价</td><td>O(m) per pair</td><td>O(k) per pair</td></tr>
+</table>
+
+<div class="box box-green">
+<div class="title">💡 为什么 MinHash 能降维？</div>
+每个排列（hash 函数）把一篇文档映射成一个整数。<br>
+K 个 hash 函数 → K 个整数 → 一个 K 维的"签名"。<br>
+当 K << m 时，计算量大幅下降，而相似度估算仍然准确。
+</div>
+</section>
+
+<!-- Section 6: Compare -->
+<section id="sec-compare">
+<h2 class="section-title"><span class="num">6</span> SimHash vs MinHash 对比</h2>
+
+<table>
+<tr><th>特性</th><th>SimHash</th><th>MinHash</th></tr>
+<tr><td>核心思想</td><td>指纹识别文档（降维到 f-bit）</td><td>集合相似度（Jaccard 估算）</td></tr>
+<tr><td>相似度度量</td><td>海明距离</td><td>Jaccard 系数</td></tr>
+<tr><td>输出</td><td>单个 f-bit 指纹</td><td>K 个 hash 值的签名</td></tr>
+<tr><td>存储</td><td>极小（64 bit / 文档）</td><td>较大（K × 32 bit / 文档）</td></tr>
+<tr><td>精度</td><td>较低（信息压缩严重）</td><td>较高（K 越大越准）</td></tr>
+<tr><td>适用场景</td><td>海量网页去重（Google）</td><td>推荐系统、文档聚类</td></tr>
+<tr><td>查找效率</td><td>分块索引，O(1) 级别</td><td>需要 LSH 分桶加速</td></tr>
+</table>
+
+<div class="box box-blue">
+<div class="title">🔑 如何选择？</div>
+• 需要<strong>极致存储效率</strong>和<strong>海量数据快速去重</strong> → SimHash<br>
+• 需要<strong>更精确的相似度估算</strong>和<strong>灵活的阈值调整</strong> → MinHash<br>
+• 实际系统中，两者常常结合使用：SimHash 做粗筛，MinHash 做精排
+</div>
+</section>
+
+<!-- Section 7: Summary -->
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">7</span> 总结与延伸</h2>
+
+<h3>7.1 核心算法总结</h3>
+<table>
+<tr><th>#</th><th>概念</th><th>一句话</th></tr>
+<tr><td>1</td><td>SimHash</td><td>文档 → 特征加权 → hash 合并 → f-bit 指纹</td></tr>
+<tr><td>2</td><td>海明距离</td><td>XOR 后数 1 的个数，≤3 即近似重复</td></tr>
+<tr><td>3</td><td>分块索引</td><td>抽屉原理，4 表并行查找</td></tr>
+<tr><td>4</td><td>MinHash</td><td>随机 hash 最小值的相等概率 = Jaccard 系数</td></tr>
+<tr><td>5</td><td>签名矩阵</td><td>K 个 hash 函数把 m 维降到 K 维</td></tr>
+</table>
+
+<h3>7.2 实际应用</h3>
+<div class="box box-purple">
+<div class="title">🚀 工业界应用</div>
+• <strong>Google</strong>：SimHash 用于网页去重，64-bit 指纹，海明距离阈值 3<br>
+• <strong>百度</strong>：取文章最长的 n 句话做 hash 签名（简单但有效，准确率 >80%）<br>
+• <strong>推荐系统</strong>：MinHash + LSH 用于物品相似度计算<br>
+• <strong>搜索引擎</strong>：爬虫去重、结果去重
+</div>
+
+<h3>7.3 延伸阅读</h3>
+<div class="box box-green">
+<div class="title">📚 参考资料</div>
+• <a href="http://dl.acm.org/citation.cfm?id=509965" target="_blank">Similarity Estimation Techniques from Rounding Algorithms</a> — SimHash 原始论文 (Charikar, 2002)<br>
+• <a href="http://www2007.org/papers/paper215.pdf" target="_blank">Detecting Near-Duplicates for Web Crawling</a> — Google 的 SimHash 实践 (WWW 2007)<br>
+• <a href="http://en.wikipedia.org/wiki/MinHash" target="_blank">Wikipedia: MinHash</a><br>
+• <a href="http://en.wikipedia.org/wiki/Locality-sensitive_hashing" target="_blank">Wikipedia: Locality-Sensitive Hashing</a><br>
+• <a href="https://github.com/yanyiwu/simhash" target="_blank">yanyiwu/simhash</a> — 中文 SimHash 开源实现
+</div>
+</section>
+
+</div><!-- end container -->
+
+<footer>
+  <p>SimHash & MinHash Tutorial — 基于多篇技术文章整理</p>
+  <p>教程由 AI 辅助生成 / Tutorial generated with AI assistance</p>
+</footer>
+
+<a href="#" class="back-top" id="back-top" title="回到顶部">↑</a>
+
+<script src="simhash.js"></script>
+<script>
+// Render SVG diagrams
+document.getElementById('diagram-feature').innerHTML = createFeatureExtractionDiagram() + '<div class="caption">图 1: 特征提取 — 文档分词并计算权重</div>';
+document.getElementById('diagram-hash-weight').innerHTML = createHashWeightDiagram() + '<div class="caption">图 2: Hash 加权 — 每个特征的 hash 按权重累加</div>';
+document.getElementById('diagram-xor').innerHTML = createXORDiagram() + '<div class="caption">图 3: 指纹 XOR — 不同位即为海明距离</div>';
+document.getElementById('diagram-hamming').innerHTML = createHammingComparisonDiagram() + '<div class="caption">图 4: 海明距离比较 — 距离越小越相似</div>';
+
+// Init demo
+runSimHashDemo();
+</script>
+
+<!-- Giscus Comments -->
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

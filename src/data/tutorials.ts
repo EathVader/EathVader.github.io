@@ -8,6 +8,30 @@ export interface Tutorial {
 
 export const tutorials: Tutorial[] = [
   {
+    slug: 'consistent-hash',
+    tag: '🌐 分布式',
+    title: '一致性哈希算法',
+    description:
+      '从取模到哈希环，理解分布式系统负载均衡的首选算法。覆盖哈希环原理、虚拟节点、节点增删影响，含交互式哈希环可视化与分布统计。',
+    meta: '基于峰云就她了博客 · 2026-03',
+  },
+  {
+    slug: 'simhash',
+    tag: '🔍 相似度算法',
+    title: 'SimHash 与 MinHash 文档去重',
+    description:
+      '海量文档的近似查重：SimHash 指纹识别与 MinHash 集合相似度。覆盖局部敏感哈希、海明距离、分块索引、Jaccard 系数，含交互式 SimHash 计算演示。',
+    meta: '基于多篇技术文章 · 2026-03',
+  },
+  {
+    slug: 'lru-cache',
+    tag: '🗄️ 缓存',
+    title: 'LRU Cache 设计实现',
+    description:
+      '双向链表 + 哈希表，O(1) 实现最近最少使用缓存。覆盖数据结构设计、get/put 操作图解、淘汰机制、完整 Python 代码、交互式可视化。',
+    meta: '基于 LeetCode 146 · 2026-03',
+  },
+  {
     slug: 'microgpt',
     tag: '🧠 Deep Learning',
     title: 'MicroGPT 交互式教程',
@@ -150,5 +174,13 @@ export const tutorials: Tutorial[] = [
     description:
       'LIFO 与 FIFO 的经典应用。覆盖括号匹配、单调栈、最小栈、两栈实现队列，含交互式可视化。',
     meta: '综合多篇文章 · 2026-03',
+  },
+  {
+    slug: 'external-sort',
+    tag: '📊 大数据',
+    title: '磁盘多路归并排序',
+    description:
+      '海量数据排序经典方案。覆盖归并段生成、K 路归并、最小堆优先队列、I/O 缓冲优化、败者树对比，含交互式可视化。',
+    meta: '基于老钱的文章 · 2026-03',
   },
 ];

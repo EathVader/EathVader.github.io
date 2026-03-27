@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LRU Cache 设计实现</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Hero -->
+<header class="hero">
+  <h1>🗄️ <span>LRU Cache</span> 设计实现</h1>
+  <p class="subtitle">双向链表 + 哈希表，O(1) 实现最近最少使用缓存<br>
+  Design and implement an LRU (Least Recently Used) cache</p>
+  <span class="badge">🔗 双向链表</span>
+  <span class="badge">#️⃣ 哈希表</span>
+  <span class="badge">⚡ O(1) 操作</span>
+</header>
+
+<div class="container">
+
+<!-- TOC -->
+<nav class="toc">
+  <h2>📑 目录 / Table of Contents</h2>
+  <ol>
+    <li><a href="#sec-what">什么是 LRU Cache？</a></li>
+    <li><a href="#sec-structure">数据结构设计</a></li>
+    <li><a href="#sec-get">Get 操作</a></li>
+    <li><a href="#sec-put">Put 操作</a></li>
+    <li><a href="#sec-evict">淘汰机制</a></li>
+    <li><a href="#sec-code">完整代码</a></li>
+    <li><a href="#sec-demo">交互演示</a></li>
+    <li><a href="#sec-summary">总结</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1: What is LRU Cache -->
+<section id="sec-what">
+<h2 class="section-title"><span class="num">1</span> 什么是 LRU Cache？</h2>
+
+<div class="analogy">
+  <div class="emoji">🧊</div>
+  <h4>生活类比：冰箱门</h4>
+  <p>想象你的冰箱——<strong>最近使用的放门口</strong>。每次拿东西出来用完，放回去时总是放在最前面。冰箱满了要放新东西？把最里面（最久没用的）那个扔掉。这就是 LRU（Least Recently Used）的核心思想。</p>
+</div>
+
+<p>LRU Cache 是一种<strong>固定容量</strong>的缓存，当容量满时，淘汰最久没有被访问的数据。它需要支持两个操作，且都是 <strong>O(1)</strong> 时间复杂度：</p>
+
+<table>
+  <tr><th>操作</th><th>说明</th><th>复杂度</th></tr>
+  <tr><td><code>get(key)</code></td><td>查询 key 对应的 value，不存在返回 -1</td><td>O(1)</td></tr>
+  <tr><td><code>put(key, value)</code></td><td>插入/更新键值对，满了则淘汰最久未用的</td><td>O(1)</td></tr>
+</table>
+
+<div class="box box-blue">
+  <div class="title">💡 为什么需要 LRU？</div>
+  <p>Cache 空间有限，需要淘汰策略。LRU 基于一个假设：<strong>最近用到的数据，被再次使用的概率更大</strong>。CPU 缓存、操作系统页面置换、数据库查询缓存、Redis 都用到了 LRU 或其变体。</p>
+</div>
+</section>
+
+<!-- Section 2: Data Structure -->
+<section id="sec-structure">
+<h2 class="section-title"><span class="num">2</span> 数据结构设计</h2>
+
+<p>要实现 O(1) 的 get 和 put，需要两个数据结构<strong>配合</strong>：</p>
+
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6"><strong>哈希表</strong><br><small style="color:#64748b">O(1) 查找</small></div>
+  <div class="arrow">+</div>
+  <div class="step" style="border-color:#22c55e"><strong>双向链表</strong><br><small style="color:#64748b">O(1) 增删移动</small></div>
+  <div class="arrow">=</div>
+  <div class="step" style="border-color:#a78bfa"><strong>LRU Cache</strong><br><small style="color:#64748b">O(1) 全部操作</small></div>
+</div>
+
+<div class="diagram" id="diagram-structure">
+  <svg viewBox="0 0 620 260" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker>
+    </defs>
+    <text x="10" y="20" fill="#f8fafc" font-size="13" font-weight="700" font-family="Inter">HashMap</text>
+    <text x="350" y="20" fill="#f8fafc" font-size="13" font-weight="700" font-family="Inter">Doubly Linked List</text>
+
+    <!-- Hash table entries -->
+    <rect x="10" y="35" width="120" height="32" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="70" y="55" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="JetBrains Mono">key: 1 → ●</text>
+    <rect x="10" y="75" width="120" height="32" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="70" y="95" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="JetBrains Mono">key: 2 → ●</text>
+    <rect x="10" y="115" width="120" height="32" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="70" y="135" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="JetBrains Mono">key: 3 → ●</text>
+
+    <!-- Arrows from hash to nodes -->
+    <line x1="130" y1="51" x2="218" y2="51" stroke="#60a5fa" stroke-width="1.5" stroke-dasharray="4" marker-end="url(#arr)"/>
+    <line x1="130" y1="91" x2="218" y2="131" stroke="#60a5fa" stroke-width="1.5" stroke-dasharray="4" marker-end="url(#arr)"/>
+    <line x1="130" y1="131" x2="218" y2="211" stroke="#60a5fa" stroke-width="1.5" stroke-dasharray="4" marker-end="url(#arr)"/>
+
+    <!-- HEAD sentinel -->
+    <rect x="180" y="35" width="40" height="32" rx="4" fill="#334155" stroke="#64748b"/>
+    <text x="200" y="55" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">HEAD</text>
+
+    <!-- Node 1 (most recent) -->
+    <rect x="250" y="35" width="100" height="32" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="300" y="55" text-anchor="middle" fill="#86efac" font-size="10" font-family="JetBrains Mono">1: "one"</text>
+
+    <!-- Node 2 -->
+    <rect x="250" y="115" width="100" height="32" rx="6" fill="#1e293b" stroke="#334155"/>
+    <text x="300" y="135" text-anchor="middle" fill="#cbd5e1" font-size="10" font-family="JetBrains Mono">2: "two"</text>
+
+    <!-- Node 3 (least recent) -->
+    <rect x="250" y="195" width="100" height="32" rx="6" fill="#450a0a" stroke="#ef4444"/>
+    <text x="300" y="215" text-anchor="middle" fill="#fca5a5" font-size="10" font-family="JetBrains Mono">3: "three"</text>
+
+    <!-- TAIL sentinel -->
+    <rect x="180" y="195" width="40" height="32" rx="4" fill="#334155" stroke="#64748b"/>
+    <text x="200" y="215" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">TAIL</text>
+
+    <!-- Double arrows between nodes (vertical layout) -->
+    <line x1="300" y1="67" x2="300" y2="115" stroke="#94a3b8" stroke-width="1.5"/>
+    <line x1="300" y1="147" x2="300" y2="195" stroke="#94a3b8" stroke-width="1.5"/>
+    <line x1="220" y1="55" x2="250" y2="51" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="220" y1="211" x2="250" y2="211" stroke="#94a3b8" stroke-width="1"/>
+
+    <!-- Labels -->
+    <text x="380" y="55" fill="#86efac" font-size="10" font-family="Inter">← 最近使用 (MRU)</text>
+    <text x="380" y="215" fill="#fca5a5" font-size="10" font-family="Inter">← 最久未用 (LRU) 淘汰这个!</text>
+
+    <!-- prev/next labels -->
+    <text x="310" y="90" fill="#64748b" font-size="9" font-family="Inter">prev ↑ ↓ next</text>
+    <text x="310" y="175" fill="#64748b" font-size="9" font-family="Inter">prev ↑ ↓ next</text>
+  </svg>
+  <div class="caption">图 1: LRU Cache 数据结构 — 哈希表指向双向链表节点，链表头部是最近使用，尾部是最久未用</div>
+</div>
+
+<div class="box box-green">
+  <div class="title">💡 为什么用双向链表？</div>
+  <p>• <strong>单向链表</strong>删除节点需要 O(n) 找前驱<br>
+  • <strong>双向链表</strong>有 prev 指针，删除任意节点只需 O(1)<br>
+  • 哈希表存的是<strong>节点引用</strong>，直接定位到链表中的节点，无需遍历</p>
+</div>
+
+<div class="box box-purple">
+  <div class="title">🧩 哨兵节点 HEAD / TAIL</div>
+  <p>使用虚拟的头尾节点（dummy head/tail），避免处理边界条件（空链表、只有一个节点等）。所有真实数据节点都在 HEAD 和 TAIL 之间。</p>
+</div>
+
+<p>节点定义：</p>
+<pre><code>class Node:
+    def __init__(self, key=0, val=0):
+        self.key = key
+        self.val = val
+        self.prev = None
+        self.next = None</code></pre>
+</section>
+
+<!-- Section 3: Get -->
+<section id="sec-get">
+<h2 class="section-title"><span class="num">3</span> Get 操作</h2>
+
+<p>查询 key 对应的 value。如果命中，需要把该节点<strong>移到链表头部</strong>（标记为"最近使用"）。</p>
+
+<div class="flow">
+  <div class="step">🔍 哈希表查找 key</div>
+  <div class="arrow">→</div>
+  <div class="step">命中？</div>
+  <div class="arrow">→ Yes</div>
+  <div class="step">🔄 移到头部</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">返回 value</div>
+</div>
+
+<div class="diagram" id="diagram-get">
+  <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="18" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="700" font-family="Inter">get(2): 命中后移到头部</text>
+
+    <!-- Before -->
+    <text x="10" y="50" fill="#94a3b8" font-size="11" font-family="Inter">Before:</text>
+    <rect x="80" y="38" width="30" height="24" rx="3" fill="#334155" stroke="#64748b"/>
+    <text x="95" y="54" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">H</text>
+    <rect x="130" y="38" width="70" height="24" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="165" y="54" text-anchor="middle" fill="#86efac" font-size="10" font-family="JetBrains Mono">1</text>
+    <rect x="220" y="38" width="70" height="24" rx="4" fill="#451a03" stroke="#f59e0b"/>
+    <text x="255" y="54" text-anchor="middle" fill="#fcd34d" font-size="10" font-family="JetBrains Mono">2 ← hit!</text>
+    <rect x="310" y="38" width="70" height="24" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="345" y="54" text-anchor="middle" fill="#cbd5e1" font-size="10" font-family="JetBrains Mono">3</text>
+    <rect x="400" y="38" width="30" height="24" rx="3" fill="#334155" stroke="#64748b"/>
+    <text x="415" y="54" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">T</text>
+    <line x1="110" y1="50" x2="130" y2="50" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="200" y1="50" x2="220" y2="50" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="290" y1="50" x2="310" y2="50" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="380" y1="50" x2="400" y2="50" stroke="#94a3b8" stroke-width="1"/>
+
+    <!-- Arrow showing move -->
+    <path d="M 255 65 Q 255 100 165 100 Q 100 100 100 80" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="5" marker-end="url(#arr2)"/>
+    <text x="180" y="115" text-anchor="middle" fill="#f59e0b" font-size="10" font-family="Inter">① 从原位置删除 ② 插入头部</text>
+
+    <!-- After -->
+    <text x="10" y="155" fill="#94a3b8" font-size="11" font-family="Inter">After:</text>
+    <rect x="80" y="143" width="30" height="24" rx="3" fill="#334155" stroke="#64748b"/>
+    <text x="95" y="159" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">H</text>
+    <rect x="130" y="143" width="70" height="24" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="165" y="159" text-anchor="middle" fill="#86efac" font-size="10" font-family="JetBrains Mono">2 ✓</text>
+    <rect x="220" y="143" width="70" height="24" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="255" y="159" text-anchor="middle" fill="#cbd5e1" font-size="10" font-family="JetBrains Mono">1</text>
+    <rect x="310" y="143" width="70" height="24" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="345" y="159" text-anchor="middle" fill="#cbd5e1" font-size="10" font-family="JetBrains Mono">3</text>
+    <rect x="400" y="143" width="30" height="24" rx="3" fill="#334155" stroke="#64748b"/>
+    <text x="415" y="159" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">T</text>
+    <line x1="110" y1="155" x2="130" y2="155" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="200" y1="155" x2="220" y2="155" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="290" y1="155" x2="310" y2="155" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="380" y1="155" x2="400" y2="155" stroke="#94a3b8" stroke-width="1"/>
+  </svg>
+  <div class="caption">图 2: get(2) — 命中节点 2，从中间删除并移到头部</div>
+</div>
+
+<pre><code>def get(self, key: int) -> int:
+    if key not in self.cache:
+        return -1
+    node = self.cache[key]
+    self._move_to_head(node)
+    return node.val</code></pre>
+</section>
+
+<!-- Section 4: Put -->
+<section id="sec-put">
+<h2 class="section-title"><span class="num">4</span> Put 操作</h2>
+
+<p>插入或更新键值对。分两种情况：</p>
+
+<div class="timeline">
+  <div class="timeline-item">
+    <div class="tl-label">情况 1: key 已存在</div>
+    <strong>更新 value</strong>，然后移到头部（和 get 类似）
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">情况 2: key 不存在</div>
+    <strong>创建新节点</strong>，插入头部，加入哈希表。如果超出容量，淘汰尾部节点。
+  </div>
+</div>
+
+<div class="diagram" id="diagram-put">
+  <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="18" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="700" font-family="Inter">put(4, "four"): 插入新节点（容量=3，需淘汰）</text>
+
+    <!-- Before -->
+    <text x="10" y="50" fill="#94a3b8" font-size="11" font-family="Inter">Before (满):</text>
+    <rect x="100" y="38" width="30" height="24" rx="3" fill="#334155" stroke="#64748b"/>
+    <text x="115" y="54" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">H</text>
+    <rect x="150" y="38" width="60" height="24" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="180" y="54" text-anchor="middle" fill="#cbd5e1" font-size="10" font-family="JetBrains Mono">1</text>
+    <rect x="230" y="38" width="60" height="24" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="260" y="54" text-anchor="middle" fill="#cbd5e1" font-size="10" font-family="JetBrains Mono">2</text>
+    <rect x="310" y="38" width="60" height="24" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="340" y="54" text-anchor="middle" fill="#fca5a5" font-size="10" font-family="JetBrains Mono">3 ✗</text>
+    <rect x="390" y="38" width="30" height="24" rx="3" fill="#334155" stroke="#64748b"/>
+    <text x="405" y="54" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">T</text>
+    <line x1="130" y1="50" x2="150" y2="50" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="210" y1="50" x2="230" y2="50" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="290" y1="50" x2="310" y2="50" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="370" y1="50" x2="390" y2="50" stroke="#94a3b8" stroke-width="1"/>
+
+    <!-- Steps -->
+    <text x="300" y="95" text-anchor="middle" fill="#f59e0b" font-size="10" font-family="Inter">① 淘汰尾部节点 3 ② 新节点 4 插入头部</text>
+
+    <!-- After -->
+    <text x="10" y="155" fill="#94a3b8" font-size="11" font-family="Inter">After:</text>
+    <rect x="100" y="143" width="30" height="24" rx="3" fill="#334155" stroke="#64748b"/>
+    <text x="115" y="159" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">H</text>
+    <rect x="150" y="143" width="60" height="24" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="180" y="159" text-anchor="middle" fill="#86efac" font-size="10" font-family="JetBrains Mono">4 ✓</text>
+    <rect x="230" y="143" width="60" height="24" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="260" y="159" text-anchor="middle" fill="#cbd5e1" font-size="10" font-family="JetBrains Mono">1</text>
+    <rect x="310" y="143" width="60" height="24" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="340" y="159" text-anchor="middle" fill="#cbd5e1" font-size="10" font-family="JetBrains Mono">2</text>
+    <rect x="390" y="143" width="30" height="24" rx="3" fill="#334155" stroke="#64748b"/>
+    <text x="405" y="159" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">T</text>
+    <line x1="130" y1="155" x2="150" y2="155" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="210" y1="155" x2="230" y2="155" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="290" y1="155" x2="310" y2="155" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="370" y1="155" x2="390" y2="155" stroke="#94a3b8" stroke-width="1"/>
+  </svg>
+  <div class="caption">图 3: put(4, "four") — 容量已满，淘汰尾部节点 3，新节点 4 插入头部</div>
+</div>
+
+<pre><code>def put(self, key: int, value: int) -> None:
+    if key in self.cache:
+        node = self.cache[key]
+        node.val = value
+        self._move_to_head(node)
+    else:
+        node = Node(key, value)
+        self.cache[key] = node
+        self._add_to_head(node)
+        self.size += 1
+        if self.size > self.capacity:
+            tail = self._remove_tail()
+            del self.cache[tail.key]
+            self.size -= 1</code></pre>
+</section>
+
+<!-- Section 5: Eviction -->
+<section id="sec-evict">
+<h2 class="section-title"><span class="num">5</span> 淘汰机制</h2>
+
+<p>淘汰发生在 <code>put</code> 新 key 且容量已满时。淘汰的永远是<strong>链表尾部</strong>（TAIL 前面的节点）——即最久没被访问的。</p>
+
+<div class="diagram" id="diagram-evict">
+  <svg viewBox="0 0 600 160" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="18" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="700" font-family="Inter">淘汰过程：删除 TAIL.prev</text>
+
+    <!-- Chain -->
+    <rect x="40" y="50" width="30" height="28" rx="3" fill="#334155" stroke="#64748b"/>
+    <text x="55" y="68" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">H</text>
+    <rect x="90" y="50" width="60" height="28" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="120" y="68" text-anchor="middle" fill="#cbd5e1" font-size="10" font-family="JetBrains Mono">A</text>
+    <rect x="170" y="50" width="60" height="28" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="200" y="68" text-anchor="middle" fill="#cbd5e1" font-size="10" font-family="JetBrains Mono">B</text>
+    <rect x="250" y="50" width="60" height="28" rx="4" fill="#450a0a" stroke="#ef4444" stroke-width="2"/>
+    <text x="280" y="68" text-anchor="middle" fill="#fca5a5" font-size="10" font-weight="700" font-family="JetBrains Mono">C ✗</text>
+    <rect x="330" y="50" width="30" height="28" rx="3" fill="#334155" stroke="#64748b"/>
+    <text x="345" y="68" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">T</text>
+
+    <line x1="70" y1="64" x2="90" y2="64" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="150" y1="64" x2="170" y2="64" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="230" y1="64" x2="250" y2="64" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="310" y1="64" x2="330" y2="64" stroke="#94a3b8" stroke-width="1"/>
+
+    <!-- Steps -->
+    <text x="280" y="100" text-anchor="middle" fill="#ef4444" font-size="10" font-family="Inter">① C.prev.next = TAIL</text>
+    <text x="280" y="115" text-anchor="middle" fill="#ef4444" font-size="10" font-family="Inter">② TAIL.prev = C.prev (即 B)</text>
+    <text x="280" y="130" text-anchor="middle" fill="#ef4444" font-size="10" font-family="Inter">③ del cache[C.key]</text>
+
+    <!-- Result arrow -->
+    <text x="420" y="55" fill="#94a3b8" font-size="10" font-family="Inter">结果:</text>
+    <rect x="420" y="60" width="30" height="24" rx="3" fill="#334155" stroke="#64748b"/>
+    <text x="435" y="76" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">H</text>
+    <rect x="460" y="60" width="40" height="24" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="480" y="76" text-anchor="middle" fill="#cbd5e1" font-size="9" font-family="JetBrains Mono">A</text>
+    <rect x="510" y="60" width="40" height="24" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="530" y="76" text-anchor="middle" fill="#cbd5e1" font-size="9" font-family="JetBrains Mono">B</text>
+    <rect x="560" y="60" width="30" height="24" rx="3" fill="#334155" stroke="#64748b"/>
+    <text x="575" y="76" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">T</text>
+  </svg>
+  <div class="caption">图 4: 淘汰 — 删除 TAIL 前面的节点 C，同时从哈希表中移除</div>
+</div>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 别忘了同步哈希表</div>
+  <p>从链表删除节点时，必须同时从哈希表中 <code>del self.cache[node.key]</code>。这就是为什么节点要存 key——删除时需要用 key 去清理哈希表。</p>
+</div>
+
+<p>链表辅助方法：</p>
+<pre><code>def _remove(self, node):
+    """Remove a node from the linked list."""
+    node.prev.next = node.next
+    node.next.prev = node.prev
+
+def _add_to_head(self, node):
+    """Insert node right after HEAD sentinel."""
+    node.prev = self.head
+    node.next = self.head.next
+    self.head.next.prev = node
+    self.head.next = node
+
+def _move_to_head(self, node):
+    """Move existing node to head (most recent)."""
+    self._remove(node)
+    self._add_to_head(node)
+
+def _remove_tail(self):
+    """Remove and return the node before TAIL (least recent)."""
+    node = self.tail.prev
+    self._remove(node)
+    return node</code></pre>
+</section>
+
+<!-- Section 6: Full Code -->
+<section id="sec-code">
+<h2 class="section-title"><span class="num">6</span> 完整代码</h2>
+
+<pre><code>class Node:
+    def __init__(self, key=0, val=0):
+        self.key = key
+        self.val = val
+        self.prev = None
+        self.next = None
+
+class LRUCache:
+    def __init__(self, capacity: int):
+        self.capacity = capacity
+        self.size = 0
+        self.cache = {}  # key -> Node
+        # Sentinel nodes to avoid boundary checks
+        self.head = Node()
+        self.tail = Node()
+        self.head.next = self.tail
+        self.tail.prev = self.head
+
+    def get(self, key: int) -> int:
+        if key not in self.cache:
+            return -1
+        node = self.cache[key]
+        self._move_to_head(node)
+        return node.val
+
+    def put(self, key: int, value: int) -> None:
+        if key in self.cache:
+            node = self.cache[key]
+            node.val = value
+            self._move_to_head(node)
+        else:
+            node = Node(key, value)
+            self.cache[key] = node
+            self._add_to_head(node)
+            self.size += 1
+            if self.size > self.capacity:
+                tail = self._remove_tail()
+                del self.cache[tail.key]
+                self.size -= 1
+
+    def _remove(self, node):
+        node.prev.next = node.next
+        node.next.prev = node.prev
+
+    def _add_to_head(self, node):
+        node.prev = self.head
+        node.next = self.head.next
+        self.head.next.prev = node
+        self.head.next = node
+
+    def _move_to_head(self, node):
+        self._remove(node)
+        self._add_to_head(node)
+
+    def _remove_tail(self):
+        node = self.tail.prev
+        self._remove(node)
+        return node</code></pre>
+
+<div class="box box-blue">
+  <div class="title">🐍 Python 捷径：OrderedDict</div>
+  <p>Python 的 <code>collections.OrderedDict</code> 内部就是哈希表+双向链表，可以一行搞定：</p>
+</div>
+
+<pre><code>from collections import OrderedDict
+
+class LRUCache:
+    def __init__(self, capacity: int):
+        self.cap = capacity
+        self.d = OrderedDict()
+
+    def get(self, key: int) -> int:
+        if key not in self.d:
+            return -1
+        self.d.move_to_end(key)
+        return self.d[key]
+
+    def put(self, key: int, value: int) -> None:
+        if key in self.d:
+            self.d.move_to_end(key)
+        self.d[key] = value
+        if len(self.d) > self.cap:
+            self.d.popitem(last=False)</code></pre>
+
+<div class="box box-green">
+  <div class="title">📊 复杂度分析</div>
+  <table>
+    <tr><th>操作</th><th>时间</th><th>空间</th></tr>
+    <tr><td>get</td><td>O(1)</td><td>—</td></tr>
+    <tr><td>put</td><td>O(1)</td><td>—</td></tr>
+    <tr><td>总空间</td><td>—</td><td>O(capacity)</td></tr>
+  </table>
+</div>
+</section>
+
+<!-- Section 7: Interactive Demo -->
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">7</span> 交互演示</h2>
+
+<div class="demo">
+  <h4>🎮 LRU Cache 可视化</h4>
+  <p>容量:
+    <select id="demo-cap" onchange="resetDemo()">
+      <option value="3" selected>3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+    </select>
+  </p>
+  <p>
+    <label>Key:</label> <input type="number" id="demo-key" value="1" min="0" max="99" style="width:60px">
+    <label>Value:</label> <input type="number" id="demo-val" value="10" min="0" max="999" style="width:70px">
+    <button onclick="demoPut()">put(k, v)</button>
+    <button onclick="demoGet()">get(k)</button>
+    <button onclick="resetDemo()">重置 Reset</button>
+  </p>
+  <div id="demo-visual" style="margin:1rem 0"></div>
+  <div class="output" id="demo-log">点击 put / get 开始操作...</div>
+</div>
+</section>
+
+<!-- Section 8: Summary -->
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">8</span> 总结</h2>
+
+<h3>核心要点</h3>
+<table>
+  <tr><th>概念</th><th>说明</th></tr>
+  <tr><td>数据结构</td><td>哈希表 + 双向链表，两者配合实现 O(1)</td></tr>
+  <tr><td>哈希表</td><td>key → Node 引用，O(1) 定位节点</td></tr>
+  <tr><td>双向链表</td><td>维护访问顺序，头部最新，尾部最旧</td></tr>
+  <tr><td>哨兵节点</td><td>HEAD/TAIL 避免边界判断</td></tr>
+  <tr><td>get 命中</td><td>移到头部，返回 value</td></tr>
+  <tr><td>put 新 key</td><td>插入头部，超容量则淘汰尾部</td></tr>
+  <tr><td>淘汰</td><td>删除 TAIL.prev，同步清理哈希表</td></tr>
+</table>
+
+<div class="box box-purple">
+  <div class="title">📚 延伸阅读</div>
+  <ul>
+    <li><a href="https://leetcode.com/problems/lru-cache/" target="_blank">LeetCode 146. LRU Cache</a></li>
+    <li><a href="https://en.wikipedia.org/wiki/Cache_replacement_policies#LRU" target="_blank">Wikipedia: LRU Cache Replacement</a></li>
+    <li>变体：LFU Cache（最不经常使用）、2Q、ARC</li>
+    <li>实际应用：Redis <code>maxmemory-policy allkeys-lru</code>、Linux 页面置换</li>
+  </ul>
+</div>
+</section>
+
+</div><!-- /.container -->
+
+<footer>
+  <p>基于 <a href="https://leetcode.com/problems/lru-cache/" target="_blank">LeetCode 146. LRU Cache</a></p>
+  <p><a href="../">← 返回主页 / Back to Home</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script src="lru-cache.js"></script>
+<script>
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => { btn.classList.toggle('show', window.scrollY > 400); });
+</script>
+
+<!-- Giscus Comments -->
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
