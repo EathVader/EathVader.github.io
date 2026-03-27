@@ -20,25 +20,26 @@ a:hover { text-decoration: underline; }
 }
 .hero p { color: #94a3b8; font-size: 1.1rem; }
 
-/* ===== Grid ===== */
+/* ===== List ===== */
 .grid {
   max-width: 800px; margin: 2rem auto; padding: 0 1.5rem;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.25rem;
+  display: flex; flex-direction: column; gap: .75rem;
 }
 
 /* ===== Card ===== */
 .card {
-  background: #1e293b; border: 1px solid #334155; border-radius: 12px;
-  padding: 1.5rem; transition: border-color .2s, transform .2s; display: block;
+  background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+  padding: 1rem 1.25rem; transition: border-color .2s, transform .2s; display: flex;
+  align-items: center; gap: 1rem;
 }
-.card:hover { border-color: #60a5fa; transform: translateY(-2px); text-decoration: none; }
+.card:hover { border-color: #60a5fa; transform: translateX(4px); text-decoration: none; }
 .card .tag {
-  display: inline-block; background: #172554; color: #60a5fa;
-  font-size: .75rem; padding: .2rem .6rem; border-radius: 999px; margin-bottom: .75rem;
+  flex-shrink: 0; background: #172554; color: #60a5fa;
+  font-size: .7rem; padding: .15rem .5rem; border-radius: 999px;
 }
-.card h2 { font-size: 1.25rem; color: #f8fafc; margin-bottom: .5rem; }
-.card p { color: #94a3b8; font-size: .9rem; line-height: 1.6; }
-.card .meta { margin-top: .75rem; font-size: .8rem; color: #64748b; }
+.card h2 { font-size: 1rem; color: #f8fafc; margin: 0; flex: 1; }
+.card p { display: none; }
+.card .meta { display: none; }
 
 /* ===== Footer ===== */
 footer { text-align: center; padding: 3rem 1rem 2rem; color: #475569; font-size: .85rem; }
