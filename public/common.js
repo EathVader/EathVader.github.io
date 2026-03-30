@@ -118,3 +118,41 @@ window.CommonUtils = {
   scrollToTop,
   scrollToElement
 };
+
+// ===== 添加浮动返回主页按钮 =====
+(function() {
+  if (window.location.pathname === '/' || window.location.pathname === '/index.html') return;
+  
+  const style = document.createElement('style');
+  style.textContent = `
+    .home-btn {
+      position: fixed;
+      bottom: 2rem;
+      left: 2rem;
+      width: 3rem;
+      height: 3rem;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      text-decoration: none;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+      z-index: 1000;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .home-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
+    }
+  `;
+  document.head.appendChild(style);
+  
+  const btn = document.createElement('a');
+  btn.href = '/';
+  btn.className = 'home-btn';
+  btn.innerHTML = '🏠';
+  btn.title = '返回主页';
+  document.body.appendChild(btn);
+})();
