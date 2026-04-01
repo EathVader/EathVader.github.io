@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="从输入URL到页面显示的完整过程：DNS解析、TCP连接、HTTPS、TLS握手、HTTP请求、渲染">
+<meta property="og:type" content="article">
+<meta property="og:title" content="从输入URL到页面显示">
+<meta property="og:description" content="从输入URL到页面显示的完整过程：DNS解析、TCP连接、HTTPS、TLS握手、HTTP请求、渲染">
+<meta property="og:url" content="https://eathvader.github.io/url-to-page/">
+<meta property="og:image" content="">
+<title>从输入URL到页面显示 / What Happens When You Type a URL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "从输入URL到页面显示",
+  "description": "从输入URL到页面显示的完整过程：DNS解析、TCP连接、HTTPS、TLS握手、HTTP请求、渲染",
+  "author": {"@type": "Person", "name": "EathVader"},
+  "datePublished": "2026-04-01",
+  "dateModified": "2026-04-01",
+  "url": "https://eathvader.github.io/url-to-page/"
+}
+</script>
+</head>
+<body>
+
+<header class="hero">
+  <h1>🌐 <span>从输入URL到页面显示</span></h1>
+  <p class="subtitle">浏览器地址栏输入 google.com 后发生了什么？<br>DNS → TCP → TLS → HTTP → 渲染，完整流程一网打尽</p>
+  <span class="badge">🌐 Web</span>
+  <span class="badge">🎯 面试必考</span>
+  <span class="badge">🔗 网络协议</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-url">URL 解析</a></li>
+    <li><a href="#sec-dns">DNS 解析</a></li>
+    <li><a href="#sec-tcp">TCP 连接</a></li>
+    <li><a href="#sec-tls">TLS 握手 (HTTPS)</a></li>
+    <li><a href="#sec-http">HTTP 请求/响应</a></li>
+    <li><a href="#sec-render">页面渲染</a></li>
+    <li><a href="#sec-demo">交互演示</a></li>
+    <li><a href="#sec-summary">总结</a></li>
+  </ol>
+</nav>
+
+<section id="sec-url">
+<h2 class="section-title"><span class="num">1</span> URL 解析</h2>
+
+<div class="analogy">
+  <div class="emoji">📝</div>
+  <h4>类比：写信封</h4>
+  <p>输入 URL 后，浏览器首先<strong>解析 URL</strong>，就像写信封一样：</p>
+  <ul>
+    <li><strong>协议</strong>（scheme）：用什么方式寄信（HTTP/HTTPS）</li>
+    <li><strong>域名</strong>（hostname）：收件人地址（google.com）</li>
+    <li><strong>端口</strong>（port）：找哪个门卫（默认 80/443）</li>
+    <li><strong>路径</strong>（path）：具体楼层（/index.html）</li>
+    <li><strong>参数</strong>（query）：信的内容（?id=123）</li>
+  </ul>
+</div>
+
+<div class="box box-blue">
+  <div class="title">📝 URL 格式</div>
+  <pre style="margin:.5rem 0;font-size:11px;color:#e2e8f0"><code>protocol://hostname:port/path?query#fragment</code></pre>
+  <p>例如：<code>https://www.google.com:443/search?q=hello#results</code></p>
+</div>
+
+<p>解析过程：</p>
+
+<ol>
+  <li>检查协议，如果是 <code>http</code> 补全为 <code>http://</code>，<code>https</code> 补全为 <code>https://</code></li>
+  <li>提取域名、端口、路径、参数</li>
+  <li>检查缓存（浏览器缓存、操作系统缓存）</li>
+  <li>如果缓存未命中，发起网络请求</li>
+</ol>
+</section>
+
+<section id="sec-dns">
+<h2 class="section-title"><span class="num">2</span> DNS 解析</h2>
+
+<p>浏览器需要将域名转换为 IP 地址：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 140" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">DNS 解析流程</text>
+    <!-- Steps -->
+    <rect x="30" y="35" width="80" height="35" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="70" y="57" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">浏览器缓存</text>
+    <line x1="110" y1="52" x2="140" y2="52" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="3"/>
+    <rect x="140" y="35" width="80" height="35" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="180" y="57" text-anchor="middle" fill="#86efac" font-size="10" font-family="Inter">系统缓存</text>
+    <line x1="220" y1="52" x2="250" y2="52" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="3"/>
+    <rect x="250" y="35" width="100" height="35" rx="6" fill="#451a03" stroke="#f59e0b"/>
+    <text x="300" y="57" text-anchor="middle" fill="#fcd34d" font-size="10" font-family="Inter">本地 DNS</text>
+    <line x1="350" y1="52" x2="380" y2="52" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="3"/>
+    <rect x="380" y="35" width="80" height="35" rx="6" fill="#450a0a" stroke="#ef4444"/>
+    <text x="420" y="57" text-anchor="middle" fill="#fca5a5" font-size="10" font-family="Inter">根服务器</text>
+    <line x1="460" y1="52" x2="490" y2="52" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="3"/>
+    <rect x="490" y="35" width="80" height="35" rx="6" fill="#334155" stroke="#475569"/>
+    <text x="530" y="57" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">返回 IP</text>
+    <text x="300" y="100" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">缓存命中则直接返回，否则递归查询</text>
+  </svg>
+</div>
+
+<div class="box box-green">
+  <div class="title">💡 DNS 缓存层级</h1>
+  <ol>
+    <li>浏览器 DNS 缓存（TTL 约 1 分钟）</li>
+    <li>操作系统 DNS 缓存（TTL 约 1 小时）</li>
+    <li>本地 DNS 服务器（ISP DNS，TTL 几小时）</li>
+    <li>根服务器 → TLD 服务器 → 权威 DNS</li>
+  </ol>
+</div>
+</section>
+
+<section id="sec-tcp">
+<h2 class="section-title"><span class="num">3</span> TCP 连接</h2>
+
+<p>获取 IP 后，浏览器与服务器建立 TCP 连接（如果是 HTTPS 则还有 TLS）：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 120" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">TCP 三次握手</text>
+    <!-- Client -->
+    <rect x="30" y="40" width="80" height="40" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="70" y="65" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">客户端</text>
+    <!-- Server -->
+    <rect x="490" y="40" width="80" height="40" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="530" y="65" text-anchor="middle" fill="#86efac" font-size="10" font-family="Inter">服务器</text>
+    <!-- SYN -->
+    <line x1="110" y1="50" x2="250" y2="50" stroke="#ef4444" stroke-width="2" marker-end="url(#arr2)"/>
+    <text x="180" y="42" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">SYN</text>
+    <!-- SYN-ACK -->
+    <line x1="350" y1="60" x2="490" y2="60" stroke="#22c55e" stroke-width="2" marker-end="url(#arr2)"/>
+    <text x="420" y="52" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">SYN+ACK</text>
+    <!-- ACK -->
+    <line x1="250" y1="80" x2="110" y2="80" stroke="#60a5fa" stroke-width="2" marker-end="url(#arr2)"/>
+    <text x="180" y="95" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">ACK</text>
+    <text x="300" y="110" text-anchor="middle" fill="#86efac" font-size="10" font-weight="600" font-family="Inter">→ 连接建立</text>
+  </svg>
+</div>
+
+<div class="analogy">
+  <div class="emoji">📞</div>
+  <h4>类比：打电话</h4>
+  <ul>
+    <li>你拨通号码（发送 SYN）</li>
+    <li>对方接听并确认（返回 SYN+ACK）</li>
+    <li>你说"好的"（发送 ACK）</li>
+    <li>现在开始通话（TCP 连接建立）</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-tls">
+<h2 class="section-title"><span class="num">4</span> TLS 握手 (HTTPS)</h2>
+
+<p>如果使用 HTTPS，还需要进行 TLS 握手来建立加密通道：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 180" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">TLS 1.2 握手过程</text>
+    <!-- Steps -->
+    <rect x="30" y="35" width="540" height="30" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="300" y="55" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">ClientHello: 支持的密码套件、随机数</text>
+    <rect x="30" y="70" width="540" height="30" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="300" y="90" text-anchor="middle" fill="#86efac" font-size="10" font-family="Inter">ServerHello: 选定密码套件、服务器随机数、证书</text>
+    <rect x="30" y="105" width="540" height="30" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="300" y="125" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">客户端验证证书，生成预主密钥，用公钥加密发送</text>
+    <rect x="30" y="140" width="540" height="30" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="300" y="160" text-anchor="middle" fill="#86efac" font-size="10" font-family="Inter">双方用预主密钥生成会话密钥，握手完成</text>
+  </svg>
+</div>
+
+<div class="box box-blue">
+  <div class="title">📝 TLS 握手关键步骤</h1>
+  <ol>
+    <li><strong>ClientHello</strong>：客户端发送支持的密码套件列表、随机数</li>
+    <li><strong>ServerHello</strong>：服务器选择密码套件、发送证书、服务器随机数</li>
+    <li><strong>证书验证</strong>：客户端验证服务器证书（是否过期、是否可信）</li>
+    <li><strong>密钥交换</strong>：客户端生成预主密钥，用服务器公钥加密发送</li>
+    <li><strong>会话密钥生成</strong>：双方用预主密钥 + 随机数生成会话密钥</li>
+  </ol>
+</div>
+
+<div class="box box-amber">
+  <div class="title">⚠️ HTTPS 跳转</h1>
+  <p>如果输入的是 <code>http://google.com</code>，服务器会返回 <strong>301/302 重定向</strong>，让浏览器跳转到 <code>https://</code> 版本。</p>
+</div>
+</section>
+
+<section id="sec-http">
+<h2 class="section-title"><span class="num">5</span> HTTP 请求/响应</h2>
+
+<p>TCP/TLS 连接建立后，浏览器发送 HTTP 请求，服务器返回响应：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 160" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">HTTP 请求-响应</text>
+    <!-- Request -->
+    <rect x="30" y="35" width="260" height="110" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="160" y="55" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="600" font-family="Inter">HTTP 请求</text>
+    <text x="160" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="JetBrains Mono">GET / HTTP/1.1</text>
+    <text x="160" y="90" text-anchor="middle" fill="#64748b" font-size="9" font-family="JetBrains Mono">Host: google.com</text>
+    <text x="160" y="105" text-anchor="middle" fill="#64748b" font-size="9" font-family="JetBrains Mono">User-Agent: ...</text>
+    <text x="160" y="125" text-anchor="middle" fill="#64748b" font-size="9" font-family="JetBrains Mono">Accept: text/html</text>
+    <!-- Arrow -->
+    <line x1="300" y1="85" x2="320" y2="85" stroke="#60a5fa" stroke-width="2" marker-end="url(#arr4)"/>
+    <!-- Response -->
+    <rect x="330" y="35" width="240" height="110" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="450" y="55" text-anchor="middle" fill="#86efac" font-size="11" font-weight="600" font-family="Inter">HTTP 响应</text>
+    <text x="450" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="JetBrains Mono">HTTP/1.1 200 OK</text>
+    <text x="450" y="90" text-anchor="middle" fill="#64748b" font-size="9" font-family="JetBrains Mono">Content-Type: text/html</text>
+    <text x="450" y="105" text-anchor="middle" fill="#64748b" font-size="9" font-family="JetBrains Mono">Content-Length: ...</text>
+    <text x="450" y="125" text-anchor="middle" fill="#64748b" font-size="9" font-family="JetBrains Mono">&lt;html&gt;...&lt;/html&gt;</text>
+  </svg>
+</div>
+
+<h3>HTTP/2 和 HTTP/3</h3>
+
+<div class="box box-green">
+  <div class="title">🚀 性能优化</h1>
+  <ul>
+    <li><strong>HTTP/1.1</strong>：持久连接、管道化（但串行处理）</li>
+    <li><strong>HTTP/2</strong>：多路复用、头部压缩、服务器推送</li>
+    <li><strong>HTTP/3</strong>：QUIC 协议（UDP）、无队头阻塞、0-RTT</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-render">
+<h2 class="section-title"><span class="num">6</span> 页面渲染</h2>
+
+<p>浏览器收到 HTML 后，开始渲染页面：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">浏览器渲染流程</text>
+    <!-- DOM -->
+    <rect x="30" y="35" width="120" height="30" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="90" y="55" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="600" font-family="Inter">HTML 解析</text>
+    <text x="90" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">→ DOM 树</text>
+    <!-- CSS -->
+    <rect x="160" y="35" width="120" height="30" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="220" y="55" text-anchor="middle" fill="#86efac" font-size="10" font-weight="600" font-family="Inter">CSS 解析</text>
+    <text x="220" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">→ CSSOM</text>
+    <!-- Render Tree -->
+    <rect x="290" y="35" width="120" height="30" rx="4" fill="#451a03" stroke="#f59e0b"/>
+    <text x="350" y="55" text-anchor="middle" fill="#fcd34d" font-size="10" font-weight="600" font-family="Inter">合成渲染树</text>
+    <text x="350" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">DOM + CSSOM</text>
+    <!-- Layout -->
+    <rect x="420" y="35" width="150" height="30" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="495" y="55" text-anchor="middle" fill="#fca5a5" font-size="10" font-weight="600" font-family="Inter">布局 (Layout)</text>
+    <text x="495" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">计算位置和大小</text>
+    <!-- Paint -->
+    <rect x="160" y="110" width="280" height="30" rx="4" fill="#334155" stroke="#475569"/>
+    <text x="300" y="130" text-anchor="middle" fill="#94a3b8" font-size="10" font-weight="600" font-family="Inter">绘制 (Paint)</text>
+    <text x="300" y="150" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">将渲染树绘制成位图层</text>
+    <!-- Composite -->
+    <rect x="160" y="160" width="280" height="25" rx="4" fill="#1e293b" border="1" stroke="#475569"/>
+    <text x="300" y="177" text-anchor="middle" fill="#e2e8f0" font-size="10" font-weight="600" font-family="Inter">合成 (Composite)</text>
+    <text x="300" y="192" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">合成 layers 显示在屏幕上</text>
+  </svg>
+</div>
+
+<div class="timeline">
+  <div class="timeline-item">
+    <div class="tl-label">❶ HTML 解析</div>
+    <p>浏览器解析 HTML，生成 DOM 树</p>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">❷ CSS 解析</div>
+    <p>解析 CSS，生成 CSSOM（CSS Object Model）</p>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">❸ 合成渲染树</div>
+    <p>DOM + CSSOM = 渲染树（Render Tree）</p>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">❹ 布局</div>
+    <p>计算每个节点的位置和大小</p>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">❺ 绘制</div>
+    <p>将渲染树绘制成位图层</p>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">❻ 合成</div>
+    <p>合成 layers，显示在屏幕上</p>
+  </div>
+</div>
+
+<h3>渲染优化</h3>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 关键渲染路径</h1>
+  <p>从请求到首次渲染的时间（FCP/LCP）受以下因素影响：</p>
+  <ul>
+    <li>DNS 解析时间</li>
+    <li>TCP/TLS 握手时间</li>
+    <li>服务器响应时间</li>
+    <li>HTML/CSS/JS 下载和解析时间</li>
+    <li>渲染树构建和布局时间</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">7</span> 交互演示</h2>
+
+<div class="demo">
+  <h4>🎮 完整流程演示</h4>
+  <p>观察从输入 URL 到页面显示的完整过程：</p>
+  <div style="display:flex;gap:.5rem;margin-bottom:1rem">
+    <button onclick="startFullFlow()">▶️ 开始</button>
+    <button onclick="resetFullFlow()" style="background:linear-gradient(135deg,#64748b,#475569)">🔄 重置</button>
+  </div>
+  <div id="flow-demo" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin:1rem 0">
+    <div id="flow-url" class="flow-step" style="background:#1e293b;border:2px solid #334155;border-radius:6px;padding:.5rem;text-align:center">
+      <div style="color:#93c5fd;font-size:10px;font-weight:600">URL 解析</div>
+      <div id="url-status" style="color:#64748b;font-size:9px;margin-top:.25rem">-</div>
+    </div>
+    <div id="flow-dns" class="flow-step" style="background:#1e293b;border:2px solid #334155;border-radius:6px;padding:.5rem;text-align:center">
+      <div style="color:#86efac;font-size:10px;font-weight:600">DNS 解析</div>
+      <div id="dns-status" style="color:#64748b;font-size:9px;margin-top:.25rem">-</div>
+    </div>
+    <div id="flow-tcp" class="flow-step" style="background:#1e293b;border:2px solid #334155;border-radius:6px;padding:.5rem;text-align:center">
+      <div style="color:#fcd34d;font-size:10px;font-weight:600">TCP 连接</div>
+      <div id="tcp-status" style="color:#64748b;font-size:9px;margin-top:.25rem">-</div>
+    </div>
+    <div id="flow-tls" class="flow-step" style="background:#1e293b;border:2px solid #334155;border-radius:6px;padding:.5rem;text-align:center">
+      <div style="color:#fca5a5;font-size:10px;font-weight:600">TLS 握手</div>
+      <div id="tls-status" style="color:#64748b;font-size:9px;margin-top:.25rem">-</div>
+    </div>
+    <div id="flow-http" class="flow-step" style="background:#1e293b;border:2px solid #334155;border-radius:6px;padding:.5rem;text-align:center">
+      <div style="color:#a78bfa;font-size:10px;font-weight:600">HTTP 请求</div>
+      <div id="http-status" style="color:#64748b;font-size:9px;margin-top:.25rem">-</div>
+    </div>
+    <div id="flow-render" class="flow-step" style="background:#1e293b;border:2px solid #334155;border-radius:6px;padding:.5rem;text-align:center">
+      <div style="color:#94a3b8;font-size:10px;font-weight:600">页面渲染</div>
+      <div id="render-status" style="color:#64748b;font-size:9px;margin-top:.25rem">-</div>
+    </div>
+  </div>
+  <div class="output" id="flow-output" style="min-height:60px;padding:.75rem;background:#1e293b;border-radius:6px;color:#94a3b8;font-size:12px;font-family:monospace">
+    点击"开始"按钮开始演示...
+  </div>
+</div>
+
+<div class="demo">
+  <h4>⏱️ 各阶段耗时（参考值）</h4>
+  <table style="font-size:11px">
+    <tr><th>阶段</th><th>耗时（参考）</th></tr>
+    <tr><td>DNS 解析</td><td>20-100ms</td></tr>
+    <tr><td>TCP 连接</td><td>20-100ms</td></tr>
+    <tr><td>TLS 握手</td><td>100-300ms</td></tr>
+    <tr><td>HTTP 请求</td><td>取决于服务器和网络</td></tr>
+    <tr><td>页面渲染</td><td>100-500ms</td></tr>
+  </table>
+</div>
+</section>
+
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">8</span> 总结</h2>
+
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">URL解析<br><small>协议/域名</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">DNS<br><small>域名→IP</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">TCP<br><small>三次握手</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#ef4444">TLS<br><small>加密通道</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#a855f7">HTTP<br><small>请求响应</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#64748b">渲染<br><small>DOM+CSS</small></div>
+</div>
+
+<h3>核心知识点</h3>
+
+<table>
+  <tr><th>概念</th><th>说明</th></tr>
+  <tr><td>URL 解析</td><td>提取协议、域名、端口、路径</td></tr>
+  <tr><td>DNS 解析</td><td>缓存 → 本地 DNS → 根 → TLD → 权威</td></tr>
+  <tr><td>TCP 三次握手</td><td>SYN → SYN+ACK → ACK</td></tr>
+  <tr><td>TLS 握手</td><td>证书验证 → 密钥交换 → 会话密钥</td></tr>
+  <tr><td>HTTP 请求</td><td>请求行 + 头 + 体</td></tr>
+  <tr><td>渲染流程</td><td>HTML解析 → CSS解析 → 渲染树 → 布局 → 绘制 → 合成</td></tr>
+</table>
+
+<div class="box box-purple">
+  <div class="title">📚 延伸阅读</h1>
+  <ul>
+    <li><a href="https://xiaolincoding.com/network/2_http/http_dispond.html" target="_blank">小林coding - 从输入URL到页面显示</a></li>
+    <li><a href="https://github.com/EathVader/EathVader.github.io/blob/main/public/url-to-page/index.html" target="_blank">本文源码</a></li>
+  </ul>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p><a href="../dns/">← DNS 详解</a> | <a href="../">返回主页</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+let flowTimer = null;
+const flowSteps = [
+  { id: 'url', status: 'url-status', text: '解析 URL：https://google.com，提取协议、域名、路径', color: '#3b82f6' },
+  { id: 'dns', status: 'dns-status', text: 'DNS 解析：查询本地缓存 → 本地 DNS → 根服务器 → 返回 IP', color: '#22c55e' },
+  { id: 'tcp', status: 'tcp-status', text: 'TCP 三次握手：客户端 SYN → 服务器 SYN+ACK → 客户端 ACK', color: '#f59e0b' },
+  { id: 'tls', status: 'tls-status', text: 'TLS 握手：ClientHello → ServerHello+证书 → 密钥交换 → 加密通道', color: '#ef4444' },
+  { id: 'http', status: 'http-status', text: 'HTTP 请求：GET / HTTP/1.1，服务器返回 200 OK + HTML', color: '#a855f7' },
+  { id: 'render', status: 'render-status', text: '页面渲染：HTML解析 → CSS解析 → 渲染树 → 布局 → 绘制 → 合成', color: '#94a3b8' }
+];
+
+function startFullFlow() {
+  resetFullFlow();
+  let idx = 0;
+  function next() {
+    if (idx >= flowSteps.length) {
+      document.getElementById('flow-output').innerHTML = '✅ <strong>页面渲染完成！</strong><br>完整的网络请求-响应-渲染流程结束。';
+      return;
+    }
+    const s = flowSteps[idx];
+    document.getElementById(s.status).textContent = '✓';
+    document.getElementById('flow-' + s.id).style.borderColor = s.color;
+    document.getElementById('flow-output').textContent = s.text;
+    idx++;
+    flowTimer = setTimeout(next, 1200);
+  }
+  next();
+}
+
+function resetFullFlow() {
+  if (flowTimer) clearTimeout(flowTimer);
+  flowSteps.forEach(s => {
+    document.getElementById(s.status).textContent = '-';
+    document.getElementById('flow-' + s.id).style.borderColor = '#334155';
+  });
+  document.getElementById('flow-output').textContent = '点击"开始"按钮开始演示...';
+}
+
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => {
+  btn.classList.toggle('show', window.scrollY > 400);
+});
+</script>
+
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

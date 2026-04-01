@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="HTTP协议详解：从请求响应格式到方法、状态码、头信息，含交互式演示">
+<meta property="og:type" content="article">
+<meta property="og:title" content="HTTP 协议详解">
+<meta property="og:description" content="HTTP协议详解：从请求响应格式到方法、状态码、头信息，含交互式演示">
+<meta property="og:url" content="https://eathvader.github.io/http/">
+<meta property="og:image" content="">
+<title>HTTP 协议详解 / HTTP Protocol</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "HTTP 协议详解",
+  "description": "HTTP协议详解：从请求响应格式到方法、状态码、头信息，含交互式演示",
+  "author": {"@type": "Person", "name": "EathVader"},
+  "datePublished": "2026-04-01",
+  "dateModified": "2026-04-01",
+  "url": "https://eathvader.github.io/http/"
+}
+</script>
+</head>
+<body>
+
+<header class="hero">
+  <h1>🌐 <span>HTTP 协议</span> 详解</h1>
+  <p class="subtitle">从请求响应格式到方法、状态码、头信息<br>通过交互式演示深入理解 Web 的基石协议</p>
+  <span class="badge">🌐 Web</span>
+  <span class="badge">📡 应用层</span>
+  <span class="badge">🎯 面试必考</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-basics">HTTP 是什么？</a></li>
+    <li><a href="#sec-request">HTTP 请求</a></li>
+    <li><a href="#sec-response">HTTP 响应</a></li>
+    <li><a href="#sec-methods">请求方法</a></li>
+    <li><a href="#sec-status">状态码</a></li>
+    <li><a href="#sec-demo">交互演示</a></li>
+    <li><a href="#sec-summary">总结</a></li>
+  </ol>
+</nav>
+
+<section id="sec-basics">
+<h2 class="section-title"><span class="num">1</span> HTTP 是什么？</h2>
+
+<div class="analogy">
+  <div class="emoji">📬</div>
+  <h4>生活类比：邮递系统</h4>
+  <p>HTTP 就像邮递系统中的<strong>信件格式规范</strong>：</p>
+  <ul>
+    <li>信封格式（请求行/状态行）</li>
+    <li>信件内容格式（头信息）</li>
+    <li>信件正文（请求/响应体）</li>
+    <li>邮编/地址（URL）</li>
+  </ul>
+  <p>无论你寄什么信，都得按这个格式来，邮递员才能帮你送达。</p>
+</div>
+
+<div class="box box-blue">
+  <div class="title">💡 核心概念</div>
+  <ul>
+    <li><strong>HTTP</strong>（HyperText Transfer Protocol）：超文本传输协议</li>
+    <li><strong>客户端-服务器</strong>：浏览器发起请求，服务器返回响应</li>
+    <li><strong>无状态</strong>：每个请求都是独立的，服务器不记得之前的请求</li>
+    <li><strong>明文传输</strong>：数据以明文形式发送（ HTTPS 是加密版本）</li>
+  </ul>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 140" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">HTTP 请求-响应模型</text>
+    <!-- Client -->
+    <rect x="30" y="45" width="100" height="60" rx="8" fill="#172554" stroke="#3b82f6"/>
+    <text x="80" y="70" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="600" font-family="Inter">浏览器</text>
+    <text x="80" y="90" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">客户端</text>
+    <!-- Server -->
+    <rect x="470" y="45" width="100" height="60" rx="8" fill="#14532d" stroke="#22c55e"/>
+    <text x="520" y="70" text-anchor="middle" fill="#86efac" font-size="12" font-weight="600" font-family="Inter">Web 服务器</text>
+    <text x="520" y="90" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">Nginx/Apache</text>
+    <!-- Request -->
+    <line x1="130" y1="60" x2="250" y2="60" stroke="#ef4444" stroke-width="2" marker-end="url(#arr)"/>
+    <rect x="150" y="48" width="80" height="20" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="190" y="62" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="Inter">Request</text>
+    <!-- Response -->
+    <line x1="370" y1="90" x2="470" y2="90" stroke="#22c55e" stroke-width="2" marker-end="url(#arr)"/>
+    <rect x="370" y="78" width="80" height="20" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="410" y="92" text-anchor="middle" fill="#86efac" font-size="9" font-family="Inter">Response</text>
+  </svg>
+</div>
+</section>
+
+<section id="sec-request">
+<h2 class="section-title"><span class="num">2</span> HTTP 请求</h2>
+
+<p>HTTP 请求由四部分组成：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">HTTP 请求格式</text>
+    <!-- Request Line -->
+    <rect x="30" y="35" width="540" height="30" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="300" y="55" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="JetBrains Mono">GET /index.html HTTP/1.1</text>
+    <text x="540" y="55" text-anchor="end" fill="#f59e0b" font-size="8" font-family="Inter">请求行</text>
+    <!-- Headers -->
+    <rect x="30" y="70" width="540" height="60" rx="4" fill="#1e293b" stroke="#475569"/>
+    <text x="50" y="85" text-anchor="start" fill="#94a3b8" font-size="9" font-family="JetBrains Mono">Host: www.example.com</text>
+    <text x="50" y="105" text-anchor="start" fill="#94a3b8" font-size="9" font-family="JetBrains Mono">User-Agent: Mozilla/5.0</text>
+    <text x="50" y="120" text-anchor="start" fill="#94a3b8" font-size="9" font-family="JetBrains Mono">Accept: text/html</text>
+    <text x="540" y="85" text-anchor="end" fill="#f59e0b" font-size="8" font-family="Inter">请求头</text>
+    <!-- Empty Line -->
+    <line x1="30" y1="135" x2="570" y2="135" stroke="#64748b" stroke-width="1" stroke-dasharray="2"/>
+    <text x="540" y="135" text-anchor="end" fill="#f59e0b" font-size="8" font-family="Inter">空行</text>
+    <!-- Body -->
+    <rect x="30" y="145" width="540" height="40" rx="4" fill="#0f172a" stroke="#334155"/>
+    <text x="50" y="162" text-anchor="start" fill="#64748b" font-size="9" font-family="JetBrains Mono">username=admin&password=123456</text>
+    <text x="540" y="162" text-anchor="end" fill="#f59e0b" font-size="8" font-family="Inter">请求体</text>
+  </svg>
+</div>
+
+<h3>请求行</h3>
+
+<div class="box box-blue">
+  <div class="title">📝 格式</div>
+  <pre style="margin:.5rem 0"><code>方法 URI HTTP版本</code></pre>
+  <p>例如：<code>GET /api/users HTTP/1.1</code></p>
+</div>
+
+<h3>请求头</h3>
+
+<table>
+  <tr><th>常见头</th><th>说明</th></tr>
+  <tr><td>Host</td><td>目标服务器域名和端口</td></tr>
+  <tr><td>User-Agent</td><td>客户端标识（浏览器信息）</td></tr>
+  <tr><td>Accept</td><td>客户端能接受的响应类型</td></tr>
+  <tr><td>Content-Type</td><td>请求体的类型</td></tr>
+  <tr><td>Content-Length</td><td>请求体的长度</td></tr>
+  <tr><td>Cookie</td><td>Cookie 信息</td></tr>
+  <tr><td>Authorization</td><td>认证信息</td></tr>
+</table>
+
+<h3>请求体</h3>
+
+<p>GET 请求通常没有请求体，POST/PUT 请求才有。常见格式：</p>
+
+<ul>
+  <li><code>application/x-www-form-urlencoded</code>：表单数据</li>
+  <li><code>application/json</code>：JSON 数据</li>
+  <li><code>multipart/form-data</code>：文件上传</li>
+</ul>
+</section>
+
+<section id="sec-response">
+<h2 class="section-title"><span class="num">3</span> HTTP 响应</h2>
+
+<p>HTTP 响应也由四部分组成：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">HTTP 响应格式</text>
+    <!-- Status Line -->
+    <rect x="30" y="35" width="540" height="30" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="300" y="55" text-anchor="middle" fill="#86efac" font-size="10" font-family="JetBrains Mono">HTTP/1.1 200 OK</text>
+    <text x="540" y="55" text-anchor="end" fill="#f59e0b" font-size="8" font-family="Inter">状态行</text>
+    <!-- Headers -->
+    <rect x="30" y="70" width="540" height="60" rx="4" fill="#1e293b" stroke="#475569"/>
+    <text x="50" y="85" text-anchor="start" fill="#94a3b8" font-size="9" font-family="JetBrains Mono">Content-Type: text/html</text>
+    <text x="50" y="105" text-anchor="start" fill="#94a3b8" font-size="9" font-family="JetBrains Mono">Content-Length: 1234</text>
+    <text x="50" y="120" text-anchor="start" fill="#94a3b8" font-size="9" font-family="JetBrains Mono">Server: Nginx</text>
+    <text x="540" y="85" text-anchor="end" fill="#f59e0b" font-size="8" font-family="Inter">响应头</text>
+    <!-- Empty Line -->
+    <line x1="30" y1="135" x2="570" y2="135" stroke="#64748b" stroke-width="1" stroke-dasharray="2"/>
+    <text x="540" y="135" text-anchor="end" fill="#f59e0b" font-size="8" font-family="Inter">空行</text>
+    <!-- Body -->
+    <rect x="30" y="145" width="540" height="40" rx="4" fill="#0f172a" stroke="#334155"/>
+    <text x="50" y="162" text-anchor="start" fill="#e2e8f0" font-size="9" font-family="JetBrains Mono">&lt;html&gt;...&lt;/html&gt;</text>
+    <text x="540" y="162" text-anchor="end" fill="#f59e0b" font-size="8" font-family="Inter">响应体</text>
+  </svg>
+</div>
+
+<h3>状态行</h3>
+
+<div class="box box-blue">
+  <div class="title">📝 格式</div>
+  <pre style="margin:.5rem 0"><code>HTTP版本 状态码 原因短语</code></pre>
+  <p>例如：<code>HTTP/1.1 404 Not Found</code></p>
+</div>
+
+<h3>响应头</h3>
+
+<table>
+  <tr><th>常见头</th><th>说明</th></tr>
+  <tr><td>Content-Type</td><td>响应体的类型</td></tr>
+  <tr><td>Content-Length</td><td>响应体的长度</td></tr>
+  <tr><td>Server</td><td>服务器信息</td></tr>
+  <tr><td>Date</td><td>响应时间</td></tr>
+  <tr><td>Set-Cookie</td><td>设置 Cookie</td></tr>
+  <tr><td>Cache-Control</td><td>缓存控制</td></tr>
+  <tr><td>Location</td><td>重定向地址</td></tr>
+</table>
+</section>
+
+<section id="sec-methods">
+<h2 class="section-title"><span class="num">4</span> 请求方法</h2>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 160" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">HTTP 方法分类</text>
+    <!-- Safe -->
+    <rect x="30" y="35" width="260" height="90" rx="8" fill="#14532d" border="1" stroke="#22c55e"/>
+    <text x="160" y="55" text-anchor="middle" fill="#86efac" font-size="11" font-weight="600" font-family="Inter">Safe（只读）</text>
+    <text x="160" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">GET</text>
+    <text x="160" y="90" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">HEAD</text>
+    <text x="160" y="105" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">OPTIONS</text>
+    <!-- Idempotent -->
+    <rect x="310" y="35" width="260" height="90" rx="8" fill="#451a03" border="1" stroke="#f59e0b"/>
+    <text x="440" y="55" text-anchor="middle" fill="#fcd34d" font-size="11" font-weight="600" font-family="Inter">Idempotent（幂等）</text>
+    <text x="440" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">PUT</text>
+    <text x="440" y="90" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">DELETE</text>
+    <!-- None -->
+    <rect x="30" y="135" width="540" height="20" rx="4" fill="#450a0a" border="1" stroke="#ef4444"/>
+    <text x="300" y="149" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="Inter">POST（既不安全也不幂等）</text>
+  </svg>
+</div>
+
+<table>
+  <tr><th>方法</th><th>说明</th><th>幂等</th></tr>
+  <tr><td><strong>GET</strong></td><td>获取资源</td><td>✓</td></tr>
+  <tr><td><strong>POST</strong></td><td>创建资源</td><td>✗</td></tr>
+  <tr><td><strong>PUT</strong></td><td>完全替换资源</td><td>✓</td></tr>
+  <tr><td><strong>DELETE</strong></td><td>删除资源</td><td>✓</td></tr>
+  <tr><td><strong>PATCH</strong></td><td>部分更新资源</td><td>✗</td></tr>
+  <tr><td><strong>HEAD</strong></td><td>只获取头部，不获取体</td><td>✓</td></tr>
+  <tr><td><strong>OPTIONS</strong></td><td>查询支持的 HTTP 方法</td><td>✓</td></tr>
+</table>
+
+<div class="analogy">
+  <div class="emoji">📋</div>
+  <h4>类比：图书馆</h4>
+  <ul>
+    <li><strong>GET</strong>：查书（只看不改）</li>
+    <li><strong>POST</strong>：新书入库（创建）</li>
+    <li><strong>PUT</strong>：书架整层替换（完全替换）</li>
+    <li><strong>DELETE</strong>：销毁图书</li>
+    <li><strong>PATCH</strong>：更新书的某一页</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-status">
+<h2 class="section-title"><span class="num">5</span> 状态码</h2>
+
+<p>状态码分为 5 类：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 100" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">状态码分类</text>
+    <!-- 1xx -->
+    <rect x="30" y="30" width="100" height="50" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="80" y="50" text-anchor="middle" fill="#93c5fd" font-size="14" font-weight="700" font-family="Inter">1xx</text>
+    <text x="80" y="70" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">信息</text>
+    <!-- 2xx -->
+    <rect x="140" y="30" width="100" height="50" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="190" y="50" text-anchor="middle" fill="#86efac" font-size="14" font-weight="700" font-family="Inter">2xx</text>
+    <text x="190" y="70" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">成功</text>
+    <!-- 3xx -->
+    <rect x="250" y="30" width="100" height="50" rx="6" fill="#451a03" stroke="#f59e0b"/>
+    <text x="300" y="50" text-anchor="middle" fill="#fcd34d" font-size="14" font-weight="700" font-family="Inter">3xx</text>
+    <text x="300" y="70" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">重定向</text>
+    <!-- 4xx -->
+    <rect x="360" y="30" width="100" height="50" rx="6" fill="#450a0a" stroke="#ef4444"/>
+    <text x="410" y="50" text-anchor="middle" fill="#fca5a5" font-size="14" font-weight="700" font-family="Inter">4xx</text>
+    <text x="410" y="70" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">客户端错误</text>
+    <!-- 5xx -->
+    <rect x="470" y="30" width="100" height="50" rx="6" fill="#450a0a" stroke="#dc2626"/>
+    <text x="520" y="50" text-anchor="middle" fill="#fca5a5" font-size="14" font-weight="700" font-family="Inter">5xx</text>
+    <text x="520" y="70" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">服务端错误</text>
+  </svg>
+</div>
+
+<h3>常见状态码</h3>
+
+<table>
+  <tr><th>状态码</th><th>说明</th></tr>
+  <tr><td><strong>200 OK</strong></td><td>请求成功</td></tr>
+  <tr><td><strong>201 Created</strong></td><td>资源创建成功</td></tr>
+  <tr><td><strong>204 No Content</strong></td><td>成功但无返回体</td></tr>
+  <tr><td><strong>301 Moved Permanently</strong></td><td>永久重定向</td></tr>
+  <tr><td><strong>302 Found</strong></td><td>临时重定向</td></tr>
+  <tr><td><strong>304 Not Modified</strong></td><td>使用缓存</td></tr>
+  <tr><td><strong>400 Bad Request</strong></td><td>请求格式错误</td></tr>
+  <tr><td><strong>401 Unauthorized</strong></td><td>需要认证</td></tr>
+  <tr><td><strong>403 Forbidden</strong></td><td>无权限</td></tr>
+  <tr><td><strong>404 Not Found</strong></td><td>资源不存在</td></tr>
+  <tr><td><strong>500 Internal Server Error</strong></td><td>服务器内部错误</td></tr>
+  <tr><td><strong>502 Bad Gateway</strong></td><td>网关错误</td></tr>
+  <tr><td><strong>503 Service Unavailable</strong></td><td>服务不可用</td></tr>
+</table>
+</section>
+
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">6</span> 交互演示</h2>
+
+<div class="demo">
+  <h4>🎮 构建 HTTP 请求</h4>
+  <p>选择方法和输入 URL，构建请求：</p>
+  <div style="display:flex;gap:.5rem;margin:1rem 0;flex-wrap:wrap">
+    <select id="method-select" style="padding:.5rem;background:#1e293b;border:1px solid #334155;border-radius:4px;color:#e2e8f0">
+      <option value="GET">GET</option>
+      <option value="POST">POST</option>
+      <option value="PUT">PUT</option>
+      <option value="DELETE">DELETE</option>
+    </select>
+    <input type="text" id="url-input" value="/api/users" style="flex:1;min-width:200px;padding:.5rem;background:#1e293b;border:1px solid #334155;border-radius:4px;color:#e2e8f0;font-family:monospace">
+    <button onclick="buildRequest()">构建</button>
+  </div>
+  <div id="request-preview" style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:1rem;font-family:monospace;font-size:11px;color:#e2e8f0;white-space:pre-wrap"></div>
+</div>
+
+<div class="demo">
+  <h4>🔢 状态码测试</h4>
+  <p>点击状态码查看说明：</p>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin:1rem 0">
+    <button onclick="showStatus(200)" style="background:#14532d;border:1px solid #22c55e">200</button>
+    <button onclick="showStatus(201)" style="background:#14532d;border:1px solid #22c55e">201</button>
+    <button onclick="showStatus(301)" style="background:#451a03;border:1px solid #f59e0b">301</button>
+    <button onclick="showStatus(302)" style="background:#451a03;border:1px solid #f59e0b">302</button>
+    <button onclick="showStatus(400)" style="background:#450a0a;border:1px solid #ef4444">400</button>
+    <button onclick="showStatus(401)" style="background:#450a0a;border:1px solid #ef4444">401</button>
+    <button onclick="showStatus(404)" style="background:#450a0a;border:1px solid #ef4444">404</button>
+    <button onclick="showStatus(500)" style="background:#450a0a;border:1px solid #dc2626">500</button>
+  </div>
+  <div id="status-detail" style="background:#1e293b;border-radius:6px;padding:1rem;color:#94a3b8;font-size:12px">
+    点击状态码查看详情...
+  </div>
+</div>
+</section>
+
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">7</span> 总结</h2>
+
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">请求<br><small>方法+URL+头+体</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">响应<br><small>状态码+头+体</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">方法<br><small>GET/POST/PUT/DELETE</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#ef4444">状态码<br><small>1xx~5xx</small></div>
+</div>
+
+<h3>核心知识点</h3>
+
+<table>
+  <tr><th>概念</th><th>说明</th></tr>
+  <tr><td>请求/响应格式</td><td>请求行/状态行 + 头 + 空行 + 体</td></tr>
+  <tr><td>请求方法</td><td>GET/POST/PUT/DELETE/PATCH</td></tr>
+  <tr><td>幂等性</td><td>GET/PUT/DELETE 幂等，POST/PATCH 不幂等</td></tr>
+  <tr><td>状态码</td><td>1xx 信息, 2xx 成功, 3xx 重定向, 4xx 客户端错误, 5xx 服务端错误</td></tr>
+  <tr><td>无状态</td><td>每个请求独立，Cookie/Session 实现状态</td></tr>
+</table>
+
+<div class="box box-purple">
+  <div class="title">📚 延伸阅读</div>
+  <ul>
+    <li><a href="https://xiaolincoding.com/network/2_http/http_basis.html" target="_blank">小林coding - HTTP 基础</a></li>
+    <li><a href="https://github.com/EathVader/EathVader.github.io/blob/main/public/http/index.html" target="_blank">本文源码</a></li>
+  </ul>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p><a href="../tcp-window/">← TCP 滑动窗口</a> | <a href="../">返回主页</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+const statusInfo = {
+  200: { desc: 'OK', detail: '请求成功，服务器返回请求的数据。' },
+  201: { desc: 'Created', detail: '资源创建成功，通常用于 POST 请求的响应。' },
+  301: { desc: 'Moved Permanently', detail: '永久重定向，请求的资源已永久移动到新位置。' },
+  302: { desc: 'Found', detail: '临时重定向，请求的资源临时移动到新位置。' },
+  400: { desc: 'Bad Request', detail: '请求语法错误或无法被服务器理解。' },
+  401: { desc: 'Unauthorized', detail: '请求需要用户认证（未提供认证信息）。' },
+  403: { desc: 'Forbidden', detail: '服务器理解请求，但拒绝执行（无权限）。' },
+  404: { desc: 'Not Found', detail: '请求的资源在服务器上不存在。' },
+  500: { desc: 'Internal Server Error', detail: '服务器内部错误，无法完成请求。' },
+  502: { desc: 'Bad Gateway', detail: '网关或代理服务器收到无效响应。' },
+  503: { desc: 'Service Unavailable', detail: '服务器暂时无法处理请求（过载或维护）。' }
+};
+
+function buildRequest() {
+  const method = document.getElementById('method-select').value;
+  const url = document.getElementById('url-input').value;
+  const preview = document.getElementById('request-preview');
+  
+  let req = `${method} ${url} HTTP/1.1\r\n`;
+  req += `Host: www.example.com\r\n`;
+  req += `User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)\r\n`;
+  req += `Accept: application/json\r\n`;
+  
+  if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
+    req += `Content-Type: application/json\r\n`;
+    req += `Content-Length: 42\r\n`;
+    req += `\r\n`;
+    req += `{"name": "张三", "age": 25}`;
+  } else {
+    req += `\r\n`;
+  }
+  
+  preview.textContent = req;
+}
+
+function showStatus(code) {
+  const info = statusInfo[code];
+  document.getElementById('status-detail').innerHTML = `<strong style="color:#fcd34d">${code} ${info.desc}</strong><br><br>${info.detail}`;
+}
+
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => {
+  btn.classList.toggle('show', window.scrollY > 400);
+});
+</script>
+
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="TCP三次握手详解，从为什么需要握手到Seq/Ack机制的可视化交互演示">
+<meta property="og:type" content="article">
+<meta property="og:title" content="TCP 三次握手详解">
+<meta property="og:description" content="TCP三次握手详解，从为什么需要握手到Seq/Ack机制的可视化交互演示">
+<meta property="og:url" content="https://eathvader.github.io/tcp-handshake/">
+<meta property="og:image" content="">
+<title>TCP 三次握手详解 / TCP Three-Way Handshake</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "TCP 三次握手详解",
+  "description": "TCP三次握手详解，从为什么需要握手到Seq/Ack机制的可视化交互演示",
+  "author": {"@type": "Person", "name": "EathVader"},
+  "datePublished": "2026-04-01",
+  "dateModified": "2026-04-01",
+  "url": "https://eathvader.github.io/tcp-handshake/"
+}
+</script>
+</head>
+<body>
+
+<header class="hero">
+  <h1>🤝 <span>TCP 三次握手</span> 详解</h1>
+  <p class="subtitle">为什么建立连接需要"三次握手"？Seq 和 Ack 到底有什么用？<br>通过动画和图解，彻底理解 TCP 可靠传输的起点</p>
+  <span class="badge">🔗 网络协议</span>
+  <span class="badge">📡 传输层</span>
+  <span class="badge">🎯 面试必考</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-why">为什么需要握手？</a></li>
+    <li><a href="#sec-what">三次握手是什么？</a></li>
+    <li><a href="#sec-seq">Seq 和 Ack 机制</a></li>
+    <li><a href="#sec-demo">交互演示</a></li>
+    <li><a href="#sec-summary">总结</a></li>
+  </ol>
+</nav>
+
+<section id="sec-why">
+<h2 class="section-title"><span class="num">1</span> 为什么需要握手？</h2>
+
+<div class="analogy">
+  <div class="emoji">📬</div>
+  <h4>生活类比</h4>
+  <p>想象你给远方的朋友寄一封重要的信，但你<strong>不知道对方是否还住在那里</strong>，也不知道<strong>信件能否到达</strong>。最聪明的办法是：先寄一封信问"你在吗？"，等对方回复后，再正式发送内容。</p>
+  <p>TCP 握手就是这个"确认对方在不在"的过程。</p>
+</div>
+
+<p>TCP 的核心目标是<strong>可靠传输</strong>。但在不可靠的网络中，我们面临诸多问题：</p>
+
+<ul>
+  <li>⚠️ <strong>延迟</strong>：数据包可能在网络中停留很久</li>
+  <li>⚠️ <strong>丢包</strong>：路由器可能丢弃数据包</li>
+  <li>⚠️ <strong>重复</strong>：网络拥堵可能导致发送多次</li>
+  <li>⚠️ <strong>乱序</strong>：不同路由可能让数据包走不同路径</li>
+</ul>
+
+<div class="box box-blue">
+  <div class="title">💡 关键洞察</div>
+  <p>TCP 是<strong>双向通信协议</strong>。双方都需要知道：</p>
+  <ol>
+    <li>对方的发送能力是否正常</li>
+    <li>对方的接收能力是否正常</li>
+    <li>双方协商好初始序列号（后续数据传输的基础）</li>
+  </ol>
+  <p>三次握手本质上是在交换这些"配置信息"。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 160" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">TCP 面临的问题</text>
+    <!-- Client -->
+    <rect x="20" y="35" width="120" height="100" rx="8" fill="#172554" stroke="#3b82f6"/>
+    <text x="80" y="55" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="600" font-family="Inter">客户端</text>
+    <text x="80" y="75" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">发送数据</text>
+    <line x1="140" y1="75" x2="190" y2="75" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4"/>
+    <!-- Server -->
+    <rect x="460" y="35" width="120" height="100" rx="8" fill="#14532d" stroke="#22c55e"/>
+    <text x="520" y="55" text-anchor="middle" fill="#86efac" font-size="12" font-weight="600" font-family="Inter">服务器</text>
+    <text x="520" y="75" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">接收数据</text>
+    <!-- Problems -->
+    <rect x="180" y="50" width="100" height="30" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="230" y="70" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="Inter">丢包?</text>
+    <rect x="320" y="50" width="100" height="30" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="370" y="70" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="Inter">延迟?</text>
+    <rect x="300" y="90" width="100" height="30" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="350" y="110" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="Inter">乱序?</text>
+    <text x="350" y="140" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">→ 可靠传输需要先建立"共识"</text>
+  </svg>
+</div>
+</section>
+
+<section id="sec-what">
+<h2 class="section-title"><span class="num">2</span> 三次握手是什么？</h2>
+
+<p>三次握手（Three-Way Handshake）是 TCP 建立连接的过程，由客户端发起：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">三次握手流程</text>
+    <!-- Client -->
+    <rect x="30" y="35" width="100" height="40" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="80" y="60" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="600" font-family="Inter">客户端</text>
+    <!-- Server -->
+    <rect x="470" y="35" width="100" height="40" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="520" y="60" text-anchor="middle" fill="#86efac" font-size="11" font-weight="600" font-family="Inter">服务器</text>
+    <!-- Step 1: SYN -->
+    <line x1="130" y1="55" x2="250" y2="55" stroke="#ef4444" stroke-width="2" marker-end="url(#arr2)"/>
+    <rect x="160" y="35" width="80" height="22" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="200" y="50" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="Inter">SYN=1, Seq=X</text>
+    <text x="200" y="90" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">❶ SYN (同步)</text>
+    <!-- Step 2: SYN-ACK -->
+    <line x1="370" y1="85" x2="470" y2="55" stroke="#22c55e" stroke-width="2" marker-end="url(#arr2)"/>
+    <rect x="320" y="70" width="120" height="22" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="380" y="85" text-anchor="middle" fill="#86efac" font-size="9" font-family="Inter">SYN=1, ACK=1, Seq=Y, Ack=X+1</text>
+    <text x="380" y="120" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">❷ SYN-ACK (同步+确认)</text>
+    <!-- Step 3: ACK -->
+    <line x1="250" y1="115" x2="130" y2="145" stroke="#60a5fa" stroke-width="2" marker-end="url(#arr2)"/>
+    <rect x="160" y="105" width="80" height="22" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="200" y="120" text-anchor="middle" fill="#93c5fd" font-size="9" font-family="Inter">ACK=1, Ack=Y+1</text>
+    <text x="200" y="150" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">❸ ACK (确认)</text>
+    <!-- Connection established -->
+    <rect x="200" y="165" width="200" height="25" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="300" y="182" text-anchor="middle" fill="#86efac" font-size="10" font-weight="600" font-family="Inter">✅ 连接建立!</text>
+  </svg>
+</div>
+
+<h3>三次握手详解</h3>
+
+<div class="timeline">
+  <div class="timeline-item">
+    <div class="tl-label">❶ 第一次握手</div>
+    <p><strong>客户端 → 服务器：SYN, Seq=X</strong></p>
+    <p>客户端发送 SYN=1 的包，表示<strong>请求建立连接</strong>，并带上自己的初始序列号 X。</p>
+    <div class="box box-amber">
+      <div class="title">💡 客户端此时知道</div>
+      <p>服务器能收到自己的消息（发送能力OK），但还不知道服务器的情况。</p>
+    </div>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">❷ 第二次握手</div>
+    <p><strong>服务器 → 客户端：SYN+ACK, Seq=Y, Ack=X+1</strong></p>
+    <p>服务器收到 SYN 后，发送 SYN+ACK 包：</p>
+    <ul>
+      <li>SYN=1：同意建立连接</li>
+      <li>ACK=1：确认收到客户端的 Seq X</li>
+      <li>Seq=Y：服务器自己的初始序列号</li>
+      <li>Ack=X+1：告诉客户端"我期望下一个收到 X+1"</li>
+    </ul>
+    <div class="box box-amber">
+      <div class="title">💡 服务器此时知道</div>
+      <p>客户端能收到自己的消息（接收能力OK），自己也能收到客户端的消息（发送能力OK）。</p>
+    </div>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">❸ 第三次握手</div>
+    <p><strong>客户端 → 服务器：ACK, Ack=Y+1</strong></p>
+    <p>客户端收到 SYN+ACK 后，发送 ACK 包确认。</p>
+    <div class="box box-amber">
+      <div class="title">💡 客户端此时知道</div>
+      <p>服务器能收到自己的消息，双方的发送和接收能力都正常。连接正式建立！</p>
+    </div>
+  </div>
+</div>
+
+<div class="box box-green">
+  <div class="title">🎯 为什么要三次？</div>
+  <p>两次不够！假设只有两次：客户端发 SYN，服务器回复 ACK。此时：</p>
+  <ul>
+    <li>客户端知道服务器能收到自己的消息 ✓</li>
+    <li>但服务器不知道客户端能否收到自己的回复（可能丢失）</li>
+    <li>服务器也无法确认自己的初始序列号是否被客户端认可</li>
+  </ul>
+  <p>第三次握手解决了这个问题：服务器确认客户端收到了自己的初始序列号。</p>
+</div>
+</section>
+
+<section id="sec-seq">
+<h2 class="section-title"><span class="num">3</span> Seq 和 Ack 机制</h2>
+
+<p>Seq（Sequence Number）和 Ack（Acknowledgment Number） 是 TCP 可靠传输的核心：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 180" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">Seq 和 Ack 的关系</text>
+    <!-- Client side -->
+    <rect x="30" y="35" width="120" height="130" rx="8" fill="#172554" stroke="#3b82f6"/>
+    <text x="90" y="55" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="600" font-family="Inter">客户端</text>
+    <text x="90" y="80" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">Seq = X</text>
+    <text x="90" y="100" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">发送数据</text>
+    <text x="90" y="120" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">长度 L</text>
+    <text x="90" y="150" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">期望 Ack = X+L</text>
+    <!-- Arrow -->
+    <line x1="150" y1="85" x2="200" y2="85" stroke="#ef4444" stroke-width="2" marker-end="url(#arr3)"/>
+    <text x="175" y="75" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">发送 X~X+L-1</text>
+    <!-- Server side -->
+    <rect x="450" y="35" width="120" height="130" rx="8" fill="#14532d" stroke="#22c55e"/>
+    <text x="510" y="55" text-anchor="middle" fill="#86efac" font-size="12" font-weight="600" font-family="Inter">服务器</text>
+    <text x="510" y="80" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">Ack = X+L</text>
+    <text x="510" y="100" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">表示已收到</text>
+    <text x="510" y="120" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">X 之前的所有数据</text>
+    <text x="510" y="150" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">期望下一个: X+L</text>
+    <!-- Back arrow -->
+    <line x1="400" y1="115" x2="350" y2="115" stroke="#22c55e" stroke-width="2" marker-end="url(#arr3)"/>
+    <text x="375" y="105" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">确认 Ack=X+L</text>
+  </svg>
+</div>
+
+<div class="box box-blue">
+  <div class="title">📝 重要规则</div>
+  <ul>
+    <li><strong>Seq</strong>：表示<strong>当前发送的数据的第一个字节的序号</strong></li>
+    <li><strong>Ack</strong>：表示<strong>期望收到的下一个字节的序号</strong>，即"之前的数据都收到了"</li>
+    <li><strong>Ack = Seq + 数据长度</strong></li>
+    <li><strong>SYN 和 FIN 也占用一个序号</strong></li>
+  </ul>
+</div>
+
+<h3>三次握手中的 Seq/Ack</h3>
+
+<table>
+  <tr><th>步骤</th><th>客户端 Seq</th><th>服务器 Ack</th><th>说明</th></tr>
+  <tr><td>❶ SYN</td><td>X</td><td>-</td><td>客户端发送初始序列号 X</td></tr>
+  <tr><td>❷ SYN-ACK</td><td>Y</td><td>X+1</td><td>服务器确认 X，期待 X+1</td></tr>
+  <tr><td>❸ ACK</td><td>-</td><td>Y+1</td><td>客户端确认 Y，期待 Y+1</td></tr>
+</table>
+
+<div class="analogy">
+  <div class="emoji">📦</div>
+  <h4>类比：寄信编号</h4>
+  <p>想象你给朋友寄 10 封信，每封信都有编号：</p>
+  <ul>
+    <li>你寄出编号 1-10 的信，朋友回复"Ack=11"表示"11号之前的都收到了"</li>
+    <li>如果朋友回复"Ack=5"，表示"4号之前的收到了，5号可能丢了"</li>
+  </ul>
+  <p>这样双方都能精确知道哪些数据收到了、哪些需要重传。</p>
+</div>
+</section>
+
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">4</span> 交互演示</h2>
+
+<div class="demo">
+  <h4>🎮 三次握手动画演示</h4>
+  <p>点击"开始"按钮，观察三次握手的完整过程：</p>
+  <div style="display:flex;gap:.5rem;margin-bottom:1rem">
+    <button onclick="startHandshake()">▶️ 开始</button>
+    <button onclick="resetHandshake()" style="background:linear-gradient(135deg,#64748b,#475569)">🔄 重置</button>
+  </div>
+  <div id="handshake-demo" style="position:relative;height:200px;background:#0f172a;border-radius:8px;margin:1rem 0;overflow:hidden">
+    <!-- Client -->
+    <div id="client-box" style="position:absolute;left:20px;top:50%;transform:translateY(-50%);width:80px;height:60px;background:#172554;border:2px solid #3b82f6;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#93c5fd;font-size:11px;transition:all 0.3s">
+      客户端
+    </div>
+    <!-- Server -->
+    <div id="server-box" style="position:absolute;right:20px;top:50%;transform:translateY(-50%);width:80px;height:60px;background:#14532d;border:2px solid #22c55e;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#86efac;font-size:11px;transition:all 0.3s">
+      服务器
+    </div>
+    <!-- Messages -->
+    <div id="msg-syn" class="msg-packet" style="position:absolute;left:100px;top:85px;background:#450a0a;border:1px solid #ef4444;padding:4px 8px;border-radius:4px;color:#fca5a5;font-size:9px;opacity:0">
+      SYN<br>Seq=100
+    </div>
+    <div id="msg-synack" class="msg-packet" style="position:absolute;left:300px;top:85px;background:#14532d;border:1px solid #22c55e;padding:4px 8px;border-radius:4px;color:#86efac;font-size:9px;opacity:0">
+      SYN+ACK<br>Seq=200<br>Ack=101
+    </div>
+    <div id="msg-ack" class="msg-packet" style="position:absolute;left:300px;top:120px;background:#172554;border:1px solid #3b82f6;padding:4px 8px;border-radius:4px;color:#93c5fd;font-size:9px;opacity:0">
+      ACK<br>Ack=201
+    </div>
+  </div>
+  <div class="output" id="handshake-output" style="min-height:60px;padding:.75rem;background:#1e293b;border-radius:6px;color:#94a3b8;font-size:12px;font-family:monospace">
+    点击"开始"按钮开始动画...
+  </div>
+</div>
+
+<div class="demo">
+  <h4>🔢 序列号变化演示</h4>
+  <p>观察三次握手中序列号的变化：</p>
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;margin:1rem 0">
+    <div id="seq-client" style="flex:1;min-width:150px;padding:1rem;background:#172554;border-radius:8px;border:2px solid #3b82f6">
+      <div style="color:#93c5fd;font-size:11px;font-weight:600">客户端</div>
+      <div style="color:#64748b;font-size:10px;margin-top:.5rem">Seq</div>
+      <div id="client-seq-val" style="color:#fca5a5;font-size:14px;font-weight:600">-</div>
+      <div style="color:#64748b;font-size:10px;margin-top:.5rem">Ack</div>
+      <div id="client-ack-val" style="color:#86efac;font-size:14px;font-weight:600">-</div>
+    </div>
+    <div id="seq-server" style="flex:1;min-width:150px;padding:1rem;background:#14532d;border-radius:8px;border:2px solid #22c55e">
+      <div style="color:#86efac;font-size:11px;font-weight:600">服务器</div>
+      <div style="color:#64748b;font-size:10px;margin-top:.5rem">Seq</div>
+      <div id="server-seq-val" style="color:#fca5a5;font-size:14px;font-weight:600">-</div>
+      <div style="color:#64748b;font-size:10px;margin-top:.5rem">Ack</div>
+      <div id="server-ack-val" style="color:#86efac;font-size:14px;font-weight:600">-</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:.5rem">
+    <button onclick="showStep(0)">❶ SYN</button>
+    <button onclick="showStep(1)">❷ SYN-ACK</button>
+    <button onclick="showStep(2)">❸ ACK</button>
+  </div>
+</div>
+</section>
+
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">5</span> 总结</h2>
+
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">SYN<br><small>客户端发起</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">SYN+ACK<br><small>服务器确认</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#3b82f6">ACK<br><small>客户端确认</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#a855f7">✅ 连接建立</div>
+</div>
+
+<h3>核心知识点</h3>
+
+<table>
+  <tr><th>概念</th><th>说明</th></tr>
+  <tr><td>三次握手</td><td>Client→SYN, Server→SYN+ACK, Client→ACK</td></tr>
+  <tr><td>序列号 Seq</td><td>每个字节的唯一标识，用于排序和重传</td></tr>
+  <tr><td>确认号 Ack</td><td>期望收到的下一个字节，表示之前都已收到</td></tr>
+  <tr><td>SYN 占用序号</td><td>SYN 和 FIN 控制标志都占用一个序列号</td></tr>
+  <tr><td>为什么三次</td><td>确保双方都能收发，确认初始序列号</td></tr>
+</table>
+
+<div class="box box-purple">
+  <div class="title">📚 延伸阅读</div>
+  <ul>
+    <li><a href="https://xiaolincoding.com/network/2_http/tcp_triple_handshake.html" target="_blank">小林coding - TCP 三次握手详解</a></li>
+    <li><a href="https://github.com/EathVader/EathVader.github.io/blob/main/public/tcp-handshake/index.html" target="_blank">本文源码</a></li>
+  </ul>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p><a href="../">← 返回主页</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+let currentStep = -1;
+let timer = null;
+const steps = [
+  { msg: 'syn', from: 'client', to: 'server', text: '客户端发送 SYN 包，Seq=100', clientSeq: '100', clientAck: '-', serverSeq: '-', serverAck: '101' },
+  { msg: 'synack', from: 'server', to: 'client', text: '服务器回复 SYN+ACK，Seq=200, Ack=101', clientSeq: '100', clientAck: '201', serverSeq: '200', serverAck: '101' },
+  { msg: 'ack', from: 'client', to: 'server', text: '客户端发送 ACK，Ack=201，连接建立！', clientSeq: '101', clientAck: '201', serverSeq: '200', serverAck: '201' }
+];
+
+function startHandshake() {
+  resetHandshake();
+  document.getElementById('handshake-output').textContent = '开始三次握手...';
+  let idx = 0;
+  function next() {
+    if (idx >= steps.length) {
+      document.getElementById('handshake-output').innerHTML = '✅ <strong>连接建立成功！</strong><br>客户端和服务器都已确认对方的序列号，可以开始传输数据。';
+      return;
+    }
+    const s = steps[idx];
+    showStep(idx);
+    document.getElementById('handshake-output').textContent = s.text;
+    idx++;
+    timer = setTimeout(next, 1500);
+  }
+  next();
+}
+
+function showStep(idx) {
+  const s = steps[idx];
+  document.getElementById('client-seq-val').textContent = s.clientSeq;
+  document.getElementById('client-ack-val').textContent = s.clientAck;
+  document.getElementById('server-seq-val').textContent = s.serverSeq;
+  document.getElementById('server-ack-val').textContent = s.serverAck;
+  
+  document.querySelectorAll('.msg-packet').forEach(el => el.style.opacity = '0');
+  if (idx >= 0) {
+    document.getElementById('msg-syn').style.opacity = idx >= 0 ? '1' : '0';
+    document.getElementById('msg-synack').style.opacity = idx >= 1 ? '1' : '0';
+    document.getElementById('msg-ack').style.opacity = idx >= 2 ? '1' : '0';
+  }
+}
+
+function resetHandshake() {
+  if (timer) clearTimeout(timer);
+  currentStep = -1;
+  document.getElementById('client-seq-val').textContent = '-';
+  document.getElementById('client-ack-val').textContent = '-';
+  document.getElementById('server-seq-val').textContent = '-';
+  document.getElementById('server-ack-val').textContent = '-';
+  document.querySelectorAll('.msg-packet').forEach(el => el.style.opacity = '0');
+  document.getElementById('handshake-output').textContent = '点击"开始"按钮开始动画...';
+}
+
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => {
+  btn.classList.toggle('show', window.scrollY > 400);
+});
+</script>
+
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

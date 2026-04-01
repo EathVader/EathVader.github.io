@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="TCP滑动窗口与可靠传输机制详解，含交互式窗口动画演示">
+<meta property="og:type" content="article">
+<meta property="og:title" content="TCP 滑动窗口与可靠传输">
+<meta property="og:description" content="TCP滑动窗口与可靠传输机制详解，含交互式窗口动画演示">
+<meta property="og:url" content="https://eathvader.github.io/tcp-window/">
+<meta property="og:image" content="">
+<title>TCP 滑动窗口与可靠传输 / TCP Sliding Window</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "TCP 滑动窗口与可靠传输",
+  "description": "TCP滑动窗口与可靠传输机制详解，含交互式窗口动画演示",
+  "author": {"@type": "Person", "name": "EathVader"},
+  "datePublished": "2026-04-01",
+  "dateModified": "2026-04-01",
+  "url": "https://eathvader.github.io/tcp-window/"
+}
+</script>
+</head>
+<body>
+
+<header class="hero">
+  <h1>📜 <span>TCP 滑动窗口</span> 与可靠传输</h1>
+  <p class="subtitle">滑动窗口如何实现流量控制？累计确认和选择重传如何保证可靠性？<br>通过交互式动画彻底理解 TCP 的核心机制</p>
+  <span class="badge">🔗 网络协议</span>
+  <span class="badge">📡 传输层</span>
+  <span class="badge">⚡ 性能优化</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-window">滑动窗口是什么？</a></li>
+    <li><a href="#sec-flow">流量控制</a></li>
+    <li><a href="#sec-reliable">可靠传输机制</a></li>
+    <li><a href="#sec-demo">交互演示</a></li>
+    <li><a href="#sec-summary">总结</a></li>
+  </ol>
+</nav>
+
+<section id="sec-window">
+<h2 class="section-title"><span class="num">1</span> 滑动窗口是什么？</h2>
+
+<div class="analogy">
+  <div class="emoji">🏭</div>
+  <h4>生活类比：流水线工人</h4>
+  <p>想象一个流水线：</p>
+  <ul>
+    <li>工人 A 负责发送数据包</li>
+    <li>工人 B 负责确认收到</li>
+    <li>流水线一次最多放 <strong>3 个</strong> 在制品（WIP）</li>
+    <li>只有当 B 确认收到 1 个，A 才能再放入新的</li>
+  </ul>
+  <p>这个"流水线"就是滑动窗口：<strong>允许连续发送多个数据包，但有限制</strong>。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">滑动窗口工作原理</text>
+    <!-- Window -->
+    <rect x="180" y="40" width="240" height="80" rx="8" fill="none" stroke="#3b82f6" stroke-width="2" stroke-dasharray="4"/>
+    <text x="300" y="55" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="600" font-family="Inter">窗口大小 = 3</text>
+    <!-- Packets -->
+    <rect x="200" y="65" width="40" height="30" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="220" y="85" text-anchor="middle" fill="#93c5fd" font-size="9" font-family="Inter">1</text>
+    <rect x="250" y="65" width="40" height="30" rx="4" fill="#22c55e" stroke="#22c55e"/>
+    <text x="270" y="85" text-anchor="middle" fill="#86efac" font-size="9" font-family="Inter">2</text>
+    <rect x="300" y="65" width="40" height="30" rx="4" fill="#f59e0b" stroke="#f59e0b"/>
+    <text x="320" y="85" text-anchor="middle" fill="#fcd34d" font-size="9" font-family="Inter">3</text>
+    <rect x="350" y="65" width="40" height="30" rx="4" fill="#334155" stroke="#475569"/>
+    <text x="370" y="85" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">4</text>
+    <!-- Labels -->
+    <text x="220" y="110" text-anchor="middle" fill="#86efac" font-size="8" font-family="Inter">已发送<br>已确认</text>
+    <text x="270" y="110" text-anchor="middle" fill="#86efac" font-size="8" font-family="Inter">已发送<br>等待确认</text>
+    <text x="320" y="110" text-anchor="middle" fill="#fcd34d" font-size="8" font-family="Inter">可发送</text>
+    <text x="370" y="110" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">未发送</text>
+    <!-- Arrows -->
+    <line x1="300" y1="130" x2="300" y2="160" stroke="#60a5fa" stroke-width="2" marker-end="url(#arr)"/>
+    <text x="300" y="180" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">窗口滑动后，发送新的数据包</text>
+  </svg>
+</div>
+
+<div class="box box-blue">
+  <div class="title">💡 核心概念</div>
+  <ul>
+    <li><strong>窗口</strong>：允许连续发送但未确认的数据包数量</li>
+    <li><strong>发送窗口</strong>：发送端可以发送的数据范围</li>
+    <li><strong>接收窗口</strong>：接收端愿意接收的数据范围</li>
+    <li><strong>滑动</strong>：收到确认后，窗口向前移动，允许发送新的数据</li>
+  </ul>
+</div>
+
+<h3>为什么需要滑动窗口？</h3>
+
+<p>假设没有滑动窗口，每发送一个包都要等待确认：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 100" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="20" text-anchor="middle" fill="#f8fafc" font-size="11" font-weight="600" font-family="Inter">停等协议（效率低）</text>
+    <!-- Timeline -->
+    <rect x="20" y="40" width="60" height="25" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="50" y="57" text-anchor="middle" fill="#93c5fd" font-size="9" font-family="Inter">发送</text>
+    <line x1="80" y1="52" x2="150" y2="52" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4"/>
+    <text x="115" y="45" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">RTT</text>
+    <rect x="150" y="40" width="60" height="25" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="180" y="57" text-anchor="middle" fill="#86efac" font-size="9" font-family="Inter">确认</text>
+    <rect x="230" y="40" width="60" height="25" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="260" y="57" text-anchor="middle" fill="#93c5fd" font-size="9" font-family="Inter">发送</text>
+    <text x="360" y="52" text-anchor="middle" fill="#ef4444" font-size="9" font-family="Inter">→ 50% 时间在等待！</text>
+  </svg>
+</div>
+
+<p>滑动窗口允许<strong>连续发送多个包</strong>，大幅提高效率：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 100" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="20" text-anchor="middle" fill="#f8fafc" font-size="11" font-weight="600" font-family="Inter">滑动窗口（效率高）</text>
+    <!-- Packets -->
+    <rect x="20" y="40" width="40" height="25" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="40" y="57" text-anchor="middle" fill="#93c5fd" font-size="9" font-family="Inter">1</text>
+    <rect x="65" y="40" width="40" height="25" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="85" y="57" text-anchor="middle" fill="#93c5fd" font-size="9" font-family="Inter">2</text>
+    <rect x="110" y="40" width="40" height="25" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="130" y="57" text-anchor="middle" fill="#93c5fd" font-size="9" font-family="Inter">3</text>
+    <rect x="155" y="40" width="40" height="25" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="175" y="57" text-anchor="middle" fill="#93c5fd" font-size="9" font-family="Inter">4</text>
+    <line x1="200" y1="52" x2="250" y2="52" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4"/>
+    <rect x="250" y="40" width="50" height="25" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="275" y="57" text-anchor="middle" fill="#86efac" font-size="9" font-family="Inter">ACK 1-4</text>
+    <text x="360" y="52" text-anchor="middle" fill="#22c55e" font-size="9" font-family="Inter">→ 批量确认，效率更高！</text>
+  </svg>
+</div>
+</section>
+
+<section id="sec-flow">
+<h2 class="section-title"><span class="num">2</span> 流量控制</h2>
+
+<p>滑动窗口不仅提高效率，还能实现<strong>流量控制</strong>——防止发送方压垮接收方：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 180" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">流量控制机制</text>
+    <!-- Receiver buffer -->
+    <rect x="450" y="40" width="130" height="100" rx="8" fill="#14532d" stroke="#22c55e"/>
+    <text x="515" y="60" text-anchor="middle" fill="#86efac" font-size="11" font-weight="600" font-family="Inter">接收缓冲区</text>
+    <rect x="460" y="75" width="110" height="50" rx="4" fill="#0f172a" stroke="#334155"/>
+    <text x="515" y="95" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">可用空间</text>
+    <text x="515" y="115" text-anchor="middle" fill="#fcd34d" font-size="11" font-weight="600" font-family="Inter">Window Size</text>
+    <!-- Sender -->
+    <rect x="20" y="60" width="100" height="60" rx="8" fill="#172554" stroke="#3b82f6"/>
+    <text x="70" y="85" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="600" font-family="Inter">发送方</text>
+    <text x="70" y="105" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">不能超过</text>
+    <text x="70" y="118" text-anchor="middle" fill="#fcd34d" font-size="9" font-family="Inter">Window Size</text>
+    <!-- Arrow with rwnd -->
+    <line x1="120" y1="90" x2="280" y2="90" stroke="#60a5fa" stroke-width="2" marker-end="url(#arr2)"/>
+    <rect x="160" y="75" width="80" height="20" rx="4" fill="#451a03" stroke="#f59e0b"/>
+    <text x="200" y="89" text-anchor="middle" fill="#fcd34d" font-size="9" font-family="Inter">rwnd = 500</text>
+    <!-- ACK with window -->
+    <line x1="380" y1="110" x2="450" y2="110" stroke="#22c55e" stroke-width="2" marker-end="url(#arr2)"/>
+    <rect x="390" y="95" width="60" height="20" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="420" y="109" text-anchor="middle" fill="#86efac" font-size="8" font-family="Inter">ACK+Window</text>
+  </svg>
+</div>
+
+<div class="box box-blue">
+  <div class="title">📝 核心机制</div>
+  <ul>
+    <li><strong>接收窗口 (rwnd)</strong>：接收方在 ACK 中告诉发送方自己还有多少缓冲区空间</li>
+    <li><strong>动态调整</strong>：接收方处理速度慢时，窗口变小；处理快时，窗口变大</li>
+    <li><strong>零窗口探测</strong>：当窗口为 0 时，发送方会定期发送探测报文</li>
+  </ul>
+</div>
+
+<div class="analogy">
+  <div class="emoji">🍽️</div>
+  <h4>类比：自助餐厅</h4>
+  <p>接收方就像自助餐厅的<strong>盘子存量</strong>：</p>
+  <ul>
+    <li>你（发送方）不停端菜（发数据）</li>
+    <li>餐厅（接收方）告诉你还剩多少空盘子</li>
+    <li>空盘子少时，你得等一等</li>
+    <li>空盘子多了，你可以多端一些</li>
+  </ul>
+</div>
+
+<h3>糊涂窗口综合征</h3>
+
+<p>如果接收方每次只消费 1 字节就通知窗口，会导致发送方每次只发 1 字节，效率极低：</p>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 问题</div>
+  <ul>
+    <li>接收方：缓冲区满 → 清空 1 字节 → 通知窗口=1</li>
+    <li>发送方：收到窗口=1 → 发送 1 字节</li>
+    <li>结果：40 字节数据需要 40 次交互！</li>
+  </ul>
+</div>
+
+<div class="box box-green">
+  <div class="title">✅ 解决方案</div>
+  <ul>
+    <li><strong>Nagle 算法</strong>（发送方）：等数据达到 MSS 或收到确认后再发送</li>
+    <li><strong>延迟 ACK</strong>（接收方）：等有数据时一起确认，或延迟确认</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-reliable">
+<h2 class="section-title"><span class="num">3</span> 可靠传输机制</h2>
+
+<p>滑动窗口 + 确认机制 = 可靠传输。主要有两种方式：</p>
+
+<h3>累计确认 vs 选择性确认</h3>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">累计确认 vs 选择性确认</text>
+    <!-- Cumulative ACK -->
+    <rect x="30" y="35" width="260" height="70" rx="8" fill="#172554" border="1" stroke="#3b82f6"/>
+    <text x="160" y="55" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="600" font-family="Inter">累计确认 (Cumulative ACK)</text>
+    <text x="160" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">发送 1,2,3,4,5，丢了 3</text>
+    <rect x="50" y="85" width="30" height="15" rx="2" fill="#22c55e"/>
+    <text x="65" y="96" text-anchor="middle" fill="#86efac" font-size="8">1</text>
+    <rect x="85" y="85" width="30" height="15" rx="2" fill="#22c55e"/>
+    <text x="100" y="96" text-anchor="middle" fill="#86efac" font-size="8">2</text>
+    <rect x="120" y="85" width="30" height="15" rx="2" fill="#ef4444"/>
+    <text x="135" y="96" text-anchor="middle" fill="#fca5a5" font-size="8">3?</text>
+    <rect x="155" y="85" width="30" height="15" rx="2" fill="#475569"/>
+    <text x="170" y="96" text-anchor="middle" fill="#64748b" font-size="8">4</text>
+    <rect x="190" y="85" width="30" height="15" rx="2" fill="#475569"/>
+    <text x="205" y="96" text-anchor="middle" fill="#64748b" font-size="8">5</text>
+    <text x="160" y="118" text-anchor="middle" fill="#86efac" font-size="9" font-family="Inter">→ ACK = 3，表示 1,2 收到了</text>
+    <!-- SACK -->
+    <rect x="310" y="35" width="260" height="70" rx="8" fill="#14532d" border="1" stroke="#22c55e"/>
+    <text x="440" y="55" text-anchor="middle" fill="#86efac" font-size="11" font-weight="600" font-family="Inter">选择性确认 (SACK)</text>
+    <text x="440" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">发送 1,2,3,4,5，丢了 3</text>
+    <rect x="330" y="85" width="30" height="15" rx="2" fill="#22c55e"/>
+    <text x="345" y="96" text-anchor="middle" fill="#86efac" font-size="8">1</text>
+    <rect x="365" y="85" width="30" height="15" rx="2" fill="#22c55e"/>
+    <text x="380" y="96" text-anchor="middle" fill="#86efac" font-size="8">2</text>
+    <rect x="400" y="85" width="30" height="15" rx="2" fill="#ef4444"/>
+    <text x="415" y="96" text-anchor="middle" fill="#fca5a5" font-size="8">3?</text>
+    <rect x="435" y="85" width="30" height="15" rx="2" fill="#475569"/>
+    <text x="450" y="96" text-anchor="middle" fill="#64748b" font-size="8">4</text>
+    <rect x="470" y="85" width="30" height="15" rx="2" fill="#475569"/>
+    <text x="485" y="96" text-anchor="middle" fill="#64748b" font-size="8">5</text>
+    <text x="440" y="118" text-anchor="middle" fill="#86efac" font-size="9" font-family="Inter">→ SACK: 4,5 收到了，只重传 3</text>
+  </svg>
+</div>
+
+<div class="box box-blue">
+  <div class="title">📝 两种确认方式</div>
+  <ul>
+    <li><strong>累计确认</strong>：ACK=N 表示"N之前的数据都收到了"</li>
+    <li><strong>SACK</strong>（Selective ACK）：告诉发送方哪些数据收到了，哪些需要重传</li>
+  </ul>
+</div>
+
+<h3>重传机制</h3>
+
+<p>TCP 有两种重传触发条件：</p>
+
+<div class="timeline">
+  <div class="timeline-item">
+    <div class="tl-label">⏱️ 超时重传</div>
+    <p>发送数据后，启动定时器。如果在超时时间内没有收到 ACK，就重传。</p>
+    <div class="box box-amber">
+      <div class="title">💡 RTO (Retransmission Timeout)</div>
+      <p>超时时间 = 平滑 RTT + 4 × RTTVAR（抖动）</p>
+    </div>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">🔔 快速重传</div>
+    <p>收到<strong>3 个重复的 ACK</strong>，说明某个包丢了，立即重传，无需等待超时。</p>
+    <div class="diagram">
+      <svg viewBox="0 0 600 80" xmlns="http://www.w3.org/2000/svg">
+        <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="11" font-weight="600" font-family="Inter">快速重传示例</text>
+        <rect x="30" y="30" width="30" height="20" rx="2" fill="#22c55e"/><text x="45" y="45" text-anchor="middle" fill="#86efac" font-size="8">1</text>
+        <rect x="65" y="30" width="30" height="20" rx="2" fill="#22c55e"/><text x="80" y="45" text-anchor="middle" fill="#86efac" font-size="8">2</text>
+        <rect x="100" y="30" width="30" height="20" rx="2" fill="#ef4444"/><text x="115" y="45" text-anchor="middle" fill="#fca5a5" font-size="8">3?</text>
+        <rect x="135" y="30" width="30" height="20" rx="2" fill="#475569"/><text x="150" y="45" text-anchor="middle" fill="#64748b" font-size="8">4</text>
+        <rect x="170" y="30" width="30" height="20" rx="2" fill="#475569"/><text x="185" y="45" text-anchor="middle" fill="#64748b" font-size="8">5</text>
+        <text x="250" y="40" text-anchor="middle" fill="#f59e0b" font-size="9" font-weight="600" font-family="Inter">ACK=3 × 3</text>
+        <line x1="350" y1="40" x2="380" y2="40" stroke="#ef4444" stroke-width="2" marker-end="url(#arr)"/>
+        <rect x="380" y="30" width="30" height="20" rx="2" fill="#ef4444"/><text x="395" y="45" text-anchor="middle" fill="#fca5a5" font-size="8">3!</text>
+        <text x="450" y="40" text-anchor="middle" fill="#22c55e" font-size="9" font-family="Inter">→ 立即重传！</text>
+      </svg>
+    </div>
+  </div>
+</div>
+</section>
+
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">4</span> 交互演示</h2>
+
+<div class="demo">
+  <h4>🎮 滑动窗口动画</h4>
+  <p>观察窗口滑动和数据传输过程：</p>
+  <div style="display:flex;gap:.5rem;margin-bottom:1rem">
+    <button onclick="startWindowDemo()">▶️ 开始</button>
+    <button onclick="pauseWindowDemo()" style="background:linear-gradient(135deg,#f59e0b,#d97706)">⏸️ 暂停</button>
+    <button onclick="resetWindowDemo()" style="background:linear-gradient(135deg,#64748b,#475569)">🔄 重置</button>
+  </div>
+  <div style="margin:1rem 0">
+    <div style="display:flex;gap:2px;justify-content:center" id="packet-container"></div>
+    <div style="display:flex;justify-content:center;margin-top:.5rem" id="window-container">
+      <div style="border:2px solid #3b82f6;padding:4px 8px;border-radius:4px">
+        <span style="color:#60a5fa;font-size:10px">发送窗口</span>
+      </div>
+    </div>
+  </div>
+  <div id="window-status" style="display:flex;gap:1rem;justify-content:center;margin:1rem 0;flex-wrap:wrap">
+    <div style="padding:.5rem 1rem;background:#1e293b;border-radius:4px;font-size:11px">
+      <span style="color:#94a3b8">已发送/已确认: </span><span id="sent-acked" style="color:#86efac">0</span>
+    </div>
+    <div style="padding:.5rem 1rem;background:#1e293b;border-radius:4px;font-size:11px">
+      <span style="color:#94a3b8">已发送/未确认: </span><span id="sent-unack" style="color:#fcd34d">0</span>
+    </div>
+    <div style="padding:.5rem 1rem;background:#1e293b;border-radius:4px;font-size:11px">
+      <span style="color:#94a3b8">可发送: </span><span id="can-send" style="color:#60a5fa">3</span>
+    </div>
+  </div>
+  <div class="output" id="window-output" style="min-height:60px;padding:.75rem;background:#1e293b;border-radius:6px;color:#94a3b8;font-size:12px;font-family:monospace">
+    点击"开始"按钮开始演示...
+  </div>
+</div>
+
+<div class="demo">
+  <h4>🔧 参数调整</h4>
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin:1rem 0">
+    <label style="font-size:11px;color:#94a3b8">
+      窗口大小:
+      <input type="range" id="window-size-slider" min="2" max="6" value="3" onchange="updateWindowSize(this.value)" style="vertical-align:middle">
+      <span id="window-size-val" style="color:#60a5fa">3</span>
+    </label>
+  </div>
+</div>
+</section>
+
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">5</span> 总结</h2>
+
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">发送窗口<br><small>允许连续发送</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">累计确认<br><small>ACK 表示收到</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">流量控制<br><small>接收方控制</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#ef4444">重传机制<br><small>超时/快速</small></div>
+</div>
+
+<h3>核心知识点</h3>
+
+<table>
+  <tr><th>概念</th><th>说明</th></tr>
+  <tr><td>滑动窗口</td><td>允许连续发送多个包，提高效率</td></tr>
+  <tr><td>流量控制</td><td>接收方通过窗口大小控制发送方</td></tr>
+  <tr><td>累计确认</td><td>ACK=N 表示 N 之前的数据都收到了</td></tr>
+  <tr><td>SACK</td><td>选择性确认，告诉发送方哪些需要重传</td></tr>
+  <tr><td>超时重传</td><td>RTO 超时后重传</td></tr>
+  <tr><td>快速重传</td><td>收到 3 个重复 ACK 后立即重传</td></tr>
+</table>
+
+<div class="box box-purple">
+  <div class="title">📚 延伸阅读</div>
+  <ul>
+    <li><a href="https://xiaolincoding.com/network/2_http/tcp_feature.html" target="_blank">小林coding - TCP 特性详解</a></li>
+    <li><a href="https://github.com/EathVader/EathVader.github.io/blob/main/public/tcp-window/index.html" target="_blank">本文源码</a></li>
+  </ul>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p><a href="../tcp-wave/">← TCP 四次挥手</a> | <a href="../">返回主页</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+let windowTimer = null;
+let windowSize = 3;
+let currentPos = 0;
+let ackedPos = 0;
+let totalPackets = 10;
+let isPaused = false;
+
+function updateWindowSize(val) {
+  windowSize = parseInt(val);
+  document.getElementById('window-size-val').textContent = val;
+  resetWindowDemo();
+}
+
+function renderPackets() {
+  const container = document.getElementById('packet-container');
+  let html = '';
+  for (let i = 0; i < totalPackets; i++) {
+    let bg = '#475569', border = '#475569', color = '#64748b';
+    if (i < ackedPos) {
+      bg = '#14532d'; border = '#22c55e'; color = '#86efac';
+    } else if (i < currentPos) {
+      bg = '#451a03'; border = '#f59e0b'; color = '#fcd34d';
+    } else if (i < currentPos + windowSize) {
+      bg = '#172554'; border = '#3b82f6'; color = '#93c5fd';
+    }
+    html += `<div style="width:36px;height:28px;background:${bg};border:1px solid ${border};border-radius:4px;display:flex;align-items:center;justify-content:center;color:${color};font-size:10px;margin:2px">${i + 1}</div>`;
+  }
+  container.innerHTML = html;
+  document.getElementById('sent-acked').textContent = ackedPos;
+  document.getElementById('sent-unack').textContent = currentPos - ackedPos;
+  document.getElementById('can-send').textContent = Math.max(0, windowSize - (currentPos - ackedPos));
+}
+
+function startWindowDemo() {
+  if (windowTimer) return;
+  isPaused = false;
+  windowTimer = setInterval(() => {
+    if (isPaused) return;
+    if (currentPos < totalPackets && (currentPos - ackedPos) < windowSize) {
+      currentPos++;
+      document.getElementById('window-output').textContent = `发送数据包 ${currentPos}...`;
+    } else if (currentPos > ackedPos && currentPos - ackedPos < windowSize) {
+      ackedPos++;
+      document.getElementById('window-output').textContent = `确认数据包 ${ackedPos}，窗口滑动！`;
+    }
+    renderPackets();
+    if (ackedPos >= totalPackets) {
+      document.getElementById('window-output').innerHTML = '✅ <strong>全部数据已传输并确认！</strong>';
+      clearInterval(windowTimer);
+      windowTimer = null;
+    }
+  }, 800);
+}
+
+function pauseWindowDemo() {
+  isPaused = !isPaused;
+  document.getElementById('window-output').textContent = isPaused ? '⏸️ 已暂停' : '继续...';
+}
+
+function resetWindowDemo() {
+  if (windowTimer) {
+    clearInterval(windowTimer);
+    windowTimer = null;
+  }
+  currentPos = 0;
+  ackedPos = 0;
+  isPaused = false;
+  renderPackets();
+  document.getElementById('window-output').textContent = '点击"开始"按钮开始演示...';
+}
+
+renderPackets();
+
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => {
+  btn.classList.toggle('show', window.scrollY > 400);
+});
+</script>
+
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

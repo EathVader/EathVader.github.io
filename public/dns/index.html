@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="DNS域名系统详解：从递归查询到迭代查询，从DNS记录类型到缓存机制">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DNS 域名系统详解">
+<meta property="og:description" content="DNS域名系统详解：从递归查询到迭代查询，从DNS记录类型到缓存机制">
+<meta property="og:url" content="https://eathvader.github.io/dns/">
+<meta property="og:image" content="">
+<title>DNS 域名系统详解 / DNS Protocol</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "DNS 域名系统详解",
+  "description": "DNS域名系统详解：从递归查询到迭代查询，从DNS记录类型到缓存机制",
+  "author": {"@type": "Person", "name": "EathVader"},
+  "datePublished": "2026-04-01",
+  "dateModified": "2026-04-01",
+  "url": "https://eathvader.github.io/dns/"
+}
+</script>
+</head>
+<body>
+
+<header class="hero">
+  <h1>📖 <span>DNS 域名系统</span> 详解</h1>
+  <p class="subtitle">从域名到 IP 地址的翻译过程<br>递归查询、迭代查询、DNS记录类型一网打尽</p>
+  <span class="badge">🌐 网络协议</span>
+  <span class="badge">📡 应用层</span>
+  <span class="badge">🔍 查找</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-why">为什么需要 DNS？</a></li>
+    <li><a href="#sec-query">查询过程</a></li>
+    <li><a href="#sec-records">记录类型</a></li>
+    <li><a href="#sec-cache">缓存机制</a></li>
+    <li><a href="#sec-demo">交互演示</a></li>
+    <li><a href="#sec-summary">总结</a></li>
+  </ol>
+</nav>
+
+<section id="sec-why">
+<h2 class="section-title"><span class="num">1</span> 为什么需要 DNS？</h2>
+
+<div class="analogy">
+  <div class="emoji">📖</div>
+  <h4>生活类比：电话簿</h4>
+  <p>DNS 就像<strong>电话号码簿</strong>：</p>
+  <ul>
+    <li>你记得朋友的名字（域名），但不记得电话号码（IP）</li>
+    <li>查电话簿 → 名字 → 电话号码</li>
+    <li>DNS → 域名 → IP 地址</li>
+  </ul>
+</div>
+
+<div class="box box-blue">
+  <div class="title">💡 核心概念</div>
+  <ul>
+    <li><strong>域名</strong>：人类可读的地址，如 <code>www.example.com</code></li>
+    <li><strong>IP 地址</strong>：计算机可读的地址，如 <code>93.184.216.34</code></li>
+    <li><strong>DNS 服务器</strong>：域名到 IP 的映射服务</li>
+    <li><strong>根域名服务器</strong>：.com、.org 等顶级域的入口</li>
+  </ul>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 140" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">域名的层级结构</text>
+    <!-- Root -->
+    <rect x="260" y="35" width="80" height="25" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="300" y="52" text-anchor="middle" fill="#fca5a5" font-size="10" font-weight="600" font-family="Inter">根 (.)</text>
+    <!-- TLD -->
+    <rect x="200" y="70" width="80" height="25" rx="4" fill="#451a03" stroke="#f59e0b"/>
+    <text x="240" y="87" text-anchor="middle" fill="#fcd34d" font-size="10" font-weight="600" font-family="Inter">.com</text>
+    <rect x="320" y="70" width="80" height="25" rx="4" fill="#451a03" stroke="#f59e0b"/>
+    <text x="360" y="87" text-anchor="middle" fill="#fcd34d" font-size="10" font-weight="600" font-family="Inter">.org</text>
+    <!-- Second level -->
+    <rect x="160" y="105" width="80" height="25" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="200" y="122" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="600" font-family="Inter">example.com</text>
+    <rect x="260" y="105" width="80" height="25" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="300" y="122" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="600" font-family="Inter">google.com</text>
+    <!-- Arrows -->
+    <line x1="280" y1="60" x2="240" y2="70" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="320" y1="60" x2="360" y2="70" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="220" y1="95" x2="200" y2="105" stroke="#94a3b8" stroke-width="1"/>
+    <line x1="280" y1="95" x2="300" y2="105" stroke="#94a3b8" stroke-width="1"/>
+  </svg>
+</div>
+</section>
+
+<section id="sec-query">
+<h2 class="section-title"><span class="num">2</span> 查询过程</h2>
+
+<h3>两种查询方式</h3>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 250" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">递归查询 vs 迭代查询</text>
+    <!-- Client -->
+    <rect x="30" y="35" width="80" height="40" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="70" y="60" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">客户端</text>
+    <!-- DNS Server -->
+    <rect x="250" y="35" width="100" height="40" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="300" y="60" text-anchor="middle" fill="#86efac" font-size="10" font-weight="600" font-family="Inter">本地 DNS</text>
+    <!-- Root -->
+    <rect x="450" y="35" width="80" height="30" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="490" y="55" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="Inter">根服务器</text>
+    <!-- TLD -->
+    <rect x="450" y="80" width="80" height="30" rx="4" fill="#451a03" stroke="#f59e0b"/>
+    <text x="490" y="100" text-anchor="middle" fill="#fcd34d" font-size="9" font-family="Inter">.com 服务器</text>
+    <!-- Authoritative -->
+    <rect x="450" y="125" width="80" height="30" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="490" y="145" text-anchor="middle" fill="#86efac" font-size="9" font-family="Inter">权威 DNS</text>
+    <!-- Recursive flow -->
+    <line x1="110" y1="55" x2="250" y2="55" stroke="#3b82f6" stroke-width="2" marker-end="url(#arr2)"/>
+    <text x="180" y="48" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">1. 查询</text>
+    <line x1="350" y1="50" x2="450" y2="50" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arr2)"/>
+    <text x="400" y="43" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">2. 找根</text>
+    <line x1="490" y1="65" x2="490" y2="80" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#arr2)"/>
+    <line x1="490" y1="95" x2="490" y2="125" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#arr2)"/>
+    <line x1="450" y1="140" x2="350" y2="140" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr2)"/>
+    <line x1="250" y1="60" x2="110" y2="60" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr2)"/>
+    <text x="180" y="67" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">6. 返回 IP</text>
+    <!-- Legend -->
+    <rect x="30" y="180" width="250" height="50" rx="6" fill="#1e293b" border="1" stroke="#334155"/>
+    <text x="155" y="200" text-anchor="middle" fill="#f8fafc" font-size="10" font-weight="600" font-family="Inter">递归查询</text>
+    <text x="155" y="218" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">本地 DNS 帮客户端查全程</text>
+    <rect x="320" y="180" width="250" height="50" rx="6" fill="#1e293b" border="1" stroke="#334155"/>
+    <text x="445" y="200" text-anchor="middle" fill="#f8fafc" font-size="10" font-weight="600" font-family="Inter">迭代查询</text>
+    <text x="445" y="218" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">服务器返回"去问下一个"</text>
+  </svg>
+</div>
+
+<div class="timeline">
+  <div class="timeline-item">
+    <div class="tl-label">❶ 客户端</div>
+    <p>向本地 DNS 服务器发起查询请求 <code>www.example.com</code></p>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">❷ 本地 DNS</div>
+    <p>缓存未命中，向根服务器查询 .com 的权威服务器</p>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">❸ 根服务器</div>
+    <p>返回 .com 服务器的 IP（不负责具体域名）</p>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">❹ .com 服务器</div>
+    <p>返回 example.com 的权威 DNS 服务器 IP</p>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">❺ 权威 DNS</div>
+    <p>查询 <code>www.example.com</code> → 返回具体 IP</p>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">❻ 返回</div>
+    <p>本地 DNS 返回 IP 给客户端，并缓存结果</p>
+  </div>
+</div>
+
+<div class="box box-green">
+  <div class="title">💡 实际场景</div>
+  <p>大多数情况下，客户端到本地 DNS 使用<strong>递归查询</strong>，本地 DNS 到其他服务器使用<strong>迭代查询</strong>。</p>
+</div>
+</section>
+
+<section id="sec-records">
+<h2 class="section-title"><span class="num">3</span> DNS 记录类型</h2>
+
+<table>
+  <tr><th>类型</th><th>说明</th><th>示例</th></tr>
+  <tr><td><strong>A</strong></td><td>IPv4 地址</td><td>example.com → 93.184.216.34</td></tr>
+  <tr><td><strong>AAAA</strong></td><td>IPv6 地址</td><td>example.com → 2606:2800:220:1:248:1893:25c8:1946</td></tr>
+  <tr><td><strong>CNAME</strong></td><td>别名</td><td>www.example.com → example.com</td></tr>
+  <tr><td><strong>MX</strong></td><td>邮件服务器</td><td>@ → mail.example.com</td></tr>
+  <tr><td><strong>TXT</strong></td><td>文本记录</td><td>SPF/DKIM 验证</td></tr>
+  <tr><td><strong>NS</strong><td>域名服务器</td><td>example.com → ns1.example.com</td></tr>
+  <tr><td><strong>SOA</strong></td><td>起始授权记录</td><td>域名的管理信息</td></tr>
+</table>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 120" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">常见 DNS 记录类型</text>
+    <!-- A -->
+    <rect x="30" y="35" width="100" height="70" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="80" y="55" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="600" font-family="Inter">A</text>
+    <text x="80" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">IPv4</text>
+    <text x="80" y="90" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">93.184.216.34</text>
+    <!-- CNAME -->
+    <rect x="150" y="35" width="100" height="70" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="200" y="55" text-anchor="middle" fill="#86efac" font-size="11" font-weight="600" font-family="Inter">CNAME</text>
+    <text x="200" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">别名</text>
+    <text x="200" y="90" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">→ example.com</text>
+    <!-- MX -->
+    <rect x="270" y="35" width="100" height="70" rx="6" fill="#451a03" stroke="#f59e0b"/>
+    <text x="320" y="55" text-anchor="middle" fill="#fcd34d" font-size="11" font-weight="600" font-family="Inter">MX</text>
+    <text x="320" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">邮件</text>
+    <text x="320" y="90" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">→ mail.example</text>
+    <!-- NS -->
+    <rect x="390" y="35" width="100" height="70" rx="6" fill="#450a0a" stroke="#ef4444"/>
+    <text x="440" y="55" text-anchor="middle" fill="#fca5a5" font-size="11" font-weight="600" font-family="Inter">NS</text>
+    <text x="440" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">DNS 服务器</text>
+    <text x="440" y="90" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">→ ns.example.com</text>
+    <!-- TXT -->
+    <rect x="510" y="35" width="60" height="70" rx="6" fill="#334155" stroke="#475569"/>
+    <text x="540" y="55" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="600" font-family="Inter">TXT</text>
+    <text x="540" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">文本</text>
+    <text x="540" y="90" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">验证</text>
+  </svg>
+</div>
+
+<div class="box box-blue">
+  <div class="title">📝 CNAME vs A 记录</div>
+  <ul>
+    <li><strong>A 记录</strong>：域名直接指向 IP</li>
+    <li><strong>CNAME</strong>：域名指向另一个域名（alias）</li>
+    <li>⚠️ CNAME 不能和其他记录共存（除了 DNSSEC）</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-cache">
+<h2 class="section-title"><span class="num">4</span> 缓存机制</h2>
+
+<p>DNS 查询涉及多级缓存，大幅减少延迟：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 160" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">DNS 缓存层级</text>
+    <!-- Browser -->
+    <rect x="30" y="40" width="100" height="45" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="80" y="58" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="600" font-family="Inter">浏览器缓存</text>
+    <text x="80" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">TTL 约 1 分钟</text>
+    <!-- OS -->
+    <rect x="150" y="40" width="100" height="45" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="200" y="58" text-anchor="middle" fill="#86efac" font-size="10" font-weight="600" font-family="Inter">操作系统缓存</text>
+    <text x="200" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">TTL 约 1 小时</text>
+    <!-- Local DNS -->
+    <rect x="270" y="40" width="120" height="45" rx="6" fill="#451a03" stroke="#f59e0b"/>
+    <text x="330" y="58" text-anchor="middle" fill="#fcd34d" font-size="10" font-weight="600" font-family="Inter">本地 DNS 服务器</text>
+    <text x="330" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">TTL 几分钟到几小时</text>
+    <!-- ISP DNS -->
+    <rect x="410" y="40" width="160" height="45" rx="6" fill="#450a0a" stroke="#ef4444"/>
+    <text x="490" y="58" text-anchor="middle" fill="#fca5a5" font-size="10" font-weight="600" font-family="Inter">ISP DNS / 公共 DNS</text>
+    <text x="490" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">TTL 几小时到几天</text>
+    <!-- TTL explanation -->
+    <rect x="30" y="105" width="540" height="40" rx="6" fill="#1e293b" border="1" stroke="#334155"/>
+    <text x="300" y="125" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">TTL (Time To Live)：记录的有效时间，越近的缓存 TTL 越短</text>
+  </svg>
+</div>
+
+<div class="analogy">
+  <div class="emoji">💾</div>
+  <h4>类比：图书馆</h4>
+  <ul>
+    <li>浏览器缓存 = 你刚查过的电话本（记得最清楚）</li>
+    <li>操作系统缓存 = 家里书架上的电话本（记得比较清楚）</li>
+    <li>本地 DNS = 小区物业的电话本（记得相当清楚）</li>
+    <li>ISP DNS = 市图书馆的电话本（记得最久）</li>
+  </ul>
+</div>
+
+<h3>TTL 的影响</h3>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 注意事项</div>
+  <ul>
+    <li><strong>修改 DNS 后</strong>：需要等待 TTL 过期才能生效</li>
+    <li><strong>TTL 设置</strong>：修改频繁的域名 TTL 短，稳定的域名 TTL 长</li>
+    <li><strong>缓存失效</strong>：TTL=0 时立即失效，需要重新查询</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">5</span> 交互演示</h2>
+
+<div class="demo">
+  <h4>🎮 DNS 查询流程</h4>
+  <p>观察 DNS 查询的完整过程：</p>
+  <div style="display:flex;gap:.5rem;margin-bottom:1rem">
+    <button onclick="startDnsQuery()">▶️ 开始查询</button>
+    <button onclick="resetDnsQuery()" style="background:linear-gradient(135deg,#64748b,#475569)">🔄 重置</button>
+  </div>
+  <div id="dns-demo" style="position:relative;height:280px;background:#0f172a;border-radius:8px;margin:1rem 0;padding:1rem">
+    <!-- Steps visualization -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:1rem">
+      <div id="step-client" class="dns-step" style="background:#172554;border:2px solid #334155;border-radius:6px;padding:.5rem;text-align:center">
+        <div style="color:#93c5fd;font-size:10px;font-weight:600">客户端</div>
+        <div id="client-status" style="color:#64748b;font-size:9px;margin-top:.25rem">等待</div>
+      </div>
+      <div id="step-local" class="dns-step" style="background:#14532d;border:2px solid #334155;border-radius:6px;padding:.5rem;text-align:center">
+        <div style="color:#86efac;font-size:10px;font-weight:600">本地 DNS</div>
+        <div id="local-status" style="color:#64748b;font-size:9px;margin-top:.25rem">等待</div>
+      </div>
+      <div id="step-root" class="dns-step" style="background:#450a0a;border:2px solid #334155;border-radius:6px;padding:.5rem;text-align:center">
+        <div style="color:#fca5a5;font-size:10px;font-weight:600">根服务器</div>
+        <div id="root-status" style="color:#64748b;font-size:9px;margin-top:.25rem">等待</div>
+      </div>
+      <div id="step-tld" class="dns-step" style="background:#451a03;border:2px solid #334155;border-radius:6px;padding:.5rem;text-align:center">
+        <div style="color:#fcd34d;font-size:10px;font-weight:600">.com 服务器</div>
+        <div id="tld-status" style="color:#64748b;font-size:9px;margin-top:.25rem">等待</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem">
+      <div id="step-auth" class="dns-step" style="background:#1e293b;border:2px solid #334155;border-radius:6px;padding:.5rem;text-align:center">
+        <div style="color:#a78bfa;font-size:10px;font-weight:600">权威 DNS</div>
+        <div id="auth-status" style="color:#64748b;font-size:9px;margin-top:.25rem">等待</div>
+      </div>
+      <div id="step-result" class="dns-step" style="background:#1e293b;border:2px solid #334155;border-radius:6px;padding:.5rem;text-align:center">
+        <div style="color:#94a3b8;font-size:10px;font-weight:600">查询结果</div>
+        <div id="result-status" style="color:#64748b;font-size:9px;margin-top:.25rem">-</div>
+      </div>
+    </div>
+  </div>
+  <div class="output" id="dns-output" style="min-height:60px;padding:.75rem;background:#1e293b;border-radius:6px;color:#94a3b8;font-size:12px;font-family:monospace">
+    点击"开始查询"按钮...
+  </div>
+</div>
+
+<div class="demo">
+  <h4>🔧 DNS 记录类型</h4>
+  <p>点击查看不同记录类型的说明：</p>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin:1rem 0">
+    <button onclick="showRecord('A')">A</button>
+    <button onclick="showRecord('AAAA')">AAAA</button>
+    <button onclick="showRecord('CNAME')">CNAME</button>
+    <button onclick="showRecord('MX')">MX</button>
+    <button onclick="showRecord('TXT')">TXT</button>
+    <button onclick="showRecord('NS')">NS</button>
+  </div>
+  <div id="record-detail" style="background:#1e293b;border-radius:6px;padding:1rem;color:#94a3b8;font-size:12px">
+    点击记录类型查看详情...
+  </div>
+</div>
+</section>
+
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">6</span> 总结</h2>
+
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">客户端<br><small>发起查询</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">本地 DNS<br><small>递归查询</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#ef4444">根服务器<br><small>.com 地址</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">TLD 服务器<br><small>权威 DNS</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#a855f7">权威 DNS<br><small>返回 IP</small></div>
+</div>
+
+<h3>核心知识点</h3>
+
+<table>
+  <tr><th>概念</th><th>说明</th></tr>
+  <tr><td>域名层级</td><td>根 → TLD → 二级域 → 子域</td></tr>
+  <tr><td>递归查询</td><td>DNS 服务器帮客户端查全程</td></tr>
+  <tr><td>迭代查询</td><td>服务器返回"去问下一个"</td></tr>
+  <tr><td>A 记录</td><td>域名 → IPv4</td></tr>
+  <tr><td>CNAME</td><td>别名 → 另一个域名</td></tr>
+  <tr><td>TTL</td><td>记录的缓存时间</td></tr>
+</table>
+
+<div class="box box-purple">
+  <div class="title">📚 延伸阅读</div>
+  <ul>
+    <li><a href="https://xiaolincoding.com/network/2_http/dns.html" target="_blank">小林coding - DNS 详解</a></li>
+    <li><a href="https://github.com/EathVader/EathVader.github.io/blob/main/public/dns/index.html" target="_blank">本文源码</a></li>
+  </ul>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p><a href="../http/">← HTTP 协议</a> | <a href="../">返回主页</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+let dnsTimer = null;
+const dnsSteps = [
+  { step: 'client', status: 'client-status', text: '客户端向本地 DNS 查询 www.example.com', active: ['step-client'] },
+  { step: 'local', status: 'local-status', text: '本地 DNS 缓存未命中，向根服务器查询 .com', active: ['step-client', 'step-local'] },
+  { step: 'root', status: 'root-status', text: '根服务器返回 .com 服务器的 IP', active: ['step-client', 'step-local', 'step-root'] },
+  { step: 'tld', status: 'tld-status', text: '本地 DNS 向 .com 服务器查询 example.com', active: ['step-client', 'step-local', 'step-root', 'step-tld'] },
+  { step: 'auth', status: 'auth-status', text: '.com 服务器返回权威 DNS 服务器', active: ['step-client', 'step-local', 'step-root', 'step-tld', 'step-auth'] },
+  { step: 'result', status: 'result-status', text: '权威 DNS 返回 IP: 93.184.216.34', active: ['step-client', 'step-local', 'step-root', 'step-tld', 'step-auth', 'step-result'], ip: '93.184.216.34' }
+];
+
+const recordInfo = {
+  'A': 'IPv4 地址记录，将域名映射到 IPv4 地址。示例：example.com → 93.184.216.34',
+  'AAAA': 'IPv6 地址记录，将域名映射到 IPv6 地址。示例：example.com → 2606:2800:220:1:248:1893:25c8:1946',
+  'CNAME': '规范名称记录，域名别名映射。示例：www.example.com → example.com。注意：CNAME 不能与其他记录共存。',
+  'MX': '邮件交换记录，指定处理邮件的服务器。示例：@ → mail.example.com，优先级 10',
+  'TXT': '文本记录，常用于 SPF（邮件反垃圾）、DKIM（邮件签名）、域名验证等。',
+  'NS': '名称服务器记录，指定域名的权威 DNS 服务器。示例：example.com → ns1.example.com'
+};
+
+function startDnsQuery() {
+  resetDnsQuery();
+  let idx = 0;
+  function next() {
+    if (idx >= dnsSteps.length) {
+      document.getElementById('dns-output').innerHTML = '✅ <strong>查询完成！</strong><br>www.example.com → 93.184.216.34';
+      return;
+    }
+    const s = dnsSteps[idx];
+    document.querySelectorAll('.dns-step').forEach(el => el.style.borderColor = '#334155');
+    s.active.forEach(id => {
+      const el = document.getElementById(id);
+      el.style.borderColor = id === 'step-client' ? '#3b82f6' : 
+                             id === 'step-local' ? '#22c55e' :
+                             id === 'step-root' ? '#ef4444' :
+                             id === 'step-tld' ? '#f59e0b' :
+                             id === 'step-auth' ? '#a855f7' : '#94a3b8';
+    });
+    document.getElementById(s.status).textContent = '✓';
+    if (s.ip) document.getElementById('result-status').textContent = s.ip;
+    document.getElementById('dns-output').textContent = s.text;
+    idx++;
+    dnsTimer = setTimeout(next, 1200);
+  }
+  next();
+}
+
+function resetDnsQuery() {
+  if (dnsTimer) clearTimeout(dnsTimer);
+  ['client', 'local', 'root', 'tld', 'auth', 'result'].forEach(s => {
+    document.getElementById(s + '-status').textContent = '等待';
+    document.getElementById(s === 'result' ? 'result-status' : s + '-status').textContent = '等待';
+  });
+  document.querySelectorAll('.dns-step').forEach(el => el.style.borderColor = '#334155');
+  document.getElementById('dns-output').textContent = '点击"开始查询"按钮...';
+}
+
+function showRecord(type) {
+  document.getElementById('record-detail').innerHTML = `<strong style="color:#60a5fa">${type}</strong><br><br>${recordInfo[type]}`;
+}
+
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => {
+  btn.classList.toggle('show', window.scrollY > 400);
+});
+</script>
+
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

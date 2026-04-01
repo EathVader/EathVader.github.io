@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="TCP四次挥手详解，从为什么需要四次挥手到TIME_WAIT状态的可视化交互演示">
+<meta property="og:type" content="article">
+<meta property="og:title" content="TCP 四次挥手详解">
+<meta property="og:description" content="TCP四次挥手详解，从为什么需要四次挥手到TIME_WAIT状态的可视化交互演示">
+<meta property="og:url" content="https://eathvader.github.io/tcp-wave/">
+<meta property="og:image" content="">
+<title>TCP 四次挥手详解 / TCP Four-Way Handshake</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "TCP 四次挥手详解",
+  "description": "TCP四次挥手详解，从为什么需要四次挥手到TIME_WAIT状态的可视化交互演示",
+  "author": {"@type": "Person", "name": "EathVader"},
+  "datePublished": "2026-04-01",
+  "dateModified": "2026-04-01",
+  "url": "https://eathvader.github.io/tcp-wave/"
+}
+</script>
+</head>
+<body>
+
+<header class="hero">
+  <h1>👋 <span>TCP 四次挥手</span> 详解</h1>
+  <p class="subtitle">为什么关闭连接需要"四次挥手"？TIME_WAIT 状态有什么用？<br>通过动画和图解，理解 TCP 连接的安全关闭</p>
+  <span class="badge">🔗 网络协议</span>
+  <span class="badge">📡 传输层</span>
+  <span class="badge">🎯 面试必考</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-why">为什么需要挥手？</a></li>
+    <li><a href="#sec-what">四次挥手是什么？</a></li>
+    <li><a href="#sec-timewait">TIME_WAIT 状态</a></li>
+    <li><a href="#sec-demo">交互演示</a></li>
+    <li><a href="#sec-summary">总结</a></li>
+  </ol>
+</nav>
+
+<section id="sec-why">
+<h2 class="section-title"><span class="num">1</span> 为什么需要挥手？</h2>
+
+<div class="analogy">
+  <div class="emoji">🚪</div>
+  <h4>生活类比</h4>
+  <p>想象你和朋友打电话：</p>
+  <ul>
+    <li>你说："我还有事，先挂了" → 你要关闭</li>
+    <li>朋友说："好的，你先挂吧" → 朋友确认</li>
+    <li>朋友也说："那我也挂了" → 朋友也要关闭</li>
+    <li>你说："好，再见" → 你确认</li>
+  </ul>
+  <p>TCP 四次挥手就是这个"双方确认要结束对话"的过程。</p>
+</div>
+
+<div class="box box-blue">
+  <div class="title">💡 关键点</div>
+  <p>TCP 是<strong>全双工通信</strong>，这意味着：</p>
+  <ul>
+    <li>客户端可以向服务器发送数据</li>
+    <li>服务器也可以向客户端发送数据</li>
+    <li>两个方向是<strong>独立</strong>的，需要分别关闭</li>
+  </ul>
+  <p>因此，关闭连接需要<strong>两个方向各发送一次 FIN</strong>，共四次。</p>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 120" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">全双工：两个独立通道</text>
+    <!-- Client to Server -->
+    <rect x="20" y="40" width="100" height="40" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="70" y="65" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="Inter">客户端</text>
+    <line x1="120" y1="50" x2="180" y2="50" stroke="#3b82f6" stroke-width="2" marker-end="url(#arr)"/>
+    <text x="150" y="42" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">数据</text>
+    <line x1="180" y1="70" x2="120" y2="70" stroke="#a78bfa" stroke-width="2" marker-end="url(#arr)"/>
+    <text x="150" y="80" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">数据</text>
+    <!-- Server -->
+    <rect x="480" y="40" width="100" height="40" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="530" y="65" text-anchor="middle" fill="#86efac" font-size="11" font-family="Inter">服务器</text>
+    <text x="300" y="105" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">两个方向独立关闭 → 需要 4 次交互</text>
+  </svg>
+</div>
+</section>
+
+<section id="sec-what">
+<h2 class="section-title"><span class="num">2</span> 四次挥手是什么？</h2>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 260" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">四次挥手流程</text>
+    <!-- Client -->
+    <rect x="30" y="35" width="100" height="40" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="80" y="60" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="600" font-family="Inter">客户端</text>
+    <!-- Server -->
+    <rect x="470" y="35" width="100" height="40" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="520" y="60" text-anchor="middle" fill="#86efac" font-size="11" font-weight="600" font-family="Inter">服务器</text>
+    <!-- Step 1: FIN -->
+    <line x1="130" y1="50" x2="250" y2="50" stroke="#ef4444" stroke-width="2" marker-end="url(#arr2)"/>
+    <rect x="160" y="35" width="80" height="18" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="200" y="48" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="Inter">FIN=1, Seq=M</text>
+    <text x="200" y="80" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">❶ FIN (客户端→服务器)</text>
+    <!-- Step 2: ACK -->
+    <line x1="370" y1="70" x2="470" y2="50" stroke="#22c55e" stroke-width="2" marker-end="url(#arr2)"/>
+    <rect x="320" y="55" width="90" height="18" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="365" y="68" text-anchor="middle" fill="#86efac" font-size="9" font-family="Inter">ACK=1, Ack=M+1</text>
+    <text x="365" y="100" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">❷ ACK (服务器→客户端)</text>
+    <!-- Step 3: FIN -->
+    <line x1="470" y1="110" x2="370" y2="130" stroke="#ef4444" stroke-width="2" marker-end="url(#arr2)"/>
+    <rect x="390" y="115" width="80" height="18" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="430" y="128" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="Inter">FIN=1, Seq=N</text>
+    <text x="430" y="160" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">❸ FIN (服务器→客户端)</text>
+    <!-- Step 4: ACK -->
+    <line x1="250" y1="150" x2="130" y2="170" stroke="#22c55e" stroke-width="2" marker-end="url(#arr2)"/>
+    <rect x="160" y="145" width="80" height="18" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="200" y="158" text-anchor="middle" fill="#86efac" font-size="9" font-family="Inter">ACK=1, Ack=N+1</text>
+    <text x="200" y="185" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">❹ ACK (客户端→服务器)</text>
+    <!-- Connection closed -->
+    <rect x="200" y="205" width="200" height="25" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="300" y="222" text-anchor="middle" fill="#fca5a5" font-size="10" font-weight="600" font-family="Inter">❌ 连接关闭!</text>
+  </svg>
+</div>
+
+<h3>四次挥手详解</h3>
+
+<div class="timeline">
+  <div class="timeline-item">
+    <div class="tl-label">❶ 第一次挥手</div>
+    <p><strong>客户端 → 服务器：FIN, Seq=M</strong></p>
+    <p>客户端发送 FIN=1 的包，表示<strong>我要关闭客户端→服务器的方向</strong>。</p>
+    <div class="box box-amber">
+      <div class="title">💡 此时状态</div>
+      <p>客户端进入 <strong>FIN_WAIT_1</strong> 状态，等待服务器的确认。</p>
+    </div>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">❷ 第二次挥手</div>
+    <p><strong>服务器 → 客户端：ACK, Ack=M+1</strong></p>
+    <p>服务器收到 FIN 后，发送 ACK 确认。此时：</p>
+    <ul>
+      <li>服务器可能还在发送数据</li>
+      <li>客户端→服务器方向关闭</li>
+      <li>服务器→客户端方向仍开放</li>
+    </ul>
+    <div class="box box-amber">
+      <div class="title">💡 此时状态</div>
+      <p>客户端进入 <strong>FIN_WAIT_2</strong>，服务器进入 <strong>CLOSE_WAIT</strong>。</p>
+    </div>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">❸ 第三次挥手</div>
+    <p><strong>服务器 → 客户端：FIN, Seq=N</strong></p>
+    <p>服务器完成数据发送后，发送 FIN 表示<strong>我要关闭服务器→客户端的方向</strong>。</p>
+    <div class="box box-amber">
+      <div class="title">💡 此时状态</div>
+      <p>服务器进入 <strong>LAST_ACK</strong> 状态，等待客户端的最后确认。</p>
+    </div>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">❹ 第四次挥手</div>
+    <p><strong>客户端 → 服务器：ACK, Ack=N+1</strong></p>
+    <p>客户端收到 FIN 后，发送 ACK 确认。</p>
+    <div class="box box-amber">
+      <div class="title">💡 此时状态</div>
+      <p>客户端进入 <strong>TIME_WAIT</strong>，服务器进入 <strong>CLOSED</strong>。</p>
+    </div>
+  </div>
+</div>
+
+<div class="box box-green">
+  <div class="title">🎯 为什么要四次？</div>
+  <p>相比三次握手，四次挥手多了一次，原因是：</p>
+  <ul>
+    <li><strong>半关闭状态</strong>：FIN 和 ACK 是分开发送的，因为关闭是<strong>半全双工</strong>的</li>
+    <li>服务器收到客户端的 FIN 后，先确认（第二次挥手），但可能还有数据要发送</li>
+    <li>等服务器数据发送完毕后，再发送自己的 FIN（第三次挥手）</li>
+  </ul>
+  <p>这确保了数据完整传输完毕后再关闭连接。</p>
+</div>
+</section>
+
+<section id="sec-timewait">
+<h2 class="section-title"><span class="num">3</span> TIME_WAIT 状态</h2>
+
+<p>客户端在收到服务器的 FIN 后，会进入 <strong>TIME_WAIT</strong> 状态，这是 TCP 最常被问到的知识点之一：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 180" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">TIME_WAIT 的作用</text>
+    <!-- Client -->
+    <rect x="50" y="40" width="140" height="100" rx="8" fill="#172554" stroke="#3b82f6"/>
+    <text x="120" y="60" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="600" font-family="Inter">客户端</text>
+    <text x="120" y="85" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">TIME_WAIT</text>
+    <text x="120" y="105" text-anchor="middle" fill="#fcd34d" font-size="10" font-family="Inter">等待 2MSL</text>
+    <text x="120" y="125" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">(约 60 秒)</text>
+    <!-- Server -->
+    <rect x="410" y="60" width="140" height="60" rx="8" fill="#14532d" stroke="#22c55e"/>
+    <text x="480" y="85" text-anchor="middle" fill="#86efac" font-size="10" font-weight="600" font-family="Inter">CLOSED</text>
+    <!-- Arrows -->
+    <line x1="190" y1="80" x2="280" y2="80" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4"/>
+    <text x="235" y="72" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter">ACK 可能丢失</text>
+    <line x1="280" y1="100" x2="410" y2="100" stroke="#ef4444" stroke-width="2" marker-end="url(#arr3)"/>
+    <text x="345" y="92" text-anchor="middle" fill="#fca5a5" font-size="9" font-family="Inter">如果丢失，重传 FIN</text>
+    <text x="300" y="160" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">确保服务器能收到最后的 ACK</text>
+  </svg>
+</div>
+
+<div class="box box-blue">
+  <div class="title">📝 TIME_WAIT 的两个作用</div>
+  <ol>
+    <li><strong>确保最后一个 ACK 能到达服务器</strong><br>
+    如果 ACK 丢失，服务器会重发 FIN，客户端需要等待并重发 ACK。</li>
+    <li><strong>让本次连接的所有数据在网络中消散</strong><br>
+    防止延迟的数据包被新连接误认为有效数据。</li>
+  </ol>
+</div>
+
+<div class="analogy">
+  <div class="emoji">⏱️</div>
+  <h4>类比：告别后再等一会儿</h4>
+  <p>你和朋友通完电话，你说"再见"，朋友说"好，再见"。你挂掉电话后，<strong>并没有立即走开</strong>，而是等了片刻，确认朋友已经真的挂掉了（没有其他话说）。</p>
+  <p>如果朋友突然又说"等等还有个事"，你还能听到。TCP 的 TIME_WAIT 就是这个"等片刻"的过程。</p>
+</div>
+
+<h3>2MSL 是什么？</h3>
+
+<div class="box box-amber">
+  <div class="title">⏱️ MSL = Maximum Segment Lifetime</div>
+  <p><strong>MSL</strong> 是数据包在网络中的最大生存时间，通常是 30 秒、60 秒或 2 分钟。</p>
+  <p><strong>2MSL</strong> 意味着等待两个最大生命周期，确保：</p>
+  <ul>
+    <li>去程的 FIN/ACK 最多活 1 个 MSL</li>
+    <li>回程的重传 FIN 也最多活 1 个 MSL</li>
+  </ul>
+  <p>这样所有本连接的数据包都会在 2MSL 内消失。</p>
+</div>
+
+<h3>TIME_WAIT 带来的问题</h3>
+
+<p>高并发服务器上，大量 TIME_WAIT 会导致：</p>
+
+<ul>
+  <li>占用内存</li>
+  <li>占用端口（客户端频繁连接）</li>
+</ul>
+
+<div class="box box-purple">
+  <div class="title">🔧 解决方案</div>
+  <ul>
+    <li><strong>服务端</strong>：设置 <code>SO_REUSEADDR</code>，允许重用 TIME_WAIT 的端口</li>
+    <li><strong>客户端</strong>：使用长连接，减少频繁创建/关闭连接</li>
+    <li><strong>调优</strong>：调整 <code>tcp_tw_reuse</code>、<code>tcp_max_tw_buckets</code> 等内核参数</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">4</span> 交互演示</h2>
+
+<div class="demo">
+  <h4>🎮 四次挥手动画演示</h4>
+  <p>点击"开始"按钮，观察四次挥手的完整过程：</p>
+  <div style="display:flex;gap:.5rem;margin-bottom:1rem">
+    <button onclick="startWave()">▶️ 开始</button>
+    <button onclick="resetWave()" style="background:linear-gradient(135deg,#64748b,#475569)">🔄 重置</button>
+  </div>
+  <div id="wave-demo" style="position:relative;height:250px;background:#0f172a;border-radius:8px;margin:1rem 0;overflow:hidden">
+    <!-- Client -->
+    <div style="position:absolute;left:20px;top:50%;transform:translateY(-50%);width:80px;height:60px;background:#172554;border:2px solid #3b82f6;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#93c5fd;font-size:11px">
+      客户端
+    </div>
+    <!-- Server -->
+    <div style="position:absolute;right:20px;top:50%;transform:translateY(-50%);width:80px;height:60px;background:#14532d;border:2px solid #22c55e;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#86efac;font-size:11px">
+      服务器
+    </div>
+    <!-- Messages -->
+    <div id="msg-fin1" class="msg-pkt" style="position:absolute;left:100px;top:70px;opacity:0">
+      <div style="background:#450a0a;border:1px solid #ef4444;padding:4px 8px;border-radius:4px;color:#fca5a5;font-size:9px">FIN<br>Seq=M</div>
+    </div>
+    <div id="msg-ack1" class="msg-pkt" style="position:absolute;left:300px;top:70px;opacity:0">
+      <div style="background:#14532d;border:1px solid #22c55e;padding:4px 8px;border-radius:4px;color:#86efac;font-size:9px">ACK<br>Ack=M+1</div>
+    </div>
+    <div id="msg-fin2" class="msg-pkt" style="position:absolute;left:300px;top:120px;opacity:0">
+      <div style="background:#450a0a;border:1px solid #ef4444;padding:4px 8px;border-radius:4px;color:#fca5a5;font-size:9px">FIN<br>Seq=N</div>
+    </div>
+    <div id="msg-ack2" class="msg-pkt" style="position:absolute;left:100px;top:150px;opacity:0">
+      <div style="background:#14532d;border:1px solid #22c55e;padding:4px 8px;border-radius:4px;color:#86efac;font-size:9px">ACK<br>Ack=N+1</div>
+    </div>
+    <!-- Status labels -->
+    <div id="status-client" style="position:absolute;left:20px;top:140px;font-size:9px;color:#64748b">-</div>
+    <div id="status-server" style="position:absolute;right:20px;top:140px;font-size:9px;color:#64748b">-</div>
+  </div>
+  <div class="output" id="wave-output" style="min-height:80px;padding:.75rem;background:#1e293b;border-radius:6px;color:#94a3b8;font-size:12px;font-family:monospace">
+    点击"开始"按钮开始动画...
+  </div>
+</div>
+
+<div class="demo">
+  <h4>🔢 状态机演示</h4>
+  <p>观察连接状态的变化：</p>
+  <div id="state-demo" style="display:flex;gap:1rem;flex-wrap:wrap;margin:1rem 0">
+    <div style="flex:1;min-width:120px;padding:1rem;background:#172554;border-radius:8px;border:2px solid #3b82f6">
+      <div style="color:#93c5fd;font-size:11px;font-weight:600;margin-bottom:.5rem">客户端</div>
+      <div id="client-state" style="color:#fcd34d;font-size:14px;font-weight:600">-</div>
+    </div>
+    <div style="flex:1;min-width:120px;padding:1rem;background:#14532d;border-radius:8px;border:2px solid #22c55e">
+      <div style="color:#86efac;font-size:11px;font-weight:600;margin-bottom:.5rem">服务器</div>
+      <div id="server-state" style="color:#fcd34d;font-size:14px;font-weight:600">-</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+    <button onclick="showWaveStep(0)">❶ FIN</button>
+    <button onclick="showWaveStep(1)">❷ ACK</button>
+    <button onclick="showWaveStep(2)">❸ FIN</button>
+    <button onclick="showWaveStep(3)">❹ ACK</button>
+  </div>
+</div>
+</section>
+
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">5</span> 总结</h2>
+
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">FIN<br><small>客户端→服务器</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">ACK<br><small>服务器→客户端</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#ef4444">FIN<br><small>服务器→客户端</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">ACK<br><small>客户端→服务器</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#a855f7">❌ 连接关闭</div>
+</div>
+
+<h3>核心知识点</h3>
+
+<table>
+  <tr><th>概念</th><th>说明</th></tr>
+  <tr><td>四次挥手</td><td>FIN→ACK→FIN→ACK，双方各发送一次 FIN</td></tr>
+  <tr><td>半关闭</td><td>每个方向可以独立关闭</td></tr>
+  <tr><td>TIME_WAIT</td><td>客户端等待 2MSL，确保 ACK 到达</td></tr>
+  <tr><td>2MSL</td><td>两个最大报文生存时间，确保数据消散</td></tr>
+  <tr><td>CLOSE_WAIT</td><td>服务器等待数据发送完毕</td></tr>
+</table>
+
+<div class="box box-purple">
+  <div class="title">📚 延伸阅读</div>
+  <ul>
+    <li><a href="https://xiaolincoding.com/network/2_http/tcp_four_wave.html" target="_blank">小林coding - TCP 四次挥手详解</a></li>
+    <li><a href="https://github.com/EathVader/EathVader.github.io/blob/main/public/tcp-wave/index.html" target="_blank">本文源码</a></li>
+  </ul>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p><a href="../">← 返回主页</a> | <a href="../tcp-handshake/">TCP 三次握手 →</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+let waveTimer = null;
+const waveSteps = [
+  { msg: 'fin1', clientState: 'FIN_WAIT_1', serverState: 'CLOSE_WAIT', text: '客户端发送 FIN，表示要关闭连接', show: ['msg-fin1'] },
+  { msg: 'ack1', clientState: 'FIN_WAIT_2', serverState: 'CLOSE_WAIT', text: '服务器发送 ACK 确认，客户端等待服务器关闭', show: ['msg-fin1', 'msg-ack1'] },
+  { msg: 'fin2', clientState: 'FIN_WAIT_2', serverState: 'LAST_ACK', text: '服务器发送 FIN，表示数据已发完', show: ['msg-fin1', 'msg-ack1', 'msg-fin2'] },
+  { msg: 'ack2', clientState: 'TIME_WAIT', serverState: 'CLOSED', text: '客户端发送 ACK，进入 TIME_WAIT 状态（等待 2MSL）', show: ['msg-fin1', 'msg-ack1', 'msg-fin2', 'msg-ack2'] }
+];
+
+function startWave() {
+  resetWave();
+  document.getElementById('wave-output').textContent = '开始四次挥手...';
+  let idx = 0;
+  function next() {
+    if (idx >= waveSteps.length) {
+      document.getElementById('wave-output').innerHTML = '✅ <strong>连接已关闭！</strong><br>客户端将等待 2MSL 后进入 CLOSED 状态。';
+      return;
+    }
+    showWaveStep(idx);
+    idx++;
+    waveTimer = setTimeout(next, 1500);
+  }
+  next();
+}
+
+function showWaveStep(idx) {
+  const s = waveSteps[idx];
+  document.getElementById('client-state').textContent = s.clientState;
+  document.getElementById('server-state').textContent = s.serverState;
+  document.getElementById('wave-output').textContent = s.text;
+  document.querySelectorAll('.msg-pkt').forEach(el => el.style.opacity = '0');
+  s.show.forEach(id => {
+    document.getElementById(id).style.opacity = '1';
+  });
+}
+
+function resetWave() {
+  if (waveTimer) clearTimeout(waveTimer);
+  document.getElementById('client-state').textContent = '-';
+  document.getElementById('server-state').textContent = '-';
+  document.querySelectorAll('.msg-pkt').forEach(el => el.style.opacity = '0');
+  document.getElementById('wave-output').textContent = '点击"开始"按钮开始动画...';
+}
+
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => {
+  btn.classList.toggle('show', window.scrollY > 400);
+});
+</script>
+
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

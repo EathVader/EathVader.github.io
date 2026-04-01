@@ -184,11 +184,59 @@ export const tutorials: Tutorial[] = [
     meta: '基于老钱的文章 · 2026-03',
   },
   {
+    slug: 'tcp-handshake',
+    tag: '🌐 网络协议',
+    title: 'TCP 三次握手详解',
+    description:
+      '为什么建立连接需要"三次握手"？Seq和Ack机制如何工作？通过动画和图解理解TCP可靠传输的起点。',
+    meta: '综合多篇文章 · 2026-04',
+  },
+  {
+    slug: 'tcp-wave',
+    tag: '🌐 网络协议',
+    title: 'TCP 四次挥手详解',
+    description:
+      '为什么关闭连接需要"四次挥手"？TIME_WAIT状态有什么用？通过动画理解TCP连接的安全关闭。',
+    meta: '综合多篇文章 · 2026-04',
+  },
+  {
+    slug: 'tcp-window',
+    tag: '🌐 网络协议',
+    title: 'TCP 滑动窗口与可靠传输',
+    description:
+      '滑动窗口如何实现流量控制？累计确认和选择重传如何保证可靠性？通过交互式动画深入理解。',
+    meta: '综合多篇文章 · 2026-04',
+  },
+  {
+    slug: 'http',
+    tag: '🌐 Web',
+    title: 'HTTP 协议详解',
+    description:
+      '从请求响应格式到方法、状态码、头信息，通过交互式演示深入理解Web的基石协议。',
+    meta: '综合多篇文章 · 2026-04',
+  },
+  {
+    slug: 'dns',
+    tag: '🌐 网络协议',
+    title: 'DNS 域名系统详解',
+    description:
+      '从域名到IP地址的翻译过程：递归查询、迭代查询、DNS记录类型、缓存机制一网打尽。',
+    meta: '综合多篇文章 · 2026-04',
+  },
+  {
+    slug: 'url-to-page',
+    tag: '🌐 Web',
+    title: '从输入URL到页面显示',
+    description:
+      '浏览器地址栏输入URL后发生了什么？DNS→TCP→TLS→HTTP→渲染，完整流程一网打尽。',
+    meta: '综合多篇文章 · 2026-04',
+  },
+  {
     slug: 'randomized-bst',
     tag: '🌲 树结构',
     title: '随机化搜索树 (Treap)',
     description:
-      '结合二叉搜索树与堆的特性，通过随机优先级实现自平衡。覆盖 Treap 原理、插入删除旋转、交互式演示，与 AVL/红黑树对比。',
+      '结合二叉搜索树与堆的特性，通过随机优先级实现自平衡。覆盖Treap原理、插入删除旋转、交互式演示，与AVL/红黑树对比。',
     meta: '基于 Martinez & Roura (1997) · 2026-03',
   },
 ];
