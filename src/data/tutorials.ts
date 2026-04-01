@@ -232,6 +232,30 @@ export const tutorials: Tutorial[] = [
     meta: '综合多篇文章 · 2026-04',
   },
   {
+    slug: 'switch-router',
+    tag: '🌐 网络协议',
+    title: '交换机与路由器区别详解',
+    description:
+      '一文读懂网络设备的核心差异：MAC地址 vs IP地址，二层 vs 三层，三层交换机 vs 路由器。',
+    meta: '综合多篇文章 · 2026-04',
+  },
+  {
+    slug: 'tcp-nagle',
+    tag: '🔗 网络协议',
+    title: 'TCP Nagle算法与Delay Ack',
+    description:
+      '经典性能问题：300KB数据延迟300ms的根因。Nagle算法和Delay Ack的相爱相伤，解决方案TCP_NODELAY。',
+    meta: '基于阿里技术文章 · 2026-04',
+  },
+  {
+    slug: 'tcp-interview',
+    tag: '🎯 面试必备',
+    title: 'TCP 面试15问',
+    description:
+      '15个经典TCP面试题：ACK确认、半打开状态、RST异常关闭、MSS/MTU、2MSL等待，面试常考。',
+    meta: '基于简书文章 · 2026-04',
+  },
+  {
     slug: 'randomized-bst',
     tag: '🌲 树结构',
     title: '随机化搜索树 (Treap)',

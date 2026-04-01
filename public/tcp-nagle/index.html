@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="TCP Nagle算法与Delay Ack优化：经典性能问题案例，300KB数据延迟300ms的根因分析">
+<meta property="og:type" content="article">
+<meta property="og:title" content="TCP Nagle算法与Delay Ack性能问题">
+<meta property="og:description" content="TCP Nagle算法与Delay Ack优化：经典性能问题案例，300KB数据延迟300ms的根因分析">
+<meta property="og:url" content="https://eathvader.github.io/tcp-nagle/">
+<meta property="og:image" content="">
+<title>TCP Nagle算法与Delay Ack / TCP Performance Issues</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "TCP Nagle算法与Delay Ack性能问题",
+  "description": "TCP Nagle算法与Delay Ack优化：经典性能问题案例，300KB数据延迟300ms的根因分析",
+  "author": {"@type": "Person", "name": "EathVader"},
+  "datePublished": "2026-04-01",
+  "dateModified": "2026-04-01",
+  "url": "https://eathvader.github.io/tcp-nagle/"
+}
+</script>
+</head>
+<body>
+
+<header class="hero">
+  <h1>⚡ <span>TCP Nagle算法</span> 与 Delay Ack</h1>
+  <p class="subtitle">经典性能问题：为什么300KB数据需要300ms？<br>Nagle算法和Delay Ack的相爱相杀</p>
+  <span class="badge">🔗 网络协议</span>
+  <span class="badge">⚡ 性能优化</span>
+  <span class="badge">🎯 面试常考</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-problem">问题场景</a></li>
+    <li><a href="#sec-delay-ack">什么是 Delay Ack？</a></li>
+    <li><a href="#sec-nagle">什么是 Nagle 算法？</a></li>
+    <li><a href="#sec-conflict">两者相遇的悲剧</a></li>
+    <li><a href="#sec-solution">解决方案</a></li>
+    <li><a href="#sec-demo">交互演示</a></li>
+    <li><a href="#sec-summary">总结</a></li>
+  </ol>
+</nav>
+
+<section id="sec-problem">
+<h2 class="section-title"><span class="num">1</span> 问题场景</h2>
+
+<div class="box box-red">
+  <div class="title">⚠️ 实际案例</div>
+  <p>某 PHP 服务通过 Nginx 封装后端存储：</p>
+  <ul>
+    <li>测试：小对象（几字节）→ 几毫秒，正常</li>
+    <li>上线：大对象（300KB）→ 300ms+，异常！</li>
+  </ul>
+  <p>单线程单次操作，无并发压力，却延迟300ms，无法接受。</p>
+</div>
+
+<div class="analogy">
+  <div class="emoji">🚚</div>
+  <h4>类比：快递公司</h4>
+  <p>想象快递公司有两个优化规则：</p>
+  <ul>
+    <li><strong>Delay Ack</strong>：收到快递后不立即回复，等有其他快递顺路一起回复</li>
+    <li><strong>Nagle</strong>：小包裹不急着发，等前面包裹确认收到再一起发</li>
+  </ul>
+  <p>如果两个规则同时启用，就会出现：两边互相等，都不发货！</p>
+</div>
+</section>
+
+<section id="sec-delay-ack">
+<h2 class="section-title"><span class="num">2</span> 什么是 Delay Ack？</h2>
+
+<p>TCP 是可靠传输，收到包后需要回复 ACK。但频繁回复 ACK 浪费带宽。</p>
+
+<div class="box box-blue">
+  <div class="title">📝 Delay Ack 机制</div>
+  <ol>
+    <li>收到包后<strong>不立即回复</strong>，等待一小段时间（如 40ms）</li>
+    <li>如果有其他数据发往对方，就<strong>搭顺风车</strong>（ACK 跟着数据一起发）</li>
+    <li>如果凑够 <strong>2 个 ACK</strong>，立即发送</li>
+    <li>如果超过 <strong>40ms</strong> 还是没有数据，也单独发送</li>
+  </ol>
+</div>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 140" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">Delay Ack 三种情况</text>
+    <!-- Case 1 -->
+    <rect x="30" y="35" width="170" height="80" rx="6" fill="#14532d" border="1" stroke="#22c55e"/>
+    <text x="115" y="55" text-anchor="middle" fill="#86efac" font-size="10" font-weight="600" font-family="Inter">情况1：搭顺风车</text>
+    <text x="115" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">有数据发往对方</text>
+    <text x="115" y="95" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">→ ACK 跟着数据一起发</text>
+    <!-- Case 2 -->
+    <rect x="215" y="35" width="170" height="80" rx="6" fill="#451a03" border="1" stroke="#f59e0b"/>
+    <text x="300" y="55" text-anchor="middle" fill="#fcd34d" font-size="10" font-weight="600" font-family="Inter">情况2：凑够2个</text>
+    <text x="300" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">收到 2 个包</text>
+    <text x="300" y="95" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">→ 立即回复一个 ACK</text>
+    <!-- Case 3 -->
+    <rect x="400" y="35" width="170" height="80" rx="6" fill="#450a0a" border="1" stroke="#ef4444"/>
+    <text x="485" y="55" text-anchor="middle" fill="#fca5a5" font-size="10" font-weight="600" font-family="Inter">情况3：超时</text>
+    <text x="485" y="75" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">等待 > 40ms</text>
+    <text x="485" y="95" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">→ 单独发 ACK</text>
+  </svg>
+</div>
+</section>
+
+<section id="sec-nagle">
+<h2 class="section-title"><span class="num">3</span> 什么是 Nagle 算法？</h2>
+
+<p>Nagle 算法用于优化小数据包的发送，减少网络开销。</p>
+
+<div class="box box-blue">
+  <div class="title">📝 Nagle 算法逻辑</div>
+  <pre style="margin:.5rem 0;font-size:11px;color:#e2e8f0"><code>if 要发送的数据 >= MSS:
+    立即发送
+else:
+    if 还有未确认的数据:
+        等待确认后再发
+    else:
+        立即发送</code></pre>
+</div>
+
+<div class="analogy">
+  <div class="emoji">📦</div>
+  <h4>一句话解释</h4>
+  <p><strong>小包裹不急发，等前面的确认到了再一起发。</strong></p>
+  <p>这样可以减少网络中小包的数量，节省带宽（早年带宽宝贵）。</p>
+</div>
+
+<div class="box box-amber">
+  <div name="title">⚠️ 默认开启</div>
+  <p>Nagle 算法默认是开启的，几乎所有操作系统都默认启用。</p>
+</div>
+</section>
+
+<section id="sec-conflict">
+<h2 class="section-title"><span class="num">4</span> 两者相遇的悲剧</h2>
+
+<p>当 Nagle 算法遇到 Delay Ack，就会产生<strong>200-500ms</strong>的延迟：</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/></marker></defs>
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">悲剧发生的过程</text>
+    <!-- Client -->
+    <rect x="30" y="35" width="80" height="35" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="70" y="57" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="600" font-family="Inter">客户端</text>
+    <!-- Server -->
+    <rect x="490" y="35" width="80" height="35" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="530" y="57" text-anchor="middle" fill="#86efac" font-size="10" font-weight="600" font-family="Inter">服务器</text>
+    <!-- Step 1 -->
+    <line x1="110" y1="50" x2="250" y2="50" stroke="#3b82f6" stroke-width="2"/>
+    <text x="180" y="42" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">发送 1460 字节</text>
+    <!-- Step 2 -->
+    <line x1="350" y1="60" x2="490" y2="60" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4"/>
+    <text x="420" y="52" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">等待完整HTTP请求</text>
+    <!-- Wait -->
+    <rect x="250" y="80" width="100" height="40" rx="4" fill="#450a0a" border="1" stroke="#ef4444"/>
+    <text x="300" y="105" text-anchor="middle" fill="#fca5a5" font-size="10" font-weight="600" font-family="Inter">互相等待！</text>
+    <!-- Arrows -->
+    <line x1="300" y1="125" x2="250" y2="145" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arr2)"/>
+    <text x="220" y="150" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">Nagle: 等ACK</text>
+    <line x1="300" y1="125" x2="350" y2="145" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arr2)"/>
+    <text x="380" y="150" text-anchor="middle" fill="#64748b" font-size="8" font-family="Inter">Delay Ack: 等数据</text>
+    <!-- Result -->
+    <rect x="200" y="160" width="200" height="25" rx="4" fill="#450a0a" stroke="#dc2626"/>
+    <text x="300" y="177" text-anchor="middle" fill="#fca5a5" font-size="10" font-weight="600" font-family="Inter">→ 延迟 40ms+ 直到 Delay Ack 超时</text>
+  </svg>
+</div>
+
+<h3>经典案例：99,900 bytes vs 100,000 bytes</h3>
+
+<div class="box box-amber">
+  <div class="title">📊 数据对比</div>
+  <ul>
+    <li><strong>99,900 bytes</strong> → 速度 5.2MB/s（正常）</li>
+    <li><strong>100,000 bytes</strong> → 速度 2.7MB/s（慢一倍！）</li>
+  </ul>
+  <p>原因：100,000 = 69×1448 + 88，最后 88 字节触发 Nagle 等待。</p>
+</div>
+
+<div class="timeline">
+  <div class="timeline-item">
+    <div class="tl-label">❶ 99,900 字节</div>
+    <p>68个整包 + 1436 字节 → 68是偶数，立即发送，Delay Ack 凑够2个也立即回复。</p>
+  </div>
+  <div class="timeline-item">
+    <div class="tl-label">❷ 100,000 字节</div>
+    <p>69个整包 + 88 字节 → 最后一个包太小，Nagle 等待前面的 ACK；服务器 Delay Ack 只收到一个包，超时才回复。</p>
+  </div>
+</div>
+</section>
+
+<section id="sec-solution">
+<h2 class="section-title"><span class="num">5</span> 解决方案</h2>
+
+<div class="box box-green">
+  <div class="title">✅ 解决方案</div>
+  <ol>
+    <li><strong>禁用 Nagle 算法</strong>：设置 TCP_NODELAY</li>
+    <li><strong>合并 HTTP 请求</strong>：禁用 Expect 头</li>
+    <li><strong>调整超时参数</strong>：减少 Delay Ack 等待时间</li>
+  </ol>
+</div>
+
+<h3>代码示例</h3>
+
+<pre><code>// Curl 示例：禁用 Expect 头
+struct curl_slist *list = NULL;
+list = curl_slist_append(list, "Expect:");
+
+// 根据请求大小决定是否禁用 Nagle
+if (request.size() < 1024) {
+    curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1);  // 小包：禁用
+} else {
+    curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 0);   // 大包：启用
+}</code></pre>
+
+<div class="box box-purple">
+  <div class="title">🔧 其他语言</div>
+  <ul>
+    <li><strong>Go</strong>: <code>conn.(*net.TCPConn).SetNoDelay(true)</code></li>
+    <li><strong>Java</strong>: <code>socket.setTcpNoDelay(true)</code></li>
+    <li><strong>Python</strong>: <code>socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)</code></li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">6</span> 交互演示</h2>
+
+<div class="demo">
+  <h4>🎮 Nagle vs No-Nagle 对比</h4>
+  <p>观察两种模式的延迟差异：</p>
+  <div style="display:flex;gap:.5rem;margin-bottom:1rem">
+    <button onclick="startNagleDemo(true)">▶️ Nagle 算法</button>
+    <button onclick="startNagleDemo(false)">▶️ 禁用 Nagle</button>
+    <button onclick="resetNagleDemo()" style="background:linear-gradient(135deg,#64748b,#475569)">🔄 重置</button>
+  </div>
+  <div style="display:flex;gap:1rem;margin:1rem 0;flex-wrap:wrap">
+    <div style="flex:1;min-width:200px;padding:1rem;background:#172554;border-radius:8px;border:2px solid #3b82f6">
+      <div style="color:#93c5fd;font-size:11px;font-weight:600;margin-bottom:.5rem">数据包</div>
+      <div id="packet-viz" style="display:flex;gap:4px;flex-wrap:wrap;min-height:30px"></div>
+    </div>
+    <div style="flex:1;min-width:150px;padding:1rem;background:#14532d;border-radius:8px;border:2px solid #22c55e">
+      <div style="color:#86efac;font-size:11px;font-weight:600;margin-bottom:.5rem">延迟</div>
+      <div id="delay-viz" style="font-size:24px;font-weight:700;color:#22c55e">-</div>
+    </div>
+  </div>
+  <div class="output" id="nagle-output" style="min-height:60px;padding:.75rem;background:#1e293b;border-radius:6px;color:#94a3b8;font-size:12px;font-family:monospace">
+    点击按钮开始演示...
+  </div>
+</div>
+</section>
+
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">7</span> 总结</h2>
+
+<div class="flow">
+  <div class="step" style="border-color:#f59e0b">Nagle<br><small>等前面的ACK</small></div>
+  <div class="arrow">+</div>
+  <div class="step" style="border-color:#ef4444">Delay Ack<br><small>等顺风车</small></div>
+  <div class="arrow">=</div>
+  <div class="step" style="border-color:#dc2626">❌ 延迟 40ms+</div>
+</div>
+
+<h3>核心知识点</h3>
+
+<table>
+  <tr><th>概念</th><th>说明</th></tr>
+  <tr><td>Delay Ack</td><td>收到包后延迟回复ACK，等顺风车或超时</td></tr>
+  <tr><td>Nagle 算法</td><td>小包等待前面的ACK确认后再发</td></tr>
+  <tr><td>悲剧场景</td><td>Nagle 等 ACK，Delay Ack 等数据，互相等待</td></tr>
+  <tr><td>解决方案</td><td>禁用 Nagle (TCP_NODELAY)</td></tr>
+  <tr><td>适用场景</td><td>高频小请求（如 RPC、HTTP）、需要低延迟的场景</td></tr>
+</table>
+
+<div class="box box-purple">
+  <div class="title">📚 延伸阅读</div>
+  <ul>
+    <li><a href="http://jm.taobao.org/2017/06/01/20170601/" target="_blank">就是让你懂 TCP - 最经典的TCP性能问题</a></li>
+    <li><a href="http://www.stuartcheshire.org/papers/nagledelayedack/" target="_blank">Nagle and Delayed ACK Paper</a></li>
+  </ul>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p><a href="../switch-router/">← 交换机与路由器</a> | <a href="../">返回主页</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+let nagleTimer = null;
+function startNagleDemo(useNagle) {
+  resetNagleDemo();
+  const packetViz = document.getElementById('packet-viz');
+  const delayViz = document.getElementById('delay-viz');
+  const output = document.getElementById('nagle-output');
+  
+  // 模拟发送 300KB 数据
+  const packets = Math.floor(300 * 1024 / 1460);
+  const lastSize = 300 * 1024 % 1460;
+  
+  if (useNagle) {
+    output.textContent = 'Nagle 算法：等待前面的 ACK...';
+    let delay = 0;
+    for (let i = 0; i < packets; i++) {
+      setTimeout(() => {
+        packetViz.innerHTML += '<div style="width:20px;height:20px;background:#3b82f6;border-radius:3px;flex-shrink:0"></div>';
+        if (i === packets - 1 && lastSize > 0) {
+          packetViz.innerHTML += '<div style="width:20px;height:20px;background:#f59e0b;border-radius:3px;flex-shrink:0"></div>';
+        }
+      }, i * 50);
+    }
+    // 最后一个小包触发 Nagle 等待
+    setTimeout(() => {
+      delayViz.textContent = '40ms+';
+      delayViz.style.color = '#ef4444';
+      output.innerHTML = '⚠️ <strong>最后小包触发等待！</strong><br>Nagle 等待 ACK，服务器 Delay Ack 等待数据...';
+    }, packets * 50 + 50);
+  } else {
+    output.textContent = '禁用 Nagle (TCP_NODELAY)：立即发送...';
+    for (let i = 0; i < packets; i++) {
+      setTimeout(() => {
+        packetViz.innerHTML += '<div style="width:20px;height:20px;background:#22c55e;border-radius:3px;flex-shrink:0"></div>';
+      }, i * 30);
+    }
+    setTimeout(() => {
+      delayViz.textContent = '~5ms';
+      delayViz.style.color = '#22c55e';
+      output.innerHTML = '✅ <strong>正常延迟！</strong><br>禁用 Nagle 后，数据立即发送，无等待。';
+    }, packets * 30 + 30);
+  }
+}
+
+function resetNagleDemo() {
+  document.getElementById('packet-viz').innerHTML = '';
+  document.getElementById('delay-viz').textContent = '-';
+  document.getElementById('delay-viz').style.color = '#22c55e';
+  document.getElementById('nagle-output').textContent = '点击按钮开始演示...';
+}
+
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => {
+  btn.classList.toggle('show', window.scrollY > 400);
+});
+</script>
+
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

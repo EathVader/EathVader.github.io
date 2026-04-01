@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="TCP面试15问：进程收到ACK就真的收到数据了吗？为什么多一次挥手？半打开状态？RST？MSS和MTU？15个经典面试题一网打尽">
+<meta property="og:type" content="article">
+<meta property="og:title" content="TCP 面试15问">
+<meta property="og:description" content="TCP面试15问：进程收到ACK就真的收到数据了吗？为什么多一次挥手？半打开状态？RST？MSS和MTU？15个经典面试题一网打尽">
+<meta property="og:url" content="https://eathvader.github.io/tcp-interview/">
+<meta property="og:image" content="">
+<title>TCP 面试15问 / TCP Interview Questions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "TCP 面试15问",
+  "description": "TCP面试15问：15个经典面试题一网打尽",
+  "author": {"@type": "Person", "name": "EathVader"},
+  "datePublished": "2026-04-01",
+  "dateModified": "2026-04-01",
+  "url": "https://eathvader.github.io/tcp-interview/"
+}
+</script>
+</head>
+<body>
+
+<header class="hero">
+  <h1>🎯 <span>TCP 面试15问</span></h1>
+  <p class="subtitle">15个经典 TCP 面试题，涵盖状态机、连接管理、细节原理<br>进程收到 ACK 就真的收到数据了吗？</p>
+  <span class="badge">🔗 网络协议</span>
+  <span class="badge">🎯 面试必备</span>
+  <span class="badge">💼 工程师</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#q1">基础概念</a></li>
+    <li><a href="#q3">挥手细节</a></li>
+    <li><a href="#q4">异常状态</a></li>
+    <li><a href="#q11">MSS/MTU</a></li>
+    <li><a href="#q13">连接关闭</a></li>
+    <li><a href="#sec-summary">总结</a></li>
+  </ol>
+</nav>
+
+<section id="q1">
+<h2 class="section-title"><span class="num">Q1</span> 进程 A 发送字符串"hello"，TCP 返回成功确认，进程 A 能否确定进程 B 收到了？</h2>
+
+<div class="box box-red">
+  <div class="title">❌ 答案：不能！</div>
+</div>
+
+<p>TCP 确认收到，只表示<strong>数据到达了进程 B 的 TCP 缓冲区</strong>，并不表示进程 B 已经读取。</p>
+
+<div class="analogy">
+  <div class="emoji">📬</div>
+  <h4>类比：邮局</h4>
+  <p>邮局告诉你"信已送到"，但收件人可能还没打开邮箱。TCP 的"确认"就是邮局的送达通知，不是收件人的阅读确认。</p>
+</div>
+
+<div class="box box-amber">
+  <div class="title">💡 风险</h4>
+  <p>如果此时机器突然掉电，缓冲区数据丢失，进程 B 将无法收到"hello"。</p>
+</div>
+</section>
+
+<section id="q2">
+<h2 class="section-title"><span class="num">Q2</span> 如何尽量避免上述情况？</h2>
+
+<div class="box box-green">
+  <div class="title">✅ 答案：设置 PSH 标志</div>
+</div>
+
+<p>在 TCP 报文段首部设置 <strong>PSH (Push) 标志</strong>，告诉接收方 TCP 尽快将数据交给进程，不要缓存。</p>
+
+<pre><code>// 示例：socket 设置
+socket.setOption(TCP_NODELAY, true);  // 或者使用 PSH 标志
+</code></pre>
+</section>
+
+<section id="q3">
+<h2 class="section-title"><span class="num">Q3</span> 为什么关闭连接需要 4 次挥手，而建立连接只需要 3 次握手？</h2>
+
+<div class="box box-blue">
+  <div class="title">📝 答案</div>
+</div>
+
+<p><strong>TCP 是全双工</strong>，两个方向可以独立关闭。</p>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 100" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">四次挥手详解</text>
+    <rect x="30" y="35" width="540" height="50" rx="6" fill="#1e293b" border="1" stroke="#334155"/>
+    <text x="300" y="65" text-anchor="middle" fill="#e2e8f0" font-size="10" font-family="Inter">A发送FIN → B确认(半关闭) → B发送FIN → A确认 → 连接关闭</text>
+  </svg>
+</div>
+
+<p>因为 TCP 允许<strong>半关闭状态</strong>：</p>
+<ul>
+  <li>A 发送 FIN："我要发完数据了"</li>
+  <li>B 确认："好的，但你可能还没发完"</li>
+  <li>B 继续发送数据...</li>
+  <li>B 发完 → 发送 FIN</li>
+  <li>A 确认 → 完全关闭</li>
+</ul>
+</section>
+
+<section id="q4">
+<h2 class="section-title"><span class="num">Q4</span> 服务器突然掉电重启，客户端不知情，二者之间的 TCP 连接处于什么状态？</h2>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 答案：半打开状态</div>
+</div>
+
+<p>客户端还认为连接正常，但服务器已经没有连接信息了。</p>
+
+<div class="analogy">
+  <div class="emoji">🚪</div>
+  <h4>类比</h4>
+  <p>你打电话对方手机突然关机，你不知道，还以为通话中。这就是"半打开"——一边还保持着会话，另一边已经重置了。</p>
+</div>
+</section>
+
+<section id="q5">
+<h2 class="section-title"><span class="num">Q5</span> 客户端通过半打开连接向服务器请求数据，服务器会怎么做？</h2>
+
+<div class="box box-red">
+  <div class="title">❌ 答案：发送 RST</div>
+</div>
+
+<p>服务器收到请求后：</p>
+<ol>
+  <li>进行 ARP 查询获取客户端 MAC</li>
+  <li>发现没有连接信息（丢失了）</li>
+  <li>发送 <strong>RST (Reset)</strong> 给客户端</li>
+</ol>
+
+<div class="box box-blue">
+  <div class="title">💡 RST 的含义</div>
+  <p>"哥们，我不认识你，想跟我说话请先发送 SYN！"</p>
+</div>
+</section>
+
+<section id="q6">
+<h2 class="section-title"><span class="num">Q6</span> 客户端重新建立连接但端口号错误，会发生什么？</h2>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 答案：两种情况</div>
+</div>
+
+<ol>
+  <li><strong>有进程监听该端口</strong>：TCP 交给进程，进程可能拒绝并发送 RST</li>
+  <li><strong>无进程监听</strong>：TCP 直接发送 RST（大多数情况）</li>
+</ol>
+</section>
+
+<section id="q7">
+<h2 class="section-title"><span class="num">Q7</span> 多进程服务器，进程 A 接受连接后新建进程 B 处理，进程 ABC 是否监听同一端口？</h2>
+
+<div class="box box-green">
+  <div class="title">✅ 答案：是！</div>
+</div>
+
+<p>所有连接请求首先到达<strong>监听进程 A</strong>，通过 <code>&lt;sourceIP:port, targetIP:port&gt;</code> 四元组区分不同连接，交给进程 B 或 C。</p>
+</section>
+
+<section id="q8">
+<h2 class="section-title"><span class="num">Q8</span> TCP 如何决定把报文段发给哪个进程？</h2>
+
+<div class="box box-blue">
+  <div class="title">📝 答案</div>
+</div>
+
+<ul>
+  <li><strong>SYN 包</strong>：全部交给监听进程 A</li>
+  <li><strong>其他包</strong>：根据四元组 (src_ip, src_port, dst_ip, dst_port) 决定</li>
+</ul>
+</section>
+
+<section id="q9">
+<h2 class="section-title"><span class="num">Q9</span> 服务器正在创建进程时又有新连接请求，TCP 如何处理？</h2>
+
+<div class="box box-blue">
+  <div class="title">📝 答案</div>
+</div>
+
+<p>服务器进程 A 会让 TCP 维护一个<strong>连接队列</strong>。三次握手后，连接放入队列，服务器进程在合适时取走。</p>
+</section>
+
+<section id="q10">
+<h2 class="section-title"><span class="num">Q10</span> 连接队列会影响并发处理能力吗？</h2>
+
+<div class="box box-green">
+  <div class="title">✅ 答案：不会！</div>
+</div>
+
+<p>队列只影响"等待处理"的连接数量，不影响实际处理能力。并发能力取决于服务器进程设计和硬件。</p>
+</section>
+
+<section id="q11">
+<h2 class="section-title"><span class="num">Q11</span> MSS 和 MTU 是什么？二者是什么关系？</h2>
+
+<div class="box box-blue">
+  <div class="title">📝 答案</div>
+</div>
+
+<ul>
+  <li><strong>MSS</strong>：TCP 最大报文段长度（数据部分）</li>
+  <li><strong>MTU</strong>：最大传输单元（包含头部）</li>
+</ul>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 80" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">MTU = MSS + IP头(20) + TCP头(20)</text>
+    <rect x="50" y="35" width="500" height="30" rx="4" fill="#1e293b" border="1" stroke="#334155"/>
+    <text x="100" y="55" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">MTU 1500</text>
+    <text x="250" y="55" text-anchor="middle" fill="#ef4444" font-size="10" font-family="Inter">MSS 1460</text>
+    <text x="400" y="55" text-anchor="middle" fill="#f59e0b" font-size="10" font-family="Inter">IP头 20</text>
+    <text x="500" y="55" text-anchor="middle" fill="#f59e0b" font-size="10" font-family="Inter">TCP头 20</text>
+  </svg>
+</div>
+
+<p>例如 MTU=1500 字节，MSS 只能是 1460 字节。</p>
+</section>
+
+<section id="q12">
+<h2 class="section-title"><span class="num">Q12</span> 机器 A (MSS=1400) 向机器 B (MSS=1600) 发送 1600 字节数据，可以吗？</h2>
+
+<div class="box box-red">
+  <div class="title">❌ 答案：不可以！</div>
+</div>
+
+<p>虽然没突破 B 的 MSS，但突破了 A 自己的 MSS。数据会被切分为 2 个 IP 片，每个 840 字节，带重复的头部，<strong>降低传输效率</strong>。</p>
+</section>
+
+<section id="q13">
+<h2 class="section-title"><span class="num">Q13</span> 机器 A 想尽快断开连接，应该怎么办？</h2>
+
+<div class="box box-red">
+  <div class="title">❌ 答案：发送 RST</div>
+</div>
+
+<p>直接发送 <strong>RST (Reset)</strong> 标志，表示异常关闭："我关闭连接了，你看着办吧。"</p>
+</section>
+
+<section id="q14">
+<h2 class="section-title"><span class="num">Q14</span> 收到 RST 后，TCP 会怎么做？</h2>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 答案</div>
+</div>
+
+<p>TCP 告诉上层进程"连接已断开"，直接回收连接资源，<strong>不发送任何确认</strong>给对端。</p>
+</section>
+
+<section id="q15">
+<h2 class="section-title"><span class="num">Q15</span> 收到 FIN 并回复 ACK，算完成 4 次挥手了吗？</h2>
+
+<div class="box box-red">
+  <div class="title">❌ 答案：不算！</div>
+</div>
+
+<p>还需要等待 <strong>2MSL</strong>：</p>
+<ul>
+  <li>防止 ACK 没送到对方，对方重传 FIN</li>
+  <li>确保连接不会跟后续连接混在一起</li>
+</ul>
+
+<div class="box box-blue">
+  <div class="title">📝 MSL</div>
+  <p>MSL (Maximum Segment Lifetime)：报文在网络中的最大存活时间，通常 2 分钟。Linux 默认 30 秒。</p>
+</div>
+</section>
+
+<section id="sec-summary">
+<h2 class="section-title">📋 总结</h2>
+
+<table>
+  <tr><th>类别</th><th>题目</th></tr>
+  <tr><td>可靠性</td><td>Q1-Q2 (ACK、PSH)</td></tr>
+  <tr><td>连接管理</td><td>Q3-Q5 (挥手、半打开、RST)</td></tr>
+  <tr><td>多进程</td><td>Q6-Q10 (端口、队列)</td></tr>
+  <tr><td>数据边界</td><td>Q11-Q12 (MSS/MTU)</td></tr>
+  <tr><td>异常关闭</td><td>Q13-Q15 (RST、2MSL)</td></tr>
+</table>
+
+<div class="box box-purple">
+  <div class="title">📚 参考来源</div>
+  <ul>
+    <li><a href="http://www.jianshu.com/p/511ba5d71aef" target="_blank">这几个问题答不对，就别说精通TCP</a></li>
+  </ul>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p><a href="../tcp-nagle/">← TCP Nagle算法</a> | <a href="../">返回主页</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+const btn = document.getElementById('backTop');
+window.addEventListener('scroll', () => {
+  btn.classList.toggle('show', window.scrollY > 400);
+});
+</script>
+
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDORuTVww"
+        data-category="General"
+        data-category-id="DIC_kwDORuTVw84C5OW8"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="dark_dimmed"
+        data-lang="zh-CN"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async>
+</script>
+</div>
+
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>
