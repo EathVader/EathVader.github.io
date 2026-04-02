@@ -263,4 +263,52 @@ export const tutorials: Tutorial[] = [
       '结合二叉搜索树与堆的特性，通过随机优先级实现自平衡。覆盖Treap原理、插入删除旋转、交互式演示，与AVL/红黑树对比。',
     meta: '基于 Martinez & Roura (1997) · 2026-03',
   },
+  {
+    slug: 'osi-model',
+    tag: '🌐 网络协议',
+    title: '网络协议模型：七层、五层、四层',
+    description:
+      '详解OSI七层模型、TCP/IP五层模型和四层模型的概念、功能及各层协议，数据封装与解封装过程，含交互式层点击查看。',
+    meta: '基于 CSDN 技术文章 · 2026-04',
+  },
+  {
+    slug: 'http-idempotent',
+    tag: '🌐 Web',
+    title: 'HTTP幂等性概念与应用',
+    description:
+      '详解HTTP幂等性概念，分布式事务vs幂等设计，GET/POST/PUT/DELETE的幂等性分析，及实际应用场景。含交互式判断练习。',
+    meta: '基于酷壳 CoolShell · 2026-04',
+  },
+  {
+    slug: 'tcp-fsm',
+    tag: '🌐 网络协议',
+    title: 'TCP状态机与重传机制',
+    description:
+      '深入理解TCP状态机、三次握手四次挥手、SYN超时、TIME_WAIT、超时重传与快速重传机制。含交互式握手过程模拟。',
+    meta: '基于程序猿说你好/酷壳 · 2026-04',
+  },
+  {
+    slug: 'http-server',
+    tag: '🌐 Web',
+    title: 'Http Server 的演进：从单进程到epoll',
+    description:
+      '用故事理解Http Server的演进：从单进程阻塞到多进程、select模型，再到epoll，理解高并发网络编程的核心思想。',
+    meta: '基于码农翻身 · 2026-04',
+  },
+  {
+    slug: 'http-interview',
+    tag: '🌐 Web',
+    title: 'HTTP 协议详解',
+    description:
+      '全面理解HTTP协议：请求响应模型、8种请求方法、状态码、请求/响应头、内容协商、缓存机制，面试常考知识点一网打尽。',
+    meta: '基于 SegmentFault · 2026-04',
+  },
+  {
+    slug: 'load-average',
+    tag: '🔧 系统运维',
+    title: '一分钟理解负载 Load Average',
+    description:
+      '用马路和汽车的比喻，一分钟理解Linux系统负载Load Average的含义、查看方法和不同数值的意义。',
+    meta: '基于架构师之路 · 2026-04',
+  },
 ];

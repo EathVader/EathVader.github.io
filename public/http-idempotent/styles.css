@@ -1,0 +1,386 @@
+:root {
+    --primary: #4d96ff;
+    --secondary: #6bcb77;
+    --accent: #ff6b6b;
+    --warning: #ffd93d;
+    --text: #333;
+    --text-light: #666;
+    --bg: #f5f7fa;
+    --card-bg: #fff;
+    --border: #e1e5eb;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.7;
+    color: var(--text);
+    background: var(--bg);
+    margin: 0;
+    padding: 0;
+}
+
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--primary);
+    color: white;
+    padding: 8px 16px;
+    z-index: 100;
+    transition: top 0.3s;
+}
+
+.skip-link:focus {
+    top: 0;
+}
+
+header {
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+}
+
+.breadcrumb {
+    max-width: 900px;
+    margin: 0 auto;
+    font-size: 14px;
+    color: var(--text-light);
+}
+
+.breadcrumb a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px;
+}
+
+article {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 40px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+h1 {
+    font-size: 2rem;
+    margin: 0 0 8px;
+}
+
+h2 {
+    font-size: 1.5rem;
+    margin: 32px 0 16px;
+    color: var(--text);
+    border-bottom: 2px solid var(--primary);
+    padding-bottom: 8px;
+}
+
+h3 {
+    font-size: 1.2rem;
+    margin: 24px 0 12px;
+}
+
+h4 {
+    font-size: 1rem;
+    margin: 16px 0 8px;
+}
+
+p {
+    margin: 12px 0;
+}
+
+.meta {
+    font-size: 14px;
+    color: var(--text-light);
+    margin-bottom: 24px;
+}
+
+ul, ol {
+    padding-left: 24px;
+    margin: 12px 0;
+}
+
+li {
+    margin: 8px 0;
+}
+
+pre {
+    background: #282c34;
+    color: #abb2bf;
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+code {
+    font-family: "Fira Code", "Consolas", monospace;
+    font-size: 0.9em;
+}
+
+blockquote {
+    border-left: 4px solid var(--primary);
+    margin: 16px 0;
+    padding: 12px 20px;
+    background: var(--bg);
+    font-style: italic;
+}
+
+.example-box {
+    background: #fff3cd;
+    border-left: 4px solid var(--warning);
+    padding: 20px;
+    border-radius: 0 8px 8px 0;
+    margin: 16px 0;
+}
+
+.highlight-box {
+    background: #d4edda;
+    border-left: 4px solid var(--secondary);
+    padding: 16px 20px;
+    border-radius: 0 8px 8px 0;
+    margin: 16px 0;
+}
+
+.pros-cons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0;
+}
+
+.pros, .cons {
+    padding: 16px;
+    border-radius: 8px;
+}
+
+.pros {
+    background: #d4edda;
+}
+
+.cons {
+    background: #f8d7da;
+}
+
+.pros h4, .cons h4 {
+    margin-top: 0;
+    color: var(--text);
+}
+
+.pros ul, .cons ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.method-table {
+    overflow-x: auto;
+    margin: 16px 0;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+th, td {
+    padding: 12px;
+    text-align: left;
+    border: 1px solid var(--border);
+}
+
+th {
+    background: var(--bg);
+    font-weight: 600;
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.badge.idempotent {
+    background: #d4edda;
+    color: #155724;
+}
+
+.badge.non-idempotent {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.badge.uncertain {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.method-detail {
+    background: var(--bg);
+    padding: 24px;
+    border-radius: 8px;
+    margin: 24px 0;
+}
+
+.method-detail h3 {
+    color: var(--primary);
+    margin-top: 20px;
+}
+
+.method-detail h3:first-child {
+    margin-top: 0;
+}
+
+.method-detail code {
+    background: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #d63384;
+}
+
+.note {
+    font-size: 13px;
+    color: var(--text-light);
+    font-style: italic;
+    background: #e7f3ff;
+    padding: 12px;
+    border-radius: 6px;
+    margin-top: 12px;
+}
+
+.interactive-quiz {
+    background: var(--bg);
+    padding: 24px;
+    border-radius: 8px;
+    margin: 24px 0;
+}
+
+.quiz-items {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.quiz-item {
+    background: var(--card-bg);
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.quiz-item:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.quiz-question {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+}
+
+.quiz-method {
+    font-family: monospace;
+    font-size: 14px;
+    color: var(--primary);
+    font-weight: 500;
+}
+
+.quiz-toggle {
+    font-size: 13px;
+    color: var(--text-light);
+    background: var(--bg);
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+
+.quiz-answer {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    background: #f8f9fa;
+}
+
+.quiz-answer.open {
+    max-height: 200px;
+    padding: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.quiz-answer p {
+    margin: 8px 0;
+}
+
+.summary {
+    background: #e8f5e9;
+    padding: 24px;
+    border-radius: 8px;
+    margin: 32px 0;
+}
+
+.summary h2 {
+    border-bottom-color: var(--secondary);
+}
+
+.references {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.references a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.references a:hover {
+    text-decoration: underline;
+}
+
+footer {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px;
+}
+
+.giscus {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    min-height: 200px;
+}
+
+@media (max-width: 640px) {
+    article {
+        padding: 24px;
+    }
+
+    h1 {
+        font-size: 1.5rem;
+    }
+
+    h2 {
+        font-size: 1.25rem;
+    }
+
+    .pros-cons {
+        grid-template-columns: 1fr;
+    }
+}

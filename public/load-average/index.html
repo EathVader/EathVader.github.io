@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>一分钟理解负载 Load Average | 系统运维</title>
+    <meta name="description" content="用马路和汽车的比喻，一分钟理解Linux系统负载Load Average的含义、查看方法和不同数值的意义。">
+    <meta name="keywords" content="Load Average,系统负载,Linux,uptime,top,运维">
+    <meta property="og:title" content="一分钟理解负载 Load Average">
+    <meta property="og:description" content="用马路和汽车的比喻理解系统负载">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/load-average/">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "一分钟理解负载 Load Average",
+        "description": "用马路和汽车的比喻，一分钟理解Linux系统负载Load Average。",
+        "author": {"@type": "Person", "name": "EathVader"},
+        "datePublished": "2026-04-02",
+        "publisher": {"@type": "Organization", "name": "EathVader"}
+    }
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <a href="#main" class="skip-link">跳到主要内容</a>
+    <header>
+        <nav class="breadcrumb">
+            <a href="/">首页</a> / <a href="/">系统运维</a> / 负载
+        </nav>
+    </header>
+    <main id="main">
+        <article>
+            <h1>一分钟理解负载 Load Average</h1>
+            <p class="meta">来源：架构师之路 · 作者：58沈剑</p>
+            
+            <section>
+                <h2>什么是 Load Average？</h2>
+                <p><strong>系统负载（System Load）</strong>是系统CPU繁忙程度的度量，即有多少进程在等待被CPU调度（进程等待队列的长度）。</p>
+                <p><strong>平均负载（Load Average）</strong>是一段时间内系统的平均负载，这个一段时间一般取 <strong>1分钟、5分钟、15分钟</strong>。</p>
+                
+                <div class="command-demo">
+                    <h3>如何查看 Load？</h3>
+                    <pre><code>$ uptime
+13:53:39 up 10 days, 2:15, 1 user, load average: 1.5, 2.5, 5.5</code></pre>
+                    <p>如上所示，dev02机器 <strong>1分钟平均负载、5分钟平均负载、15分钟平均负载</strong> 分别是 1.5、2.5、5.5</p>
+                    <p><code>top</code>、<code>uptime</code>、<code>w</code> 等命令都可以查看系统负载。</p>
+                </div>
+            </section>
+
+            <section>
+                <h2>Load 的数值是什么含义？</h2>
+                <p>把 <strong>CPU</strong> 比喻成一条（单核）<strong>马路</strong>，<strong>进程任务</strong> 比喻成马路上跑着的 <strong>汽车</strong>，<strong>Load</strong> 则表示 <strong>马路的繁忙程度</strong>。</p>
+                
+                <div class="load-scenarios">
+                    <div class="scenario low">
+                        <div class="scenario-icon">🛣️</div>
+                        <div class="scenario-visual">
+                            <div class="road">
+                                <div class="car">🚗</div>
+                                <div class="car" style="margin-left: 60px;">🚙</div>
+                            </div>
+                        </div>
+                        <h4>Load &lt; 1：不堵车</h4>
+                        <p>汽车在马路上跑得游刃有余</p>
+                        <span class="badge low">空闲</span>
+                    </div>
+                    <div class="scenario medium">
+                        <div class="scenario-icon">🛣️</div>
+                        <div class="scenario-visual">
+                            <div class="road">
+                                <div class="car">🚗</div>
+                                <div class="car">🚙</div>
+                                <div class="car">🚕</div>
+                                <div class="car">🚐</div>
+                                <div class="car">🚚</div>
+                            </div>
+                        </div>
+                        <h4>Load == 1：满载</h4>
+                        <p>马路已无额外的资源跑更多的汽车了</p>
+                        <span class="badge medium">满载</span>
+                    </div>
+                    <div class="scenario high">
+                        <div class="scenario-icon">🛣️</div>
+                        <div class="scenario-visual">
+                            <div class="road">
+                                <div class="car">🚗</div>
+                                <div class="car">🚙</div>
+                                <div class="car">🚕</div>
+                                <div class="car">🚐</div>
+                                <div class="car">🚚</div>
+                            </div>
+                            <div class="queue">
+                                <div class="car waiting">⏳🚗</div>
+                                <div class="car waiting">⏳🚙</div>
+                                <div class="car waiting">⏳🚕</div>
+                            </div>
+                        </div>
+                        <h4>Load &gt; 1：堵车</h4>
+                        <p>汽车都堵着等待进入马路</p>
+                        <span class="badge high">拥塞</span>
+                    </div>
+                </div>
+
+                <div class="multi-core">
+                    <h3>多核CPU的情况</h3>
+                    <p>如果有两个CPU，则表示有两条马路，此时即使Load大于1也不代表有汽车在等待：</p>
+                    <div class="dual-road">
+                        <div class="road-lane">
+                            <span class="lane-label">CPU 1</span>
+                            <div class="road">
+                                <div class="car">🚗</div>
+                                <div class="car">🚙</div>
+                                <div class="car">🚕</div>
+                            </div>
+                        </div>
+                        <div class="road-lane">
+                            <span class="lane-label">CPU 2</span>
+                            <div class="road">
+                                <div class="car">🚐</div>
+                                <div class="car">🚚</div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="highlight">Load == 2，双核，没有等待。所以 <strong>Load 应该与 CPU 核数比较</strong>，而不是与 1 比较。</p>
+                </div>
+            </section>
+
+            <section>
+                <h2>什么样的 Load 值得警惕？（单核）</h2>
+                <div class="load-thresholds">
+                    <div class="threshold green">
+                        <div class="threshold-value">Load &lt; 0.7</div>
+                        <div class="threshold-desc">系统很闲，马路上没什么车</div>
+                        <div class="threshold-action">考虑多部署一些服务</div>
+                    </div>
+                    <div class="threshold yellow">
+                        <div class="threshold-value">0.7 &lt; Load &lt; 1</div>
+                        <div class="threshold-desc">系统状态不错</div>
+                        <div class="threshold-action">马路可以轻松应对</div>
+                    </div>
+                    <div class="threshold orange">
+                        <div class="threshold-value">Load == 1</div>
+                        <div class="threshold-desc">系统马上要处理不过来了</div>
+                        <div class="threshold-action">赶紧找一下原因</div>
+                    </div>
+                    <div class="threshold red">
+                        <div class="threshold-value">Load &gt; 5</div>
+                        <div class="threshold-desc">马路已经非常繁忙了</div>
+                        <div class="threshold-action">每辆汽车都无法很快运行</div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>不同 Load 值组合说明什么？</h2>
+                <p>结合 1分钟、5分钟、15分钟 三个值的具体情况来分析：</p>
+                <div class="load-patterns">
+                    <div class="pattern">
+                        <div class="pattern-header">
+                            <span class="pattern-label">场景 1</span>
+                            <span class="pattern-status warning">抖动/拥塞前兆</span>
+                        </div>
+                        <div class="pattern-data">
+                            <span class="data-point high">1分钟 > 5</span>
+                            <span class="data-point normal">5分钟 < 1</span>
+                            <span class="data-point normal">15分钟 < 1</span>
+                        </div>
+                        <p>短期内繁忙，中长期空闲</p>
+                    </div>
+                    <div class="pattern">
+                        <div class="pattern-header">
+                            <span class="pattern-label">场景 2</span>
+                            <span class="pattern-status danger">拥塞的开始</span>
+                        </div>
+                        <div class="pattern-data">
+                            <span class="data-point high">1分钟 > 5</span>
+                            <span class="data-point high">5分钟 > 1</span>
+                            <span class="data-point normal">15分钟 < 1</span>
+                        </div>
+                        <p>短期内繁忙，中期内紧张</p>
+                    </div>
+                    <div class="pattern">
+                        <div class="pattern-header">
+                            <span class="pattern-label">场景 3</span>
+                            <span class="pattern-status critical">正在拥塞</span>
+                        </div>
+                        <div class="pattern-data">
+                            <span class="data-point high">1分钟 > 5</span>
+                            <span class="data-point high">5分钟 > 5</span>
+                            <span class="data-point high">15分钟 > 5</span>
+                        </div>
+                        <p>短中长期都繁忙，系统正在拥塞</p>
+                    </div>
+                    <div class="pattern">
+                        <div class="pattern-header">
+                            <span class="pattern-label">场景 4</span>
+                            <span class="pattern-status improving">拥塞正在好转</span>
+                        </div>
+                        <div class="pattern-data">
+                            <span class="data-point normal">1分钟 < 1</span>
+                            <span class="data-point high">5分钟 > 1</span>
+                            <span class="data-point high">15分钟 > 5</span>
+                        </div>
+                        <p>短期内空闲，中长期繁忙，不用紧张</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="summary">
+                <h2>总结</h2>
+                <ul>
+                    <li><strong>Load Average</strong> 是 CPU 繁忙程度的度量，即等待被调度的进程数</li>
+                    <li>三个值分别代表 <strong>1分钟、5分钟、15分钟</strong> 的平均负载</li>
+                    <li><strong>Load 应该与 CPU 核数比较</strong>，单核 Load > 1 表示有等待</li>
+                    <li>Load &lt; 0.7 很闲，0.7~1 正常，==1 需要关注，>5 非常繁忙</li>
+                    <li>通过三个时间维度的组合，可以判断系统是"抖动"、"拥塞开始"还是"正在好转"</li>
+                </ul>
+                <p>赶快 <code>uptime</code> 一下，看一下自己系统的负载吧！</p>
+            </section>
+
+            <section class="references">
+                <h2>参考来源</h2>
+                <ul>
+                    <li><a href="https://mp.weixin.qq.com/s?__biz=MjM5ODYxMDA5OQ==&mid=2651959912" target="_blank" rel="noopener">一分钟理解负载LoadAverage - 架构师之路</a></li>
+                </ul>
+            </section>
+        </article>
+    </main>
+
+    <footer>
+        <div class="giscus"></div>
+    </footer>
+
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDOHZL5Rg"
+        data-category="Comments"
+        data-category-id="DIC_kwDOHZL5Rs4CR-F6"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="preferred_color_scheme"
+        data-lang="zh-CN"
+        crossorigin="anonymous"
+        async>
+    </script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>

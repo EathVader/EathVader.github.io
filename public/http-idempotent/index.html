@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTTP幂等性概念与应用 | 分布式系统设计</title>
+    <meta name="description" content="详解HTTP幂等性概念，分布式事务vs幂等设计，GET/POST/PUT/DELETE的幂等性分析，及实际应用场景。">
+    <meta name="keywords" content="HTTP幂等性,分布式系统,RESTful API,幂等设计">
+    <meta property="og:title" content="HTTP幂等性概念与应用">
+    <meta property="og:description" content="详解HTTP幂等性概念及分布式系统设计中的实践">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/http-idempotent/">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "HTTP幂等性概念与应用",
+        "description": "详解HTTP幂等性概念，分布式事务vs幂等设计，GET/POST/PUT/DELETE的幂等性分析。",
+        "author": {"@type": "Person", "name": "EathVader"},
+        "datePublished": "2026-04-02",
+        "publisher": {"@type": "Organization", "name": "EathVader"}
+    }
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <a href="#main" class="skip-link">跳到主要内容</a>
+    <header>
+        <nav class="breadcrumb">
+            <a href="/">首页</a> / <a href="/">网络协议</a> / HTTP
+        </nav>
+    </header>
+    <main id="main">
+        <article>
+            <h1>HTTP幂等性概念与应用</h1>
+            <p class="meta">来源：酷壳 CoolShell · 作者：Todd</p>
+            
+            <section>
+                <h2>什么是幂等性？</h2>
+                <p>在HTTP/1.1规范中，幂等性的定义是：</p>
+                <blockquote>
+                    <em>Methods can also have the property of "idempotence" in that (aside from error or expiration issues) the side-effects of N > 0 identical requests is the same as for a single request.</em>
+                </blockquote>
+                <p>简单来说，<strong>HTTP方法的幂等性是指一次和多次请求某一个资源应该具有同样的副作用</strong>。幂等性属于语义范畴，正如编译器只能帮助检查语法错误一样，HTTP规范也没有办法通过消息格式等语法手段来定义它。</p>
+                <p>幂等性是分布式系统设计中十分重要的概念，而HTTP的分布式本质也决定了它在HTTP中具有重要地位。</p>
+            </section>
+
+            <section>
+                <h2>分布式事务 vs 幂等设计</h2>
+                <p>为什么需要幂等性？我们先从一个例子说起：</p>
+                <div class="example-box">
+                    <p><strong>取款场景：</strong> 假设有一个从账户取钱的API <code>withdraw(account_id, amount)</code></p>
+                    <p>取钱的语义是从account_id对应的账户中扣除amount数额的钱。如果扣除成功返回true，账户余额减少；如果扣除失败返回false，账户余额不变。</p>
+                    <p><strong>问题：</strong> 在分布式环境中，无法轻易假设网络的可靠性。withdraw请求可能已经被服务器端正确处理，但服务器端的返回结果由于网络等原因被丢失了，导致客户端无法得知处理结果。</p>
+                    <p>如果用户刷新页面重试，就会导致withdraw被调用两次，账户被多扣了一次钱。</p>
+                </div>
+
+                <h3>解决方案一：分布式事务</h3>
+                <p>通过引入支持分布式事务的中间件来保证withdraw功能的事务性。</p>
+                <div class="pros-cons">
+                    <div class="pros">
+                        <h4>优点</h4>
+                        <ul>
+                            <li>对调用者很简单</li>
+                            <li>复杂性交给中间件管理</li>
+                        </ul>
+                    </div>
+                    <div class="cons">
+                        <h4>缺点</h4>
+                        <ul>
+                            <li>架构太重量级</li>
+                            <li>容易被绑在特定的中间件上</li>
+                            <li>无法提供性能和可用性的保证</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h3>解决方案二：幂等设计</h3>
+                <p>通过业务设计将操作变成幂等的：</p>
+                <pre><code>// 1. 先获取唯一的处理号
+ticket_id = create_ticket();
+
+// 2. 带ticket_id的取款操作是幂等的
+idempotent_withdraw(ticket_id, account_id, amount);</code></pre>
+                <p>一个ticket_id表示的操作至多只会被处理一次，每次调用都将返回第一次调用时的处理结果。这样客户端就可以放心地多次调用。</p>
+                <div class="highlight-box">
+                    <strong>优势：</strong> 轻量级、容易适应异构环境、性能和可用性好
+                </div>
+            </section>
+
+            <section>
+                <h2>HTTP方法的幂等性分析</h2>
+                <p>HTTP协议本身是一种面向资源的应用层协议，但使用方式有两种：</p>
+                <ul>
+                    <li><strong>RESTful</strong>：把HTTP当成应用层协议，忠实遵守HTTP协议的各种规定</li>
+                    <li><strong>SOA</strong>：把HTTP协议作为传输层协议，在HTTP之上建立自己的应用层协议</li>
+                </ul>
+
+                <div class="method-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>方法</th>
+                                <th>语义</th>
+                                <th>幂等性</th>
+                                <th>说明</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>GET</code></td>
+                                <td>获取资源</td>
+                                <td><span class="badge idempotent">✓ 幂等</span></td>
+                                <td>不应有副作用，多次GET结果相同</td>
+                            </tr>
+                            <tr>
+                                <td><code>DELETE</code></td>
+                                <td>删除资源</td>
+                                <td><span class="badge idempotent">✓ 幂等</span></td>
+                                <td>删除同一个资源，副作用相同</td>
+                            </tr>
+                            <tr>
+                                <td><code>PUT</code></td>
+                                <td>创建/更新资源</td>
+                                <td><span class="badge idempotent">✓ 幂等</span></td>
+                                <td>同一URI多次PUT的副作用相同</td>
+                            </tr>
+                            <tr>
+                                <td><code>POST</code></td>
+                                <td>创建资源</td>
+                                <td><span class="badge non-idempotent">✗ 非幂等</span></td>
+                                <td>多次POST会创建多个资源</td>
+                            </tr>
+                            <tr>
+                                <td><code>PATCH</code></td>
+                                <td>部分更新</td>
+                                <td><span class="badge uncertain">? 不一定</span></td>
+                                <td>取决于具体实现</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="method-detail">
+                    <h3>GET - 幂等</h3>
+                    <p>GET方法用于获取资源，不应有副作用，所以是幂等的。比如：</p>
+                    <pre><code>GET http://www.bank.com/account/123456</code></pre>
+                    <p>不会改变资源的状态，不论调用一次还是N次都没有副作用。</p>
+                    <p class="note">注意：强调的是副作用相同，而不是每次GET的结果相同。GET http://www.news.com/latest-news 可能会每次得到不同的结果，但它本身并没有产生任何副作用。</p>
+
+                    <h3>DELETE - 幂等</h3>
+                    <p>HTTP DELETE方法用于删除资源，有副作用但应该满足幂等性。比如：</p>
+                    <pre><code>DELETE http://www.forum.com/article/4231</code></pre>
+                    <p>调用一次和N次对系统产生的副作用是相同的，即删掉id为4231的帖子。</p>
+
+                    <h3>PUT - 幂等</h3>
+                    <p>PUT所对应的URI是要创建或更新的资源本身。比如：</p>
+                    <pre><code>PUT http://www.forum.com/articles/4231</code></pre>
+                    <p>对同一URI进行多次PUT的副作用和一次PUT是相同的。</p>
+
+                    <h3>POST - 非幂等</h3>
+                    <p>POST所对应的URI并非创建的资源本身，而是资源的接收者。比如：</p>
+                    <pre><code>POST http://www.forum.com/articles</code></pre>
+                    <p>两次相同的POST请求会在服务器端创建两份资源，它们具有不同的URI，所以POST方法不具备幂等性。</p>
+                </div>
+            </section>
+
+            <section>
+                <h2>交互式：幂等性判断</h2>
+                <div class="interactive-quiz">
+                    <p>点击判断以下操作是否是幂等的：</p>
+                    <div class="quiz-items">
+                        <div class="quiz-item" onclick="toggleQuiz(this)">
+                            <div class="quiz-question">
+                                <span class="quiz-method">GET /users/123</span>
+                                <span class="quiz-toggle">点击判断</span>
+                            </div>
+                            <div class="quiz-answer">
+                                <p><span class="badge idempotent">幂等</span></p>
+                                <p>GET用于获取资源，多次获取不会改变资源状态。</p>
+                            </div>
+                        </div>
+                        <div class="quiz-item" onclick="toggleQuiz(this)">
+                            <div class="quiz-question">
+                                <span class="quiz-method">POST /users</span>
+                                <span class="quiz-toggle">点击判断</span>
+                            </div>
+                            <div class="quiz-answer">
+                                <p><span class="badge non-idempotent">非幂等</span></p>
+                                <p>POST创建新资源，每次调用都会创建新的用户。</p>
+                            </div>
+                        </div>
+                        <div class="quiz-item" onclick="toggleQuiz(this)">
+                            <div class="quiz-question">
+                                <span class="quiz-method">PUT /users/123</span>
+                                <span class="quiz-toggle">点击判断</span>
+                            </div>
+                            <div class="quiz-answer">
+                                <p><span class="badge idempotent">幂等</span></p>
+                                <p>PUT更新指定资源，多次更新同一资源结果相同。</p>
+                            </div>
+                        </div>
+                        <div class="quiz-item" onclick="toggleQuiz(this)">
+                            <div class="quiz-question">
+                                <span class="quiz-method">DELETE /users/123</span>
+                                <span class="quiz-toggle">点击判断</span>
+                            </div>
+                            <div class="quiz-answer">
+                                <p><span class="badge idempotent">幂等</span></p>
+                                <p>删除已不存在的资源，返回结果可能不同，但副作用相同。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>实际应用：实现取款功能</h2>
+                <p>用Web API实现前面提到的取款功能：</p>
+                <pre><code>// 1. 创建ticket（POST非幂等）
+POST /tickets
+Response: { "ticket_id": "abc123" }
+
+// 2. 幂等取款
+PUT /accounts/{account_id}/withdraw?ticket_id=abc123&amount=100
+Response: { "success": true, "balance": 900 }</code></pre>
+                <p>这种模式可以应用于很多场合，比如：论坛网站中防止意外的重复发帖。</p>
+            </section>
+
+            <section class="summary">
+                <h2>总结</h2>
+                <ul>
+                    <li><strong>幂等性</strong>是分布式系统设计中重要的概念，可以取代重量级的分布式事务</li>
+                    <li><strong>GET、DELETE、PUT</strong>是幂等的，<strong>POST</strong>是非幂等的</li>
+                    <li>幂等设计的关键是<strong>引入唯一标识</strong>（如ticket_id）来保证操作只被执行一次</li>
+                    <li>RESTful API设计应该遵循HTTP协议的语义，考虑幂等性</li>
+                </ul>
+            </section>
+
+            <section class="references">
+                <h2>参考来源</h2>
+                <ul>
+                    <li><a href="https://coolshell.cn/articles/4787.html" target="_blank" rel="noopener">HTTP幂等性概念和应用 - 酷壳</a></li>
+                    <li><a href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html" target="_blank" rel="noopener">RFC 2616 - Method Definitions</a></li>
+                </ul>
+            </section>
+        </article>
+    </main>
+
+    <footer>
+        <div class="giscus"></div>
+    </footer>
+
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script>
+    function toggleQuiz(item) {
+        const answer = item.querySelector('.quiz-answer');
+        const toggle = item.querySelector('.quiz-toggle');
+        const isOpen = answer.classList.contains('open');
+        
+        document.querySelectorAll('.quiz-answer').forEach(a => a.classList.remove('open'));
+        document.querySelectorAll('.quiz-toggle').forEach(t => t.textContent = '点击判断');
+        
+        if (!isOpen) {
+            answer.classList.add('open');
+            toggle.textContent = '收起';
+        }
+    }
+    </script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDOHZL5Rg"
+        data-category="Comments"
+        data-category-id="DIC_kwDOHZL5Rs4CR-F6"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="preferred_color_scheme"
+        data-lang="zh-CN"
+        crossorigin="anonymous"
+        async>
+    </script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>

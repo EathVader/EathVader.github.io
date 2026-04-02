@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCP状态机与重传机制 | 深入理解TCP协议</title>
+    <meta name="description" content="详解TCP状态机、三次握手、四次挥手、SYN超时、TIME_WAIT、超时重传与快速重传机制。">
+    <meta name="keywords" content="TCP状态机,三次握手,四次挥手,TIME_WAIT,快速重传,超时重传">
+    <meta property="og:title" content="TCP状态机与重传机制">
+    <meta property="og:description" content="深入理解TCP状态机与重传机制">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/tcp-fsm/">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "TCP状态机与重传机制",
+        "description": "详解TCP状态机、三次握手、四次挥手、SYN超时、TIME_WAIT、超时重传与快速重传机制。",
+        "author": {"@type": "Person", "name": "EathVader"},
+        "datePublished": "2026-04-02",
+        "publisher": {"@type": "Organization", "name": "EathVader"}
+    }
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <a href="#main" class="skip-link">跳到主要内容</a>
+    <header>
+        <nav class="breadcrumb">
+            <a href="/">首页</a> / <a href="/">网络协议</a> / TCP
+        </nav>
+    </header>
+    <main id="main">
+        <article>
+            <h1>TCP状态机与重传机制</h1>
+            <p class="meta">来源：程序猿说你好 · 酷壳</p>
+            
+            <section>
+                <h2>前置知识</h2>
+                <h3>网络分层</h3>
+                <p>TCP在OSI七层模型的第四层——<strong>传输层（Transport）</strong>，IP在第三层——<strong>网络层（Network）</strong>，ARP在第二层——<strong>数据链路层（Data Link）</strong>。</p>
+                <ul>
+                    <li>第二层数据叫 <strong>Frame（帧）</strong></li>
+                    <li>第三层数据叫 <strong>Packet（数据包）</strong></li>
+                    <li>第四层数据叫 <strong>Segment（段）</strong></li>
+                </ul>
+                <p>应用层数据先打到TCP的Segment中，然后打到IP的Packet中，再打到以太网的Frame中，传到对端后各层解析自己的协议，交给更高层处理。</p>
+
+                <h3>TCP头格式</h3>
+                <div class="tcp-header-info">
+                    <table>
+                        <tr><td><strong>Sequence Number (Seq)</strong></td><td>包的序号，用于解决网络包乱序</td></tr>
+                        <tr><td><strong>Acknowledgement Number (Ack)</strong></td><td>确认收到Seq（Ack = Seq + 1），用于解决丢包</td></tr>
+                        <tr><td><strong>Window</strong></td><td>接收窗口大小，用于流量控制</td></tr>
+                        <tr><td><strong>TCP Flag</strong></td><td>区分包的类型（SYN/FIN/RST等），用于操控状态机</td></tr>
+                    </table>
+                    <p class="note">TCP连接由四元组标识：<code>(src_ip, src_port, dst_ip, dst_port)</code>，准确说是五元组（还包括协议）。</p>
+                </div>
+            </section>
+
+            <section>
+                <h2>TCP状态机</h2>
+                <p><strong>网络传输是没有连接的——TCP所谓的"连接"，只不过是在通讯的双方维护一个"连接状态"</strong>，让它看上去好像有连接一样。所以，TCP的状态转换非常重要。</p>
+                
+                <div class="state-diagram">
+                    <h3>TCP连接状态流转</h3>
+                    <div class="state-flow">
+                        <div class="state" id="state-closed">CLOSED</div>
+                        <div class="arrow right">SYN</div>
+                        <div class="state" id="state-syn-sent">SYN_SENT</div>
+                        <div class="arrow right">SYN+ACK</div>
+                        <div class="state" id="state-syn-rcvd">SYN_RCVD</div>
+                        <div class="arrow right">ACK</div>
+                        <div class="state active" id="state-established">ESTABLISHED</div>
+                        <div class="arrow right">FIN</div>
+                        <div class="state" id="state-fin-wait-1">FIN_WAIT_1</div>
+                        <div class="arrow right">ACK</div>
+                        <div class="state" id="state-fin-wait-2">FIN_WAIT_2</div>
+                        <div class="arrow right">FIN</div>
+                        <div class="state" id="state-time-wait">TIME_WAIT</div>
+                        <div class="arrow right">2MSL</div>
+                        <div class="state" id="state-closed-end">CLOSED</div>
+                    </div>
+                </div>
+
+                <div class="interactive-demo">
+                    <h3>交互式：TCP连接过程模拟</h3>
+                    <div class="simulation-container">
+                        <div class="host client">
+                            <div class="host-icon">💻</div>
+                            <div class="host-name">Client</div>
+                            <div class="host-state" id="clientState">CLOSED</div>
+                        </div>
+                        <div class="network">
+                            <div class="packet-flow" id="packetFlow"></div>
+                        </div>
+                        <div class="host server">
+                            <div class="host-icon">🖥️</div>
+                            <div class="host-name">Server</div>
+                            <div class="host-state" id="serverState">CLOSED</div>
+                        </div>
+                    </div>
+                    <div class="controls">
+                        <button id="stepBtn" onclick="nextStep()">下一步</button>
+                        <button id="resetBtn" onclick="resetSimulation()">重置</button>
+                    </div>
+                    <div class="step-info" id="stepInfo">
+                        <p>点击"下一步"开始模拟TCP三次握手</p>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>三次握手与四次挥手</h2>
+                
+                <h3>为什么建连接要三次握手？</h3>
+                <p>主要目的是<strong>初始化Sequence Number的初始值</strong>。通信的双方要同步对方的ISN（Initial Sequence Number）——所以叫SYN（Synchronize Sequence Numbers）。</p>
+                <p>这个号在以后的数据通信中，在client端按发送顺序递增，在server端按递增顺序重新组织，以保证应用层接收到的数据不会因为网络问题乱序。</p>
+
+                <h3>为什么断连接要四次挥手？</h3>
+                <p>其实是<strong>双方各自进行2次挥手</strong>。因为TCP是全双工的，client与server都占用各自的资源发送segment，所以<strong>双方都需要关闭自己的资源（发送FIN）并确认对方资源已关闭（回复Ack）</strong>。</p>
+                <p>双方可以同时主动关闭，也可以由一方主动关闭带动另一方被动关闭。通常以一方主动另一方被动举例，所以看上去是所谓的4次挥手。</p>
+            </section>
+
+            <section>
+                <h2>握手过程中的其他问题</h2>
+                
+                <h3>SYN超时</h3>
+                <p>server收到client发的SYN并回复Ack(SYN)后，如果client掉线了（或网络超时），那么server将无法收到client回复的Ack，连接处于一个<strong>中间状态</strong>。</p>
+                <p>为了解决中间状态的问题，server如果在一定时间内没有收到Ack2，会重发Ack1。</p>
+                <div class="highlight-box">
+                    <p><strong>Linux默认重试5次，加上第一次最多共发送6次。</strong></p>
+                    <p>重试间隔从1s开始翻倍增长：1s, 2s, 4s, 8s, 16s，第5次发出后还要等待32s。</p>
+                    <p><strong>至多共经过 1+2+4+8+16+32 = 63s，TCP才会认为SYN超时断开连接。</strong></p>
+                </div>
+
+                <h3>SYN Flood攻击</h3>
+                <p>可以利用SYN超时机制发起<strong>SYN Flood攻击</strong>——给server发一个SYN就立即下线，服务器默认需要占用资源63s才会断开连接。攻击者很容易将server的SYN队列资源耗尽。</p>
+                <p>Linux提供了<code>tcp_syncookies</code>参数解决这个问题——当SYN队列满了后，TCP会通过源地址端口、目标地址端口和时间戳构造一个特别的Sequence Number发回去，称为<strong>SYN Cookie</strong>。</p>
+                <div class="warning-box">
+                    <strong>注意：</strong> 不要用<code>tcp_syncookies</code>参数来处理正常的大负载连接情况，因为SYN Cookie本质上破坏了建连接的SYN超时机制。
+                </div>
+
+                <h3>ISN的同步</h3>
+                <ul>
+                    <li><strong>不能选择静态的ISN</strong>：否则"迷途的重复分组"会被误认为新连接的数据</li>
+                    <li><strong>需要使ISN随时钟动态增长</strong>：保证新连接的ISN大于旧连接</li>
+                    <li><strong>ISN的增长不能呈现规律性</strong>：从安全角度考虑，防止伪造ISN发起攻击</li>
+                </ul>
+                <p>RFC793中描述的ISN增长算法：ISN和一个假的时钟绑在一起，每4微秒对ISN加一，直到超过2^32又从0开始。一个ISN的周期大约是<strong>4.55小时</strong>。</p>
+            </section>
+
+            <section>
+                <h2>关于TIME_WAIT</h2>
+                
+                <h3>为什么需要TIME_WAIT状态？</h3>
+                <p>从<code>TIME_WAIT</code>状态到CLOSED状态，有一个超时时间 <strong>2 × MSL</strong>。主要有两个原因：</p>
+                <ol>
+                    <li><strong>确保被动方收到了ACK</strong>：如果被动方没有收到Ack，就会触发被动方重传FIN，发送Ack+接收FIN正好2个MSL</li>
+                    <li><strong>确保"迷途的重复分组"过期丢弃</strong>：超过MSL的分组将被丢弃，否则很容易同新连接的数据混在一起</li>
+                </ol>
+
+                <h3>大规模出现TIME_WAIT</h3>
+                <p>高并发短连接场景中，会消耗很多资源。网上大部分文章都是教你打开两个参数：<code>tcp_tw_reuse</code>或<code>tcp_tw_recycle</code>。</p>
+                <div class="param-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>参数</th>
+                                <th>说明</th>
+                                <th>风险</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>tcp_tw_reuse</code></td>
+                                <td>保证客户端在协议角度的安全</td>
+                                <td>需要两端都打开tcp_timestamps</td>
+                            </tr>
+                            <tr>
+                                <td><code>tcp_tw_recycle</code></td>
+                                <td>更激进地重用连接</td>
+                                <td>NAT网络可能建连接失败</td>
+                            </tr>
+                            <tr>
+                                <td><code>tcp_max_tw_buckets</code></td>
+                                <td>控制并发TIME_WAIT数量（默认180000）</td>
+                                <td>超限会destroy多余连接</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="highlight-box">
+                    <strong>建议：</strong> 与其通过参数破协议来逃避TIME_WAIT，不如好好优化业务（如改用长连接等）。对于HTTP服务器，可以设置HTTP的KeepAlive参数，让client端发起挥手，这样TIME_WAIT只会出现在client端。
+                </div>
+            </section>
+
+            <section>
+                <h2>TCP重传机制</h2>
+                <p><strong>TCP协议通过重传机制保证所有的segment都可以到达对端，通过滑动窗口允许一定程度的乱序和丢包。</strong></p>
+                <p>TCP是面向字节流的，Seq与Ack的增长均以字节为单位。</p>
+
+                <h3>超时重传机制</h3>
+                <p>当发送方发现等待某个Seq的Ack<strong>超时</strong>后，会认为该Seq发送"失败"，重传对应的数据。</p>
+                <div class="pros-cons">
+                    <div class="pros">
+                        <h4>重传一个</h4>
+                        <p>仅重传timeout的包，后续包等超时后再重传。节省资源，但效率略低。</p>
+                    </div>
+                    <div class="cons">
+                        <h4>重传所有</h4>
+                        <p>每次都重传timeout包及之后所有的数据。效率更高，但浪费资源。</p>
+                    </div>
+                </div>
+                <p>两种方式都是<strong>基于时间驱动</strong>的，性能与timeout的长度密切相关。</p>
+
+                <h3>快速重传机制</h3>
+                <p>快速重传机制不基于时间驱动，而<strong>基于数据驱动</strong>：</p>
+                <div class="highlight-box">
+                    <p><strong>如果包没有连续到达，就Ack最后那个可能被丢了的包；如果发送方连续收到3次相同的Ack，就重传对应的Seq。</strong></p>
+                </div>
+                <div class="example-box">
+                    <p><strong>示例：</strong> 发送方发送1,2,3,4,5共5份数据</p>
+                    <ol>
+                        <li>接收方先收到Seq 1，回Ack 2</li>
+                        <li>Seq 2因网络原因丢失</li>
+                        <li>正常收到Seq 3，继续回Ack 2</li>
+                        <li>Seq 4和Seq 5都到了，继续回Ack 2</li>
+                        <li>发送方连续收到4次相同的Ack（≥3次），知道最大序号的未收到包是Seq 2，于是重传Seq 2</li>
+                        <li>接收方收到Seq 2，查看窗口发现Seq 3、4、5都收到了，回Ack 6</li>
+                    </ol>
+                </div>
+
+                <h3>更完美的设计</h3>
+                <p>将超时重传与快速重传结合起来：<strong>触发快速重传时，只重传局部的一小段Seq（甚至只重传一个Seq），其他Seq超时后重传</strong>。</p>
+            </section>
+
+            <section>
+                <h2>示例：Wireshark抓包分析</h2>
+                <p>通过Wireshark抓包可以看到Seq与Ack的增加和传输的字节数相关：</p>
+                <ul>
+                    <li>三次握手后，来了两个Len:1440的包，因此第一个包为Seq(1)，第二个包为Seq(1441)</li>
+                    <li>收到第一个Ack(1441)，表示1~1440的数据已经收到了，期待Seq(1441)</li>
+                    <li>一个包可以同时充当Ack与Seq，在一次传输中携带数据与响应</li>
+                </ul>
+                <p class="note">Wireshark为了显示更友好，使用了Relative Seq——相对序号。ISN总是显示为0。在右键菜单中的protocol preference中取消掉就可以看到"Absolute Seq"了。</p>
+            </section>
+
+            <section class="summary">
+                <h2>总结</h2>
+                <ul>
+                    <li>TCP通过状态机管理连接的生命周期，三次握手初始化ISN，四次挥手关闭双向连接</li>
+                    <li>SYN超时最长63秒，SYN Cookie可防御SYN Flood攻击</li>
+                    <li>TIME_WAIT存在是必要的，建议通过业务优化（如长连接）而非破协议参数来解决</li>
+                    <li>超时重传基于时间驱动，快速重传基于数据驱动（连续3次相同Ack）</li>
+                    <li>最佳实践：快速重传局部Seq + 超时重传其余Seq</li>
+                </ul>
+            </section>
+
+            <section class="references">
+                <h2>参考来源</h2>
+                <ul>
+                    <li><a href="https://coolshell.cn/articles/11564.html" target="_blank" rel="noopener">TCP 的那些事儿（上） - 酷壳</a></li>
+                    <li><a href="https://monkeysayhi.github.io/2018/03/07/浅谈TCP（1）：状态机与重传机制/" target="_blank" rel="noopener">浅谈TCP（1）：状态机与重传机制 - 程序猿说你好</a></li>
+                </ul>
+            </section>
+        </article>
+    </main>
+
+    <footer>
+        <div class="giscus"></div>
+    </footer>
+
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script>
+    const steps = [
+        { client: 'CLOSED', server: 'CLOSED', packet: '', info: '初始状态：双方都处于CLOSED状态' },
+        { client: 'SYN_SENT', server: 'LISTEN', packet: 'SYN (Seq=x)', info: 'Client发送SYN包，进入SYN_SENT状态' },
+        { client: 'SYN_SENT', server: 'SYN_RCVD', packet: 'SYN+ACK (Seq=y, Ack=x+1)', info: 'Server收到SYN，回复SYN+ACK，进入SYN_RCVD' },
+        { client: 'ESTABLISHED', server: 'SYN_RCVD', packet: 'ACK (Ack=y+1)', info: 'Client收到SYN+ACK，回复ACK，进入ESTABLISHED' },
+        { client: 'ESTABLISHED', server: 'ESTABLISHED', packet: '数据传输...', info: '连接建立成功，双方可以传输数据' },
+        { client: 'FIN_WAIT_1', server: 'ESTABLISHED', packet: 'FIN (Seq=u)', info: 'Client发送FIN，进入FIN_WAIT_1' },
+        { client: 'FIN_WAIT_1', server: 'CLOSE_WAIT', packet: 'ACK (Ack=u+1)', info: 'Server收到FIN，回复ACK，进入CLOSE_WAIT' },
+        { client: 'FIN_WAIT_2', server: 'CLOSE_WAIT', packet: '', info: 'Client收到ACK，进入FIN_WAIT_2' },
+        { client: 'FIN_WAIT_2', server: 'LAST_ACK', packet: 'FIN (Seq=v)', info: 'Server发送FIN，进入LAST_ACK' },
+        { client: 'TIME_WAIT', server: 'LAST_ACK', packet: 'ACK (Ack=v+1)', info: 'Client收到FIN，回复ACK，进入TIME_WAIT' },
+        { client: 'TIME_WAIT', server: 'CLOSED', packet: '', info: 'Server收到ACK，进入CLOSED' },
+        { client: 'CLOSED', server: 'CLOSED', packet: '', info: '等待2MSL后，Client进入CLOSED，连接完全关闭' }
+    ];
+
+    let currentStep = 0;
+
+    function nextStep() {
+        if (currentStep >= steps.length - 1) return;
+        currentStep++;
+        updateSimulation();
+    }
+
+    function updateSimulation() {
+        const step = steps[currentStep];
+        document.getElementById('clientState').textContent = step.client;
+        document.getElementById('serverState').textContent = step.server;
+        
+        const packetFlow = document.getElementById('packetFlow');
+        if (step.packet) {
+            const packetEl = document.createElement('div');
+            packetEl.className = 'packet';
+            packetEl.textContent = step.packet;
+            packetFlow.appendChild(packetEl);
+        }
+        
+        document.getElementById('stepInfo').innerHTML = `<p><strong>步骤 ${currentStep}:</strong> ${step.info}</p>`;
+        
+        if (currentStep >= steps.length - 1) {
+            document.getElementById('stepBtn').disabled = true;
+        }
+    }
+
+    function resetSimulation() {
+        currentStep = 0;
+        document.getElementById('clientState').textContent = 'CLOSED';
+        document.getElementById('serverState').textContent = 'CLOSED';
+        document.getElementById('packetFlow').innerHTML = '';
+        document.getElementById('stepInfo').innerHTML = '<p>点击"下一步"开始模拟TCP三次握手</p>';
+        document.getElementById('stepBtn').disabled = false;
+    }
+    </script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDOHZL5Rg"
+        data-category="Comments"
+        data-category-id="DIC_kwDOHZL5Rs4CR-F6"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="preferred_color_scheme"
+        data-lang="zh-CN"
+        crossorigin="anonymous"
+        async>
+    </script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>

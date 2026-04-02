@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网络协议模型：七层、五层、四层协议 | 图解OSI与TCP/IP</title>
+    <meta name="description" content="详解OSI七层模型、TCP/IP五层模型和四层模型的概念、功能及各层协议，数据封装与解封装过程。">
+    <meta name="keywords" content="OSI模型,TCP/IP,七层模型,网络协议,网络分层">
+    <meta property="og:title" content="网络协议模型：七层、五层、四层协议">
+    <meta property="og:description" content="详解OSI七层模型、TCP/IP五层模型和四层模型的概念与功能">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/osi-model/">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "网络协议模型：七层、五层、四层协议",
+        "description": "详解OSI七层模型、TCP/IP五层模型和四层模型的概念、功能及各层协议，数据封装与解封装过程。",
+        "author": {"@type": "Person", "name": "EathVader"},
+        "datePublished": "2026-04-02",
+        "publisher": {"@type": "Organization", "name": "EathVader"}
+    }
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <a href="#main" class="skip-link">跳到主要内容</a>
+    <header>
+        <nav class="breadcrumb">
+            <a href="/">首页</a> / <a href="/">网络协议</a> / 网络模型
+        </nav>
+    </header>
+    <main id="main">
+        <article>
+            <h1>网络协议模型：七层、五层、四层协议</h1>
+            <p class="meta">来源：buknow的博客 · 2018-07-21</p>
+            
+            <section>
+                <h2>一、OSI七层模型</h2>
+                <p>OSI（Open System Interconnect）是开放式系统互联的缩写。OSI七层参考模型的各个层次的划分遵循下列原则：</p>
+                <ul>
+                    <li>同一层中的各网络节点都有相同的层次结构，具有同样的功能</li>
+                    <li>同一节点内相邻层之间通过接口进行通信</li>
+                    <li>七层结构中的每一层使用下一层提供的服务，并且向其上层提供服务</li>
+                    <li>不同节点的同等层按照协议实现对等层之间的通信</li>
+                </ul>
+                
+                <div class="layer-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>层次</th>
+                                <th>名称</th>
+                                <th>功能</th>
+                                <th>协议示例</th>
+                                <th>数据单位</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr data-layer="7">
+                                <td>7</td>
+                                <td>应用层</td>
+                                <td>为用户提供网络服务</td>
+                                <td>HTTP, FTP, SMTP, DNS</td>
+                                <td>报文</td>
+                            </tr>
+                            <tr data-layer="6">
+                                <td>6</td>
+                                <td>表示层</td>
+                                <td>数据格式转换、加密解密</td>
+                                <td>JPEG, ASCII, SSL</td>
+                                <td>报文</td>
+                            </tr>
+                            <tr data-layer="5">
+                                <td>5</td>
+                                <td>会话层</td>
+                                <td>会话管理、同步</td>
+                                <td>RPC, SQL</td>
+                                <td>报文</td>
+                            </tr>
+                            <tr data-layer="4">
+                                <td>4</td>
+                                <td>传输层</td>
+                                <td>端到端传输、流量控制</td>
+                                <td>TCP, UDP, SPX</td>
+                                <td>段(segment)/数据报(datagram)</td>
+                            </tr>
+                            <tr data-layer="3">
+                                <td>3</td>
+                                <td>网络层</td>
+                                <td>路由选择、逻辑寻址</td>
+                                <td>IP, IPX</td>
+                                <td>数据包(packet)</td>
+                            </tr>
+                            <tr data-layer="2">
+                                <td>2</td>
+                                <td>数据链路层</td>
+                                <td>帧传输、物理寻址</td>
+                                <td>ATM, FDDI, Ethernet</td>
+                                <td>帧(frame)</td>
+                            </tr>
+                            <tr data-layer="1">
+                                <td>1</td>
+                                <td>物理层</td>
+                                <td>比特传输、物理接口</td>
+                                <td>Rj45, 802.3</td>
+                                <td>比特(bit)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="interactive-demo">
+                    <h3>交互式：点击各层查看详情</h3>
+                    <div class="osi-layers" id="osiLayers">
+                        <div class="layer layer-7" data-layer="7">
+                            <span class="layer-num">7</span>
+                            <span class="layer-name">应用层</span>
+                            <span class="layer-protocol">HTTP, FTP, DNS</span>
+                        </div>
+                        <div class="layer layer-6" data-layer="6">
+                            <span class="layer-num">6</span>
+                            <span class="layer-name">表示层</span>
+                            <span class="layer-protocol">加密, 压缩</span>
+                        </div>
+                        <div class="layer layer-5" data-layer="5">
+                            <span class="layer-num">5</span>
+                            <span class="layer-name">会话层</span>
+                            <span class="layer-protocol">RPC, SQL</span>
+                        </div>
+                        <div class="layer layer-4" data-layer="4">
+                            <span class="layer-num">4</span>
+                            <span class="layer-name">传输层</span>
+                            <span class="layer-protocol">TCP, UDP</span>
+                        </div>
+                        <div class="layer layer-3" data-layer="3">
+                            <span class="layer-num">3</span>
+                            <span class="layer-name">网络层</span>
+                            <span class="layer-protocol">IP, 路由</span>
+                        </div>
+                        <div class="layer layer-2" data-layer="2">
+                            <span class="layer-num">2</span>
+                            <span class="layer-name">数据链路层</span>
+                            <span class="layer-protocol">MAC, 帧</span>
+                        </div>
+                        <div class="layer layer-1" data-layer="1">
+                            <span class="layer-num">1</span>
+                            <span class="layer-name">物理层</span>
+                            <span class="layer-protocol">电信号, 光信号</span>
+                        </div>
+                    </div>
+                    <div class="layer-detail" id="layerDetail">
+                        <p>点击上方某一层查看详细信息</p>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>二、五层模型</h2>
+                <p>五层模型是OSI和TCP/IP的综合，是业界产生的非官方协议模型。为了方便把下两层称为网络接口层。</p>
+                <div class="model-comparison">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>五层</th>
+                                <th>对应OSI</th>
+                                <th>对应TCP/IP</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>应用层</td>
+                                <td>5-7层</td>
+                                <td>应用层</td>
+                            </tr>
+                            <tr>
+                                <td>传输层</td>
+                                <td>传输层</td>
+                                <td>传输层</td>
+                            </tr>
+                            <tr>
+                                <td>网络层</td>
+                                <td>网络层</td>
+                                <td>网际层</td>
+                            </tr>
+                            <tr>
+                                <td>数据链路层</td>
+                                <td>数据链路层</td>
+                                <td>网络接口层</td>
+                            </tr>
+                            <tr>
+                                <td>物理层</td>
+                                <td>物理层</td>
+                                <td>网络接口层</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section>
+                <h2>三、TCP/IP四层模型</h2>
+                <p>TCP/IP四层模型是实际应用中最广泛的，包括：应用层、运输层、网际层、网络接口层。</p>
+                <div class="four-layer-diagram">
+                    <svg viewBox="0 0 400 300" class="layer-svg">
+                        <rect x="20" y="10" width="360" height="30" fill="#ff6b6b" rx="5"/>
+                        <text x="200" y="30" text-anchor="middle" fill="white" font-size="12">应用层 (Application)</text>
+                        
+                        <rect x="20" y="45" width="360" height="30" fill="#ffd93d" rx="5"/>
+                        <text x="200" y="65" text-anchor="middle" fill="white" font-size="12">传输层 (Transport)</text>
+                        
+                        <rect x="20" y="80" width="360" height="30" fill="#6bcb77" rx="5"/>
+                        <text x="200" y="100" text-anchor="middle" fill="white" font-size="12">网际层 (Internet)</text>
+                        
+                        <rect x="20" y="115" width="360" height="30" fill="#4d96ff" rx="5"/>
+                        <text x="200" y="135" text-anchor="middle" fill="white" font-size="12">网络接口层 (Link)</text>
+                        
+                        <line x1="20" y1="145" x2="380" y2="145" stroke="#666" stroke-width="2" stroke-dasharray="5,5"/>
+                        <text x="200" y="160" text-anchor="middle" fill="#666" font-size="11">物理网络</text>
+                    </svg>
+                </div>
+            </section>
+
+            <section>
+                <h2>四、数据封装与解封装</h2>
+                <p>数据在网络传输过程中，每经过一层就会加上该层的头部信息，这个过程叫做"封装"。接收端则需要"解封装"。</p>
+                
+                <div class="encapsulation-demo">
+                    <h3>交互式：数据封装过程</h3>
+                    <div class="encapsulation-visual" id="encapsulationVisual">
+                        <div class="packet" id="packet">
+                            <div class="data">数据</div>
+                        </div>
+                    </div>
+                    <div class="encapsulation-controls">
+                        <button id="encapsulateBtn" onclick="startEncapsulation()">开始封装</button>
+                        <button id="resetBtn" onclick="resetEncapsulation()">重置</button>
+                    </div>
+                    <div class="encapsulation-steps" id="encapsulationSteps">
+                        <div class="step step-0 active">应用层：数据</div>
+                        <div class="step step-1">传输层：TCP头部 + 数据</div>
+                        <div class="step step-2">网络层：IP头部 + TCP头部 + 数据</div>
+                        <div class="step step-3">链路层：帧头 + IP头部 + TCP头部 + 数据 + 帧尾</div>
+                        <div class="step step-4">物理层：比特流</div>
+                    </div>
+                </div>
+
+                <div class="data-units">
+                    <h3>各层数据单位</h3>
+                    <div class="unit-flow">
+                        <div class="unit">
+                            <span class="unit-name">应用层</span>
+                            <span class="unit-data">报文 (Message)</span>
+                        </div>
+                        <div class="arrow">→</div>
+                        <div class="unit">
+                            <span class="unit-name">传输层</span>
+                            <span class="unit-data">段 (Segment)</span>
+                        </div>
+                        <div class="arrow">→</div>
+                        <div class="unit">
+                            <span class="unit-name">网络层</span>
+                            <span class="unit-data">数据包 (Packet)</span>
+                        </div>
+                        <div class="arrow">→</div>
+                        <div class="unit">
+                            <span class="unit-name">链路层</span>
+                            <span class="unit-data">帧 (Frame)</span>
+                        </div>
+                        <div class="arrow">→</div>
+                        <div class="unit">
+                            <span class="unit-name">物理层</span>
+                            <span class="unit-data">比特 (Bit)</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="summary">
+                <h2>总结</h2>
+                <ul>
+                    <li><strong>OSI七层模型</strong>：理论模型，概念清晰，用于教学和协议设计参考</li>
+                    <li><strong>五层模型</strong>：OSI与TCP/IP的综合，业界常用</li>
+                    <li><strong>TCP/IP四层模型</strong>：实际使用的模型，简化为应用层、运输层、网际层、网络接口层</li>
+                </ul>
+                <p>理解网络分层模型是理解网络协议的基础，每一层都有其特定的功能和协议。</p>
+            </section>
+            
+            <section class="references">
+                <h2>参考来源</h2>
+                <ul>
+                    <li><a href="https://blog.csdn.net/cc1949/article/details/79063439" target="_blank" rel="noopener">网络协议——七层、五层、四层协议概念及功能分析</a></li>
+                </ul>
+            </section>
+        </article>
+    </main>
+
+    <footer>
+        <div class="giscus"></div>
+    </footer>
+
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script>
+    const layerDescriptions = {
+        7: { name: "应用层", desc: "为用户提供网络服务，如HTTP、FTP、SMTP、DNS等协议", protocol: "HTTP, FTP, SMTP, DNS", unit: "报文" },
+        6: { name: "表示层", desc: "数据格式转换、加密解密、压缩解压", protocol: "JPEG, ASCII, SSL", unit: "报文" },
+        5: { name: "会话层", desc: "会话管理、同步、检查点恢复", protocol: "RPC, SQL", unit: "报文" },
+        4: { name: "传输层", desc: "端到端传输、流量控制、差错恢复", protocol: "TCP, UDP, SPX", unit: "段/数据报" },
+        3: { name: "网络层", desc: "路由选择、逻辑寻址（IP地址）", protocol: "IP, IPX, ICMP", unit: "数据包" },
+        2: { name: "数据链路层", desc: "帧传输、物理寻址（MAC地址）", protocol: "Ethernet, PPP", unit: "帧" },
+        1: { name: "物理层", desc: "比特传输、物理接口定义", protocol: "Rj45, 802.3", unit: "比特" }
+    };
+
+    document.querySelectorAll('.layer').forEach(layer => {
+        layer.addEventListener('click', () => {
+            const layerNum = layer.dataset.layer;
+            const info = layerDescriptions[layerNum];
+            const detail = document.getElementById('layerDetail');
+            detail.innerHTML = `
+                <div class="layer-info">
+                    <h4>第 ${layerNum} 层：${info.name}</h4>
+                    <p>${info.desc}</p>
+                    <p><strong>协议：</strong>${info.protocol}</p>
+                    <p><strong>数据单位：</strong>${info.unit}</p>
+                </div>
+            `;
+            document.querySelectorAll('.layer').forEach(l => l.classList.remove('active'));
+            layer.classList.add('active');
+        });
+    });
+
+    let currentStep = 0;
+    function startEncapsulation() {
+        if (currentStep >= 4) return;
+        currentStep++;
+        updateEncapsulation();
+    }
+
+    function updateEncapsulation() {
+        const packet = document.getElementById('packet');
+        const steps = document.querySelectorAll('.step');
+        
+        steps.forEach((step, i) => {
+            step.classList.toggle('active', i <= currentStep);
+        });
+
+        const headers = ['', '<div class="header tcp">TCP</div>', '<div class="header ip">IP</div>', '<div class="header frame">Frame</div>'];
+        const dataEl = packet.querySelector('.data');
+        
+        if (currentStep >= 1) {
+            dataEl.innerHTML = headers[1] + '<span>数据</span>';
+        }
+        if (currentStep >= 2) {
+            dataEl.innerHTML = headers[2] + headers[1] + '<span>数据</span>';
+        }
+        if (currentStep >= 3) {
+            dataEl.innerHTML = headers[3] + headers[2] + headers[1] + '<span>数据</span>';
+        }
+        if (currentStep >= 4) {
+            packet.innerHTML = '<div class="bit-stream">101100111001...</div>';
+        }
+    }
+
+    function resetEncapsulation() {
+        currentStep = 0;
+        const packet = document.getElementById('packet');
+        packet.innerHTML = '<div class="data">数据</div>';
+        document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+        document.querySelector('.step-0').classList.add('active');
+    }
+    </script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDOHZL5Rg"
+        data-category="Comments"
+        data-category-id="DIC_kwDOHZL5Rs4CR-F6"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="preferred_color_scheme"
+        data-lang="zh-CN"
+        crossorigin="anonymous"
+        async>
+    </script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Http Server 的演进：从单进程到epoll | 码农翻身</title>
+    <meta name="description" content="用故事理解Http Server的演进：从单进程阻塞到多进程、多线程、select模型，再到epoll，理解高并发网络编程的核心思想。">
+    <meta name="keywords" content="Http Server,epoll,select,多进程,高并发,网络编程">
+    <meta property="og:title" content="Http Server 的演进：从单进程到epoll">
+    <meta property="og:description" content="用故事理解Http Server的演进历程">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/http-server/">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "Http Server 的演进：从单进程到epoll",
+        "description": "用故事理解Http Server的演进：从单进程阻塞到多进程、select模型，再到epoll。",
+        "author": {"@type": "Person", "name": "EathVader"},
+        "datePublished": "2026-04-02",
+        "publisher": {"@type": "Organization", "name": "EathVader"}
+    }
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <a href="#main" class="skip-link">跳到主要内容</a>
+    <header>
+        <nav class="breadcrumb">
+            <a href="/">首页</a> / <a href="/">网络协议</a> / HTTP
+        </nav>
+    </header>
+    <main id="main">
+        <article>
+            <h1>Http Server 的演进：从单进程到epoll</h1>
+            <p class="meta">来源：码农翻身 · 作者：刘欣</p>
+            
+            <section>
+                <h2>Http Server 1.0：单进程阻塞</h2>
+                <p>HTTP的工作原理其实很简单：浏览器向服务器发送一个预先定义好的文本（HTTP Request），服务器处理一下（通常是从硬盘上取一个HTML文件，然后再把这个文件通过文本方式发回去（HTTP Response）。</p>
+                <p>唯一麻烦的是，需要请操作系统建立 HTTP 层下面的 TCP 连接通道，因为所有的文本数据都得通过这些 TCP 通道接收和发送，这个通道是用 <code>socket</code> 建立的。</p>
+                
+                <div class="code-block">
+                    <pre><code>// Http Server 1.0 伪代码
+socket = socket()
+bind(socket, 80)
+listen(socket)
+
+while True:
+    conn = accept(socket)     // 阻塞等待连接
+    data = receive(conn)      // 阻塞接收数据
+    response = process(data)  // 处理请求
+    send(conn, response)      // 发送响应
+    close(conn)</code></pre>
+                </div>
+                
+                <div class="problem-box">
+                    <strong>问题：</strong> <code>receive</code> 调用很慢，足足等了 100 毫秒还没有响应！程序被阻塞住了。单进程一旦阻塞就什么事都干不了了。
+                </div>
+            </section>
+
+            <section>
+                <h2>Http Server 2.0：多进程并发</h2>
+                <p>多进程的思路非常简单：当 <code>accept</code> 连接以后，对于这个新的 socket，不在主进程里处理，而是新创建子进程来接管。这样主进程就不会阻塞在 <code>receive</code> 上，可以继续接受新的连接了。</p>
+                
+                <div class="code-block">
+                    <pre><code>// Http Server 2.0 伪代码
+while True:
+    conn = accept(socket)     // 主进程只负责accept
+    pid = fork()              // 创建子进程
+    
+    if pid == 0:              // 子进程处理
+        data = receive(conn)
+        response = process(data)
+        send(conn, response)
+        close(conn)
+        exit()</code></pre>
+                </div>
+                
+                <div class="evolution-diagram">
+                    <div class="diagram-title">多进程模型</div>
+                    <div class="process-flow">
+                        <div class="process main">
+                            <div class="process-icon">👑</div>
+                            <div class="process-name">主进程</div>
+                            <div class="process-task">accept()</div>
+                        </div>
+                        <div class="arrows">
+                            <div class="arrow">fork →</div>
+                            <div class="arrow">fork →</div>
+                            <div class="arrow">fork →</div>
+                        </div>
+                        <div class="processes">
+                            <div class="process child">
+                                <div class="process-icon">👶</div>
+                                <div class="process-name">子进程1</div>
+                                <div class="process-task">处理连接1</div>
+                            </div>
+                            <div class="process child">
+                                <div class="process-icon">👶</div>
+                                <div class="process-name">子进程2</div>
+                                <div class="process-task">处理连接2</div>
+                            </div>
+                            <div class="process child">
+                                <div class="process-icon">👶</div>
+                                <div class="process-name">子进程3</div>
+                                <div class="process-task">处理连接3</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="problem-box">
+                    <strong>问题：</strong> 当并发连接越来越多，成百上千的进程耗费大量系统资源。光是做进程切换就把操作系统累死了。
+                </div>
+            </section>
+
+            <section>
+                <h2>Http Server 3.0：Select模型</h2>
+                <p>操作系统老大说：<strong>"一个 Socket 连接就是一个文件描述符（fd，是个整数），这个 fd 背后是一个简单的数据结构，但是我们用了一个非常重量级的东西——进程——来表示对它的读写操作，有点浪费啊。"</strong></p>
+                <p>解决方案是改变工作方式：</p>
+                <ol>
+                    <li>Http Server 把要等待的 socket fd 编号告诉操作系统</li>
+                    <li>Http Server 进入阻塞状态</li>
+                    <li>操作系统在后台检查这些编号的 socket，发现可以读写的做标记</li>
+                    <li>唤醒 Http Server，让它去遍历所有 socket fd，看谁有标记，有标记的做相应处理</li>
+                    <li>处理完了，再把 socket fd 告诉操作系统，再次进入阻塞，如此循环往复</li>
+                </ol>
+                
+                <div class="code-block">
+                    <pre><code>// Http Server 3.0 select 伪代码
+fd_set readfds;
+
+while True:
+    FD_ZERO(&readfds)
+    for fd in all_sockets:
+        FD_SET(fd, &readfds)
+    
+    select(max_fd + 1, &readfds, NULL, NULL, NULL)  // 阻塞等待
+    
+    for fd in all_sockets:                          // 遍历所有fd
+        if FD_ISSET(fd, &readfds):                  // 检查标记
+            data = receive(fd)
+            response = process(data)
+            send(fd, response)</code></pre>
+                </div>
+                
+                <div class="highlight-box">
+                    <strong>核心思想：</strong> 单进程就可以处理所有的 socket！不再需要为每个连接创建进程。
+                </div>
+                
+                <div class="problem-box">
+                    <strong>问题：</strong> 
+                    <ul>
+                        <li>select 最多只能监控 <strong>1024</strong> 个 socket fd</li>
+                        <li>每次唤醒后需要遍历所有 1000+ 个 socket fd，但实际可能只有几十个需要处理</li>
+                        <li>大量不活跃的 socket 也被检查，效率低</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section>
+                <h2>Http Server 4.0：epoll</h2>
+                <p>epoll 和 select 类似，但关键改进在于：<strong>操作系统只会告诉 Http Server 那些可以读写的 socket，Http Server 只需要处理这些 'ready' 的 socket 就可以了。</strong></p>
+                
+                <div class="code-block">
+                    <pre><code>// Http Server 4.0 epoll 伪代码
+epfd = epoll_create()
+epoll_ctl(epfd, EPOLL_CTL_ADD, socket, &event)
+
+while True:
+    nfds = epoll_wait(epfd, events, MAX_EVENTS, -1)  // 阻塞等待
+    
+    for i in 0..nfds:                                // 只遍历就绪的
+        fd = events[i].data.fd
+        data = receive(fd)
+        response = process(data)
+        send(fd, response)</code></pre>
+                </div>
+                
+                <div class="comparison-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>特性</th>
+                                <th>select</th>
+                                <th>epoll</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>最大连接数</td>
+                                <td>1024</td>
+                                <td>无限制</td>
+                            </tr>
+                            <tr>
+                                <td>就绪检测</td>
+                                <td>遍历所有fd</td>
+                                <td>只返回就绪的fd</td>
+                            </tr>
+                            <tr>
+                                <td>时间复杂度</td>
+                                <td>O(n)</td>
+                                <td>O(1)</td>
+                            </tr>
+                            <tr>
+                                <td>适用场景</td>
+                                <td>连接少且活跃</td>
+                                <td>大量连接，少量活跃</td>
+                            </tr>
+                            <tr>
+                                <td>平台</td>
+                                <td>跨平台</td>
+                                <td>Linux 特有</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section>
+                <h2>交互式：Http Server 演进对比</h2>
+                <div class="interactive-demo">
+                    <p>点击按钮查看不同版本的处理方式：</p>
+                    <div class="version-buttons">
+                        <button class="version-btn" onclick="showVersion(1)">1.0 单进程</button>
+                        <button class="version-btn" onclick="showVersion(2)">2.0 多进程</button>
+                        <button class="version-btn" onclick="showVersion(3)">3.0 select</button>
+                        <button class="version-btn active" onclick="showVersion(4)">4.0 epoll</button>
+                    </div>
+                    <div class="version-detail" id="versionDetail">
+                        <div class="version-4">
+                            <h4>Http Server 4.0 - epoll</h4>
+                            <p><strong>优势：</strong> 轻松支持数万并发连接</p>
+                            <p><strong>原理：</strong> 操作系统只返回就绪的socket，不需要遍历全部</p>
+                            <p><strong>代表：</strong> Nginx、Redis 等高性能服务器</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>演进总结</h2>
+                <div class="evolution-timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <h4>1.0 单进程阻塞</h4>
+                            <p>一个 receive 阻塞就什么事都干不了</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <h4>2.0 多进程并发</h4>
+                            <p>每个连接一个进程，进程切换开销大</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <h4>3.0 select模型</h4>
+                            <p>单进程处理所有连接，但需要遍历所有fd</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot highlight"></div>
+                        <div class="timeline-content highlight">
+                            <h4>4.0 epoll</h4>
+                            <p>只处理就绪的socket，性能飞跃提升</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="summary">
+                <h2>总结</h2>
+                <ul>
+                    <li><strong>select</strong> 和 <strong>epoll</strong> 都是 I/O 多路复用技术，让单进程可以处理多个连接</li>
+                    <li>select 需要遍历所有 fd，epoll 只返回就绪的 fd，性能差距巨大</li>
+                    <li>epoll 是 Linux 特有的，其他平台有类似机制（kqueue、IOCP）</li>
+                    <li>现代高性能服务器（Nginx、Redis）都使用 epoll 模型</li>
+                </ul>
+            </section>
+
+            <section class="references">
+                <h2>参考来源</h2>
+                <ul>
+                    <li><a href="https://mp.weixin.qq.com/s?__biz=MzA3MjEyNTE4MQ==&mid=2652732889" target="_blank" rel="noopener">Http Server ： 一个差生的逆袭 - 码农翻身</a></li>
+                </ul>
+            </section>
+        </article>
+    </main>
+
+    <footer>
+        <div class="giscus"></div>
+    </footer>
+
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script>
+    const versions = {
+        1: {
+            title: 'Http Server 1.0 - 单进程阻塞',
+            pros: '简单直接',
+            cons: '一个阻塞全阻塞',
+            desc: '单进程顺序处理，receive 调用阻塞时无法处理其他连接'
+        },
+        2: {
+            title: 'Http Server 2.0 - 多进程并发',
+            pros: '并发处理连接',
+            cons: '进程切换开销大，资源消耗高',
+            desc: '每个连接创建子进程处理，主进程继续 accept'
+        },
+        3: {
+            title: 'Http Server 3.0 - select模型',
+            pros: '单进程处理所有连接',
+            cons: '最多1024个fd，需遍历所有fd',
+            desc: '操作系统通知就绪事件，但需要遍历所有socket fd检查标记'
+        },
+        4: {
+            title: 'Http Server 4.0 - epoll',
+            pros: '只处理就绪的socket，性能飞跃',
+            cons: 'Linux特有',
+            desc: '操作系统只返回就绪的socket，不需要遍历全部，轻松支持数万并发连接'
+        }
+    };
+
+    function showVersion(v) {
+        const info = versions[v];
+        const detail = document.getElementById('versionDetail');
+        detail.innerHTML = `
+            <h4>${info.title}</h4>
+            <p><strong>优势：</strong>${info.pros}</p>
+            <p><strong>问题：</strong>${info.cons}</p>
+            <p>${info.desc}</p>
+        `;
+        document.querySelectorAll('.version-btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+    }
+    </script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDOHZL5Rg"
+        data-category="Comments"
+        data-category-id="DIC_kwDOHZL5Rs4CR-F6"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="preferred_color_scheme"
+        data-lang="zh-CN"
+        crossorigin="anonymous"
+        async>
+    </script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>
