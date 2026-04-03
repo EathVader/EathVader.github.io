@@ -47,6 +47,7 @@
     <li><a href="#sec-methods">请求方法</a></li>
     <li><a href="#sec-status">状态码</a></li>
     <li><a href="#sec-demo">交互演示</a></li>
+    <li><a href="#sec-deep">HTTP 与 TCP/IP 的关系</a></li>
     <li><a href="#sec-summary">总结</a></li>
   </ol>
 </nav>
@@ -347,8 +348,69 @@
 </div>
 </section>
 
+<section id="sec-deep">
+<h2 class="section-title"><span class="num">7</span> HTTP 与 TCP/IP 的关系</h2>
+
+<p>HTTP 是构建在 TCP/IP 协议之上的，是 TCP/IP 协议族的一个子集。理解它们的关系有助于深入理解 HTTP 的工作原理。</p>
+
+<h3>TCP/IP 协议族分层</h3>
+
+<div class="diagram">
+  <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="15" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="600" font-family="Inter">TCP/IP 协议族分层</text>
+    <rect x="30" y="35" width="540" height="30" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="300" y="55" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="600" font-family="Inter">应用层：HTTP, FTP, DNS, SMTP</text>
+    <rect x="30" y="70" width="540" height="30" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="300" y="90" text-anchor="middle" fill="#86efac" font-size="10" font-weight="600" font-family="Inter">传输层：TCP（可靠）, UDP（快速）</text>
+    <rect x="30" y="105" width="540" height="30" rx="4" fill="#451a03" stroke="#f59e0b"/>
+    <text x="300" y="125" text-anchor="middle" fill="#fcd34d" font-size="10" font-weight="600" font-family="Inter">网络层：IP（路由选择）, ICMP</text>
+    <rect x="30" y="140" width="540" height="30" rx="4" fill="#450a0a" stroke="#ef4444"/>
+    <text x="300" y="160" text-anchor="middle" fill="#fca5a5" font-size="10" font-weight="600" font-family="Inter">数据链路层：以太网, WiFi</text>
+    <text x="300" y="190" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">分层的好处：各层解耦，修改某一层不影响其他层</text>
+  </svg>
+</div>
+
+<h3>数据包封装过程</h3>
+
+<p>应用程序数据在发送到物理网络之前，会沿着协议栈从上往下传递。每层协议都将在上层数据的基础上加上自己的头部信息：</p>
+
+<div class="box box-blue">
+  <div class="title">📦 封装与解封装</h1>
+  <p><strong>发送端：</strong>应用层数据 → 加上TCP头 → 加上IP头 → 加上以太网头/尾 → 物理网络</p>
+  <p><strong>接收端：</strong>物理网络 → 去掉以太网头/尾 → 去掉IP头 → 去掉TCP头 → 应用层数据</p>
+  <p>下层协议的头部信息对上层协议是透明的，应用层只需要关心应用服务的实现。</p>
+</div>
+
+<h3>HTTP 与 TCP/IP、DNS 的关系</h3>
+
+<div class="box box-green">
+  <div class="title">🔄 完整通信过程</h1>
+  <ol>
+    <li>客户端通过 <strong>DNS 服务</strong>查询到域名的 IP 地址</li>
+    <li>浏览器生成 <strong>HTTP 请求</strong></li>
+    <li>HTTP 请求通过 <strong>TCP/IP 协议</strong>发送给 Web 服务器</li>
+    <li>Web 服务器根据请求生成响应内容</li>
+    <li>响应通过 <strong>TCP/IP 协议</strong>返回给客户端</li>
+  </ol>
+</div>
+
+<h3>TCP 三次握手</h3>
+
+<p>HTTP 使用 TCP 作为传输协议，TCP 提供面向连接、可靠的传输。建立连接时采用三次握手：</p>
+
+<div class="box box-amber">
+  <div class="title">🤝 三次握手过程</h1>
+  <ol>
+    <li><strong>第一次握手：</strong>客户端发送 SYN 报文，进入 SYN_SEND 状态</li>
+    <li><strong>第二次握手：</strong>服务端收到 SYN，回复 SYN+ACK，进入 SYN_RECV 状态</li>
+    <li><strong>第三次握手：</strong>客户端收到 SYN+ACK，回复 ACK，双方进入 ESTABLISHED 状态</li>
+  </ol>
+  <p>三次握手完成后，TCP 为连接双方维持连接状态，保证数据传输的可靠性。</p>
+</div>
+</section>
+
 <section id="sec-summary">
-<h2 class="section-title"><span class="num">7</span> 总结</h2>
+<h2 class="section-title"><span class="num">8</span> 总结</h2>
 
 <div class="flow">
   <div class="step" style="border-color:#3b82f6">请求<br><small>方法+URL+头+体</small></div>

@@ -48,6 +48,7 @@
     <li><a href="#sec-http">HTTP 请求/响应</a></li>
     <li><a href="#sec-render">页面渲染</a></li>
     <li><a href="#sec-demo">交互演示</a></li>
+    <li><a href="#sec-deep">深入分析：真实世界的细节</a></li>
     <li><a href="#sec-summary">总结</a></li>
   </ol>
 </nav>
@@ -372,8 +373,56 @@
 </div>
 </section>
 
+<section id="sec-deep">
+<h2 class="section-title"><span class="num">8</span> 深入分析：真实世界的细节</h2>
+
+<h3>HTTP → HTTPS 重定向</h3>
+<p>如果你输入的是 <code>http://google.com</code>，实际会发生两次重定向：</p>
+<div class="box box-amber">
+  <div class="title">🔄 重定向链</h1>
+  <ol>
+    <li><strong>301 永久重定向</strong>：主机名规范化，<code>google.com</code> → <code>www.google.com</code></li>
+    <li><strong>307 内部重定向</strong>：HTTP → HTTPS，浏览器内部将协议改为 <code>https://</code>，端口改为 443</li>
+  </ol>
+  <p>两次重定向后，浏览器才真正发起 HTTPS 请求。</p>
+</div>
+
+<h3>负载均衡与 CDN</h3>
+<p>Google.com 不只对应一个 IP 地址。DNS 可能返回多个 IP，浏览器默认选择第一个。请求到达 Google 的负载均衡器后：</p>
+<ol>
+  <li><strong>WAF 检查</strong>：Web 应用程序防火墙检查是否为恶意请求</li>
+  <li><strong>安全连接终止</strong>：TLS 在负载均衡器处解密（内部流量不需要加密）</li>
+  <li><strong>CDN 分发</strong>：请求被分配到最近的 CDN 节点，返回预压缩的页面</li>
+</ol>
+
+<h3>HTTP/2 并发请求</h3>
+<p>Google 主页优化后包含预渲染内容、内联 CSS/JS 和图片。首次加载后会触发一系列并发请求（HTTP/2 多路复用）：</p>
+<ul>
+  <li>下载字体、Logo 图像、用户头像</li>
+  <li>JavaScript 解析（可能使用 <code>defer</code> 或 <code>async</code> 非阻塞模式）</li>
+  <li>Cookie/OAuth 令牌认证，告诉服务器"我是谁"</li>
+</ul>
+
+<h3>User-Agent 嗅探</h3>
+<p>服务器端（而非客户端）会检测你的浏览器类型。如果你不是用 Chrome 访问 Google，他们可能会弹出提示推荐使用 Chrome。这说明 <strong>User-Agent 嗅探是在服务器端进行的</strong>。</p>
+
+<h3>缓存策略</h3>
+<p>浏览器根据响应头的缓存策略对内容进行缓存。Google 可能对静态资源设置了较长的缓存时间，对动态内容设置了较短的缓存时间或 <code>no-cache</code>。</p>
+
+<div class="box box-blue">
+  <div class="title">📊 实际抓包观察</h1>
+  <p>在浏览器中打开 google.com 并禁用缓存，你会看到：</p>
+  <ul>
+    <li>301 状态码：主机名规范化</li>
+    <li>307 内部重定向：HTTP → HTTPS</li>
+    <li>字体、Logo、头像等资源的下载</li>
+    <li>没有 API 调用，说明个人信息是服务器端推送的</li>
+  </ul>
+</div>
+</section>
+
 <section id="sec-summary">
-<h2 class="section-title"><span class="num">8</span> 总结</h2>
+<h2 class="section-title"><span class="num">9</span> 总结</h2>
 
 <div class="flow">
   <div class="step" style="border-color:#3b82f6">URL解析<br><small>协议/域名</small></div>

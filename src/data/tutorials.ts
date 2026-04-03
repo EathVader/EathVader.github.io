@@ -311,4 +311,12 @@ export const tutorials: Tutorial[] = [
       '用马路和汽车的比喻，一分钟理解Linux系统负载Load Average的含义、查看方法和不同数值的意义。',
     meta: '基于架构师之路 · 2026-04',
   },
+  {
+    slug: 'tcpdump',
+    tag: '🔧 网络调试',
+    title: 'iOS/Android 网络抓包教程：tcpdump',
+    description:
+      '移动端网络抓包实战：iOS 使用 rvictl 创建虚拟网卡，Android 通过 adb 上传 tcpdump。详解 TCP Flags、Seq/Ack、RTT 计算。',
+    meta: '基于 MrPeak 技术分享 · 2026-04',
+  },
 ];

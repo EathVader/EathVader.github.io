@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iOS/Android 网络抓包教程：tcpdump | 移动端网络调试</title>
+    <meta name="description" content="tcpdump 抓包教程：iOS 使用 rvictl 创建虚拟网卡抓包，Android 通过 adb 上传 tcpdump 抓包。详解 TCP Flags、Seq/Ack、RTT 计算。">
+    <meta name="keywords" content="tcpdump,网络抓包,iOS抓包,Android抓包,TCP Flags,网络调试">
+    <meta property="og:title" content="iOS/Android 网络抓包教程：tcpdump">
+    <meta property="og:description" content="tcpdump 抓包教程：iOS 和 Android 移动端网络抓包">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/tcpdump/">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "iOS/Android 网络抓包教程：tcpdump",
+        "description": "tcpdump 抓包教程：iOS 使用 rvictl 创建虚拟网卡抓包，Android 通过 adb 上传 tcpdump 抓包。",
+        "author": {"@type": "Person", "name": "EathVader"},
+        "datePublished": "2026-04-02",
+        "publisher": {"@type": "Organization", "name": "EathVader"}
+    }
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <a href="#main" class="skip-link">跳到主要内容</a>
+    <header>
+        <nav class="breadcrumb">
+            <a href="/">首页</a> / <a href="/">网络协议</a> / 抓包
+        </nav>
+    </header>
+    <main id="main">
+        <article>
+            <h1>iOS/Android 网络抓包教程：tcpdump</h1>
+            <p class="meta">来源：MrPeak 技术分享</p>
+            
+            <section>
+                <h2>为什么需要抓包？</h2>
+                <p>现在的移动端应用几乎都会通过网络请求来和服务器交互，通过抓包来诊断和网络相关的 bug 是程序员的重要技能之一。</p>
+                <div class="tool-comparison">
+                    <h3>抓包工具对比</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>工具</th>
+                                <th>协议</th>
+                                <th>特点</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Charles</td>
+                                <td>HTTP/HTTPS</td>
+                                <td>设置代理，GUI 友好</td>
+                            </tr>
+                            <tr>
+                                <td>Wireshark</td>
+                                <td>所有协议</td>
+                                <td>GUI 分析，深入全面</td>
+                            </tr>
+                            <tr>
+                                <td>tcpdump</td>
+                                <td>所有协议</td>
+                                <td>命令行，快速高效</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section>
+                <h2>iOS 上启动 tcpdump</h2>
+                <p>iOS 设备上启动 tcpdump 比较方便。Apple 在 Mac 上有个叫 <code>rvictl</code> 的程序，可以通过 iOS 设备的 UDID 创建一个虚拟网卡，然后通过这个虚拟网卡监听设备上所有的网络流量。</p>
+                
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-num">1</div>
+                        <div class="step-content">
+                            <h4>获取设备 UDID</h4>
+                            <p>通过 iTunes 或 Finder 获取 iOS 设备的 UDID</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-num">2</div>
+                        <div class="step-content">
+                            <h4>创建虚拟网卡</h4>
+                            <pre><code>rvictl -s &lt;udid&gt;</code></pre>
+                            <p>在终端输入命令，创建虚拟网卡（rvi0）</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-num">3</div>
+                        <div class="step-content">
+                            <h4>启动 tcpdump 监控</h4>
+                            <pre><code>sudo tcpdump -i rvi0 -AAl</code></pre>
+                            <p>启动 tcpdump 监控设备所有网络流量</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Android 上启动 tcpdump</h2>
+                <p>Android 设备没办法通过 rvictl 创建虚拟网卡，但是可以把 tcpdump 的可执行文件上传到 Android 设备上，然后通过 Mac 远程登录 Android 设备运行 tcpdump，前提是这台 Android 设备必须已经 root 过。</p>
+                
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-num">1</div>
+                        <div class="step-content">
+                            <h4>下载 Android 版 tcpdump</h4>
+                            <p>从 <a href="http://www.androidtcpdump.com/android-tcpdump/downloads" target="_blank" rel="noopener">androidtcpdump.com</a> 下载专为 Android 编译的版本</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-num">2</div>
+                        <div class="step-content">
+                            <h4>上传到设备</h4>
+                            <pre><code>adb push tcpdump /sdcard/data/</code></pre>
+                            <p>通过 adb 将 tcpdump 文件上传到设备</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-num">3</div>
+                        <div class="step-content">
+                            <h4>运行 tcpdump</h4>
+                            <pre><code>adb shell
+cd /sdcard/data/
+chmod 755 tcpdump
+./tcpdump</code></pre>
+                            <p>通过 adb shell 登录设备并执行 tcpdump</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>分析 tcpdump 输出</h2>
+                <p>成功运行 tcpdump 之后，接下来就可以分析输出的网络包内容了。iOS 设备和 Android 设备的输出是一致的。</p>
+                
+                <div class="packet-example">
+                    <h3>tcpdump 输出示例</h3>
+                    <pre><code>14:37:41.615018 IP 17.143.164.37.5223 > 10.29.44.140.58036: Flags [P.], seq 1:54, ack 101, win 255, options [nop,nop,TS val 2381386761 ecr 427050796], length 53</code></pre>
+                </div>
+
+                <div class="field-explanation">
+                    <h3>字段详解</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>字段</th>
+                                <th>含义</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>14:37:41.615018</code></td>
+                                <td>包接收到的时间</td>
+                            </tr>
+                            <tr>
+                                <td><code>17.143.164.37.5223</code></td>
+                                <td>发送方的 IP 地址及端口号</td>
+                            </tr>
+                            <tr>
+                                <td><code>10.29.44.140.58036</code></td>
+                                <td>接收方的 IP 地址及端口号</td>
+                            </tr>
+                            <tr>
+                                <td><code>Flags [P.]</code></td>
+                                <td>TCP 包的 flag 位（见下方详解）</td>
+                            </tr>
+                            <tr>
+                                <td><code>seq 1:54</code></td>
+                                <td>TCP 包的 seq 号，1 是起始值，54 结束值，共 53 字节</td>
+                            </tr>
+                            <tr>
+                                <td><code>ack 101</code></td>
+                                <td>确认收到 seq 100，期望下一个从 101 开始</td>
+                            </tr>
+                            <tr>
+                                <td><code>win 255</code></td>
+                                <td>接收方还可以接受的字节数（窗口大小）</td>
+                            </tr>
+                            <tr>
+                                <td><code>TS val 2381386761</code></td>
+                                <td>TCP 包的时间戳，用于确认包的顺序</td>
+                            </tr>
+                            <tr>
+                                <td><code>ecr 427050796</code></td>
+                                <td>用于计算 RTT（往返时间）</td>
+                            </tr>
+                            <tr>
+                                <td><code>length 53</code></td>
+                                <td>应用层传过来的数据大小（不包括 TCP header）</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section>
+                <h2>TCP Flags 详解</h2>
+                <p>Flags 位于 TCP header 的第十四个字节，包含 8 个比特位。每个 flag 都有特定的功能用途：</p>
+                
+                <div class="flags-grid">
+                    <div class="flag-item syn">
+                        <div class="flag-name">SYN</div>
+                        <p>建立连接请求。三次握手的第一个包设置此位：<code>SYN → SYN+ACK → ACK</code></p>
+                    </div>
+                    <div class="flag-item ack">
+                        <div class="flag-name">ACK</div>
+                        <p>确认收到。告诉对方上一个数据包已成功收到。一般不会单独发送，而是在下一个要发送的 packet 里设置。</p>
+                    </div>
+                    <div class="flag-item psh">
+                        <div class="flag-name">PSH</div>
+                        <p>Push。接收方需要马上将包 push 到应用层处理。HTTP request 的最后一个包通常设置此位。</p>
+                    </div>
+                    <div class="flag-item fin">
+                        <div class="flag-name">FIN</div>
+                        <p>Finish。发送方没有更多数据要发送了，之后要单向关闭连接。接收方回 ACK，再发送自己的 FIN 即可双向关闭。</p>
+                    </div>
+                    <div class="flag-item rst">
+                        <div class="flag-name">RST</div>
+                        <p>Reset。表明发送方马上就要断开当前连接了。HTTP 请求结束时一般可以看到设置了 RST 位。</p>
+                    </div>
+                    <div class="flag-item urg">
+                        <div class="flag-name">URG</div>
+                        <p>Urgent。表明包的优先级高，需要优先传送对方并处理。如 terminal 中 Ctrl+C 产生的网络数据包。</p>
+                    </div>
+                </div>
+
+                <div class="highlight-box">
+                    <h3>TCP Header 结构</h3>
+                    <p>理解 tcpdump 输出的关键是理解 TCP header 的结构。常看常新的 TCP header 包含：</p>
+                    <ul>
+                        <li><strong>源端口 + 目标端口</strong>：标识通信的两端</li>
+                        <li><strong>Sequence Number (Seq)</strong>：包的序号，解决乱序问题</li>
+                        <li><strong>Acknowledgement Number (Ack)</strong>：确认号，解决丢包问题</li>
+                        <li><strong>Window</strong>：接收窗口，用于流量控制</li>
+                        <li><strong>Flags (第14字节)</strong>：8个比特位，操控 TCP 状态机</li>
+                        <li><strong>Options</strong>：可选字段，如时间戳、MSS 等</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section>
+                <h2>RTT 计算原理</h2>
+                <p>tcpdump 输出中的 <code>TS val</code> 和 <code>ecr</code> 可以用来计算 RTT（Round Trip Time）：</p>
+                <div class="rtt-explanation">
+                    <ol>
+                        <li>A 发送一个 TCP 包给 B，A 会在包里带上 <code>TS val</code></li>
+                        <li>B 收到之后在 ACK 包里把这个值原样返回（作为 <code>ecr</code>）</li>
+                        <li>A 收到 B 的 ACK 包之后，根据本地时钟就可以计算出 RTT</li>
+                    </ol>
+                    <p class="note">这个时间戳和设备的系统时间没关系，刚开始是随机值，后面随着系统时钟自增长。ecr 值只在 ACK 包里有效，非 ACK 包 ecr 的值为 0。</p>
+                </div>
+            </section>
+
+            <section>
+                <h2>常用 tcpdump 命令</h2>
+                <div class="commands">
+                    <div class="command-item">
+                        <pre><code># 监控特定端口
+tcpdump -i any port 80</code></pre>
+                        <p>监控 80 端口的所有流量</p>
+                    </div>
+                    <div class="command-item">
+                        <pre><code># 监控特定主机
+tcpdump -i any host 192.168.1.100</code></pre>
+                        <p>监控与特定主机的通信</p>
+                    </div>
+                    <div class="command-item">
+                        <pre><code># 只捕获 SYN 包
+tcpdump -i any 'tcp[tcpflags] & tcp-syn != 0'</code></pre>
+                        <p>只捕获建立连接的 SYN 包</p>
+                    </div>
+                    <div class="command-item">
+                        <pre><code># 保存为 pcap 文件
+tcpdump -i any -w capture.pcap</code></pre>
+                        <p>保存抓包结果，可用 Wireshark 分析</p>
+                    </div>
+                    <div class="command-item">
+                        <pre><code># 查看 HTTP 请求
+tcpdump -i any -A 'tcp port 80'</code></pre>
+                        <p>以 ASCII 格式查看 HTTP 流量</p>
+                    </div>
+                    <div class="command-item">
+                        <pre><code># 限制抓包数量
+tcpdump -i any -c 100</code></pre>
+                        <p>只抓 100 个包后自动退出</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="summary">
+                <h2>总结</h2>
+                <ul>
+                    <li><strong>iOS 抓包</strong>：使用 <code>rvictl -s &lt;udid&gt;</code> 创建虚拟网卡，再通过 <code>tcpdump -i rvi0</code> 抓包</li>
+                    <li><strong>Android 抓包</strong>：通过 adb 上传 tcpdump 到设备，在 root 环境下运行</li>
+                    <li><strong>Seq/Ack</strong>：Seq 是包的序号，Ack 是确认号（期望收到的下一个序号）</li>
+                    <li><strong>TCP Flags</strong>：SYN/ACK/FIN/RST/PSH/URG 6 个常用 flag，操控 TCP 状态机</li>
+                    <li><strong>RTT 计算</strong>：通过 TS val 和 ecr 计算往返时间</li>
+                    <li><strong>Wireshark</strong>：tcpdump 保存的 pcap 文件可用 Wireshark 进行 GUI 分析</li>
+                </ul>
+            </section>
+
+            <section class="references">
+                <h2>参考来源</h2>
+                <ul>
+                    <li><a href="http://mrpeak.cn/ios/2016/01/26/tcpdump-wc" target="_blank" rel="noopener">iOS,Android网络抓包教程之tcpdump - MrPeak技术分享</a></li>
+                    <li><a href="https://en.wikipedia.org/wiki/Internet_protocol_suite" target="_blank" rel="noopener">TCP/IP - Wikipedia</a></li>
+                </ul>
+            </section>
+        </article>
+    </main>
+
+    <footer>
+        <div class="giscus"></div>
+    </footer>
+
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDOHZL5Rg"
+        data-category="Comments"
+        data-category-id="DIC_kwDOHZL5Rs4CR-F6"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="preferred_color_scheme"
+        data-lang="zh-CN"
+        crossorigin="anonymous"
+        async>
+    </script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>
