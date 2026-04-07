@@ -319,4 +319,76 @@ export const tutorials: Tutorial[] = [
       '移动端网络抓包实战：iOS 使用 rvictl 创建虚拟网卡，Android 通过 adb 上传 tcpdump。详解 TCP Flags、Seq/Ack、RTT 计算。',
     meta: '基于 MrPeak 技术分享 · 2026-04',
   },
+  {
+    slug: 'wsgi',
+    tag: '🐍 Python',
+    title: 'WSGI 接口详解',
+    description:
+      'WSGI（Web Server Gateway Interface）详解：从 Web 应用本质到三层架构，从 Hello World 到 Flask 框架原理，含交互式 WSGI 服务器模拟。',
+    meta: '基于廖雪峰/Flask 源码 · 2026-04',
+  },
+  {
+    slug: 'flask-source',
+    tag: '🐍 Python',
+    title: 'Flask 0.1 源代码分析',
+    description:
+      'Flask 0.1 源代码分析：从 WSGI 接口到路由系统，理解 Flask 框架如何工作，不到 700 行代码的 Web 框架设计精髓。',
+    meta: '基于 Flask 源码分析 · 2026-04',
+  },
+  {
+    slug: 'java-memory-model',
+    tag: '☕ Java',
+    title: 'Java 内存模型（JMM）详解',
+    description:
+      '从 CPU 缓存一致性到并发编程问题，深入理解 Java 内存模型。volatile、synchronized、final 如何实现原子性、可见性、有序性。',
+    meta: '基于 HollisChuang 博客 · 2026-04',
+  },
+  {
+    slug: 'jvm-offheap',
+    tag: '☕ Java',
+    title: 'JVM 堆外内存回收机制',
+    description:
+      'JVM 堆外内存的申请、释放与回收机制：DirectByteBuffer、Cleaner 链表、System.gc() 触发条件，以及 -XX:+DisableExplicitGC 的坑。',
+    meta: '基于程序员小灰/占小狼 · 2026-04',
+  },
+  {
+    slug: 'python-concurrency',
+    tag: '🐍 Python',
+    title: 'Python 并发编程：进程篇',
+    description:
+      'GIL 问题与多进程解决方案：multiprocessing、进程池 Pool、进程间通信。对比单进程/多线程/多进程的性能差异。',
+    meta: '基于 Python 之美 · 2026-04',
+  },
+  {
+    slug: 'web-scraping',
+    tag: '🐍 Python',
+    title: '高效 Web 爬虫 6 个技巧',
+    description:
+      'Python 高效 Web 爬虫开发 6 个技巧：Session 复用、连接池、并发请求、错误重试、代理轮换、数据流处理。',
+    meta: '基于 Adnan\'s Random bytes · 2026-04',
+  },
+  {
+    slug: 'python-requests',
+    tag: '🐍 Python',
+    title: 'Python requests 深入理解',
+    description:
+      'Python requests 库深度解析：Session 对象、PreparedRequest、流式上传/下载、连接复用、最佳实践。',
+    meta: '基于 Anthony Shaw Medium · 2026-04',
+  },
+  {
+    slug: 'python-web-perf',
+    tag: '🐍 Python',
+    title: 'Python Web 应用性能调优',
+    description:
+      'Python Web 应用性能调优指南：数据库查询优化、缓存策略、异步处理、连接池、内存管理、性能分析工具。',
+    meta: '基于多篇技术文章综合 · 2026-04',
+  },
+  {
+    slug: 'guava-cache',
+    tag: '☕ Java',
+    title: 'Guava Cache 源码分析',
+    description:
+      'Guava Cache 源码分析：LRU 策略、并发读写、过期机制、回收机制。深入理解本地缓存的设计与实现。',
+    meta: '基于 Guava 源码 · 2026-04',
+  },
 ];

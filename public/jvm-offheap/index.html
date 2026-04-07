@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JVM 堆外内存回收机制详解</title>
+    <meta name="description" content="深入理解 JVM 堆外内存的申请、释放和回收机制，DirectByteBuffer、Cleaner 原理，以及 System.gc() 的坑">
+    <meta property="og:title" content="JVM 堆外内存回收机制详解">
+    <meta property="og:description" content="深入理解 JVM 堆外内存的申请、释放和回收机制，DirectByteBuffer、Cleaner 原理，以及 System.gc() 的坑">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/jvm-offheap/">
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"Article","headline":"JVM 堆外内存回收机制详解","description":"深入理解 JVM 堆外内存的申请、释放和回收机制，DirectByteBuffer、Cleaner 原理，以及 System.gc() 的坑","author":{"@type":"Person","name":"EathVader"},"datePublished":"2026-04-02","publisher":{"@type":"Organization","name":"EathVader"}}
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header><nav class="breadcrumb"><a href="/">首页</a> / <a href="/">后端开发</a> / JVM</nav></header>
+    <main><article>
+        <h1>JVM 堆外内存回收机制详解</h1>
+        <p class="meta">来源：占小狼的博客 · 2026-04-02</p>
+
+        <h2>什么是堆外内存</h2>
+
+        <p>JVM 启动时分配的内存称为<strong>堆内存</strong>，由 JVM 管理，GC 算法负责回收。但在代码中还可以使用<strong>堆外内存</strong>（Off-Heap Memory），这部分内存不归 JVM 管理，GC 算法不会对它们进行回收。</p>
+
+        <p>堆外内存的使用场景：</p>
+        <ul>
+            <li><strong>Netty</strong> 等高性能网络框架广泛使用堆外内存，减少内存拷贝</li>
+            <li><strong>DirectByteBuffer</strong> 进行 NIO 操作时避免 Java 堆到 Native 堆的拷贝</li>
+            <li>大内存缓存，不受 JVM 堆大小限制</li>
+        </ul>
+
+        <div class="highlight-box">
+            <strong>注意：</strong>堆外内存不归 JVM 管理，GC 不会自动回收。使用时要格外小心，防止内存泄漏导致线上故障。
+        </div>
+
+        <h2>堆外内存的申请和释放</h2>
+
+        <p>JDK 的 <code>ByteBuffer</code> 类提供了 <code>allocateDirect(int capacity)</code> 方法进行堆外内存申请，底层通过 <code>unsafe.allocateMemory(size)</code> 实现。</p>
+
+        <div class="code-block">
+            <div class="code-label">Java — 申请堆外内存</div>
+            <pre><code class="language-java">// 高层 API
+ByteBuffer buffer = ByteBuffer.allocateDirect(1024);
+
+// 底层调用链
+// ByteBuffer.allocateDirect()
+//   → Bits.reserveMemory()
+//     → Unsafe.allocateMemory()
+//       → malloc()  ← 最终是 C 语言的 malloc</code></pre>
+        </div>
+
+        <p>最底层是通过 <code>malloc</code> 方法申请的，这块内存需要手动释放。<code>Unsafe</code> 提供了 <code>freeMemory</code> 接口进行释放：</p>
+
+        <div class="code-block">
+            <div class="code-label">Java — 释放堆外内存</div>
+            <pre><code class="language-java">unsafe.freeMemory(address);</code></pre>
+        </div>
+
+        <h2>堆外内存的回收机制</h2>
+
+        <p>如果每次申请堆外内存都需要在代码中显式释放，对于 Java 来说显然不够优雅。JVM 虽然不会直接管理堆外内存，但通过巧妙的机制实现了<strong>间接回收</strong>。</p>
+
+        <h3>DirectByteBuffer 与 Cleaner</h3>
+
+        <p>JDK 使用 <code>DirectByteBuffer</code> 对象来表示堆外内存。每个 <code>DirectByteBuffer</code> 在初始化时，都会创建一个对应的 <code>Cleaner</code> 对象。这个 Cleaner 对象会在合适的时机执行 <code>unsafe.freeMemory(address)</code>，从而回收堆外内存。</p>
+
+        <div class="code-block">
+            <div class="code-label">Java — DirectByteBuffer 构造器关键代码</div>
+            <pre><code class="language-java">DirectByteBuffer(int cap) {
+    super(-1, 0, cap, cap);
+    // 1. 申请堆外内存
+    long base = unsafe.allocateMemory(cap);
+    // 2. 创建 Cleaner，关联 this（DirectByteBuffer）和 Deallocator
+    cleaner = Cleaner.create(this, new Deallocator(base, cap, cap));
+    // ...
+}
+
+// Deallocator 的 run 方法负责释放内存
+private static class Deallocator implements Runnable {
+    public void run() {
+        if (address == 0) return;
+        unsafe.freeMemory(address);  // 释放堆外内存
+        address = 0;
+        Bits.unreserveMemory(size, capacity);
+    }
+}</code></pre>
+        </div>
+
+        <h3>引用链与回收过程</h3>
+
+        <div class="diagram">
+            <svg viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <marker id="arrow-oh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#4d96ff"/></marker>
+                    <marker id="arrow-oh-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#ff6b6b"/></marker>
+                </defs>
+
+                <!-- 正常状态 -->
+                <text x="100" y="30" text-anchor="middle" fill="#2c3e50" font-size="14" font-weight="bold">回收前（正常状态）</text>
+
+                <rect x="20" y="50" width="160" height="50" rx="8" fill="#e8f4fd" stroke="#4d96ff" stroke-width="1.5"/>
+                <text x="100" y="80" text-anchor="middle" fill="#2c3e50" font-size="12">DirectByteBuffer</text>
+
+                <rect x="250" y="50" width="140" height="50" rx="8" fill="#d4edda" stroke="#6bcb77" stroke-width="1.5"/>
+                <text x="320" y="80" text-anchor="middle" fill="#2c3e50" font-size="12">Cleaner 对象</text>
+
+                <rect x="460" y="50" width="160" height="50" rx="8" fill="#fff3cd" stroke="#ffd93d" stroke-width="1.5"/>
+                <text x="540" y="72" text-anchor="middle" fill="#2c3e50" font-size="12">堆外内存</text>
+                <text x="540" y="88" text-anchor="middle" fill="#2c3e50" font-size="10">(address, size, capacity)</text>
+
+                <line x1="180" y1="75" x2="250" y2="75" stroke="#4d96ff" stroke-width="1.5" marker-end="url(#arrow-oh)"/>
+                <text x="215" y="68" fill="#4d96ff" font-size="10">引用</text>
+
+                <line x1="390" y1="75" x2="460" y2="75" stroke="#4d96ff" stroke-width="1.5" marker-end="url(#arrow-oh)"/>
+                <text x="425" y="68" fill="#4d96ff" font-size="10">保存地址</text>
+
+                <!-- Cleaner 链表 -->
+                <rect x="250" y="140" width="140" height="40" rx="8" fill="#f0f0f0" stroke="#999" stroke-width="1"/>
+                <text x="320" y="165" text-anchor="middle" fill="#2c3e50" font-size="12">Cleaner.first (静态变量)</text>
+                <line x1="320" y1="140" x2="320" y2="100" stroke="#999" stroke-width="1.5" marker-end="url(#arrow-oh)" stroke-dasharray="4,3"/>
+
+                <!-- ReferenceQueue -->
+                <rect x="460" y="140" width="160" height="40" rx="8" fill="#f0f0f0" stroke="#999" stroke-width="1"/>
+                <text x="540" y="165" text-anchor="middle" fill="#2c3e50" font-size="12">ReferenceQueue</text>
+                <text x="540" y="155" text-anchor="middle" fill="#999" font-size="10">(保存待回收的 Cleaner)</text>
+
+                <!-- 回收后状态 -->
+                <text x="100" y="230" text-anchor="middle" fill="#2c3e50" font-size="14" font-weight="bold">回收后（GC 之后）</text>
+
+                <rect x="20" y="250" width="160" height="50" rx="8" fill="#f5f5f5" stroke="#ccc" stroke-width="1.5" stroke-dasharray="5,3"/>
+                <text x="100" y="280" text-anchor="middle" fill="#999" font-size="12">DirectByteBuffer (已回收)</text>
+
+                <rect x="250" y="250" width="140" height="50" rx="8" fill="#ffe0e0" stroke="#ff6b6b" stroke-width="1.5"/>
+                <text x="320" y="272" text-anchor="middle" fill="#2c3e50" font-size="12">Cleaner 对象</text>
+                <text x="320" y="288" text-anchor="middle" fill="#ff6b6b" font-size="10">即将执行 clean()</text>
+
+                <rect x="460" y="250" width="160" height="50" rx="8" fill="#d4edda" stroke="#6bcb77" stroke-width="1.5"/>
+                <text x="540" y="272" text-anchor="middle" fill="#2c3e50" font-size="12">堆外内存被释放</text>
+                <text x="540" y="288" text-anchor="middle" fill="#6bcb77" font-size="10">unsafe.freeMemory()</text>
+
+                <line x1="180" y1="275" x2="250" y2="275" stroke="#ff6b6b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-oh-r)"/>
+                <text x="215" y="268" fill="#ff6b6b" font-size="10">引用断了</text>
+
+                <line x1="390" y1="275" x2="460" y2="275" stroke="#6bcb77" stroke-width="1.5" marker-end="url(#arrow-oh)"/>
+                <text x="425" y="268" fill="#6bcb77" font-size="10">释放</text>
+
+                <!-- 流程说明 -->
+                <rect x="20" y="330" width="660" height="60" rx="8" fill="#e8f4fd" stroke="#4d96ff" stroke-width="1"/>
+                <text x="350" y="350" text-anchor="middle" fill="#2c3e50" font-size="12">回收流程：① DirectByteBuffer 被 GC 回收 → ② Cleaner 被放入 ReferenceQueue</text>
+                <text x="350" y="370" text-anchor="middle" fill="#2c3e50" font-size="12">③ 触发 clean() 方法 → ④ 从 Cleaner 链表删除 + 释放堆外内存</text>
+            </svg>
+        </div>
+
+        <h3>Cleaner 的 clean 方法</h3>
+
+        <p><code>Cleaner</code> 对象的 <code>clean</code> 方法有两个作用：</p>
+        <ol>
+            <li>把自身从 Cleaner 链表删除，从而在下次 GC 时能够被回收</li>
+            <li>释放堆外内存</li>
+        </ol>
+
+        <div class="code-block">
+            <div class="code-label">Java — Cleaner.clean() 核心逻辑</div>
+            <pre><code class="language-java">public void run() {
+    if (address == 0) {
+        // Paranoia - 防止重复释放
+        return;
+    }
+    unsafe.freeMemory(address);    // 释放堆外内存
+    address = 0;
+    Bits.unreserveMemory(size, capacity);
+}</code></pre>
+        </div>
+
+        <h2>System.gc() 的触发机制</h2>
+
+        <p>如果 JVM 一直没有执行 Full GC，无效的 Cleaner 对象就无法放入 ReferenceQueue，堆外内存也一直得不到释放——内存岂不会爆？</p>
+
+        <p>实际上，在初始化 <code>DirectByteBuffer</code> 时，如果当前堆外内存的条件很苛刻（剩余空间不足），会<strong>主动调用 <code>System.gc()</code></strong> 强制触发 Full GC：</p>
+
+        <div class="code-block">
+            <div class="code-label">Java — Bits.reserveMemory()</div>
+            <pre><code class="language-java">static synchronized boolean reserveMemory(long size, int cap) {
+    // ... 检查剩余堆外内存是否足够
+    if (/* 内存不足 */) {
+        System.gc();  // 主动触发 Full GC
+        try { Thread.sleep(100); } catch (InterruptedException e) {}
+        // 再次尝试申请
+    }
+    // ...
+}</code></pre>
+        </div>
+
+        <div class="highlight-box" style="background: #fff3cd; border-left-color: #ffd93d;">
+            <strong>⚠️ 线上大坑：</strong>很多线上环境的 JVM 参数配置了 <code>-XX:+DisableExplicitGC</code>，导致 <code>System.gc()</code> 变成一个空函数，根本不会触发 Full GC！使用 Netty 等框架时要特别注意这个问题。
+        </div>
+
+        <h2>如何避免堆外内存泄漏</h2>
+
+        <table>
+            <tr><th>方案</th><th>说明</th></tr>
+            <tr><td>不要使用 <code>-XX:+DisableExplicitGC</code></td><td>让 System.gc() 能正常触发，保证 Cleaner 有机会执行</td></tr>
+            <tr><td>主动调用 <code>DirectByteBuffer.cleaner().clean()</code></td><td>手动触发清理（不推荐，依赖内部 API）</td></tr>
+            <tr><td>使用 Netty 的 <code>ReferenceCountUtil.release()</code></td><td>Netty 自己管理堆外内存的生命周期</td></tr>
+            <tr><td>控制 DirectByteBuffer 的使用量</td><td>通过 <code>-XX:MaxDirectMemorySize</code> 限制最大值</td></tr>
+        </table>
+
+        <h2>总结</h2>
+
+        <div class="summary">
+            <h2>核心要点</h2>
+            <ol>
+                <li><strong>堆外内存申请</strong>：通过 <code>ByteBuffer.allocateDirect()</code> → <code>Unsafe.allocateMemory()</code> → <code>malloc()</code></li>
+                <li><strong>Cleaner 机制</strong>：每个 DirectByteBuffer 关联一个 Cleaner，GC 回收 DirectByteBuffer 后，Cleaner 被放入 ReferenceQueue 并触发 clean()</li>
+                <li><strong>clean() 两件事</strong>：从 Cleaner 链表删除自身 + 调用 unsafe.freeMemory() 释放堆外内存</li>
+                <li><strong>System.gc()</strong>：堆外内存不足时会主动调用，但 <code>-XX:+DisableExplicitGC</code> 会让它失效</li>
+                <li><strong>线上注意</strong>：使用 Netty 等框架时，要确认 GC 策略是否会影响堆外内存回收</li>
+            </ol>
+        </div>
+
+        <div class="references">
+            <h3>参考资料</h3>
+            <ul>
+                <li><a href="https://mp.weixin.qq.com/s?__biz=MzIxMjE5MTE1Nw==&mid=2653193396" target="_blank">占小狼 - JVM堆外内存，如何被回收？</a></li>
+                <li>JDK 源码：java.nio.DirectByteBuffer</li>
+                <li>JDK 源码：sun.misc.Cleaner</li>
+            </ul>
+        </div>
+    </article></main>
+    <footer><div class="giscus"></div></footer>
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDOHZL5Rg" data-category="Comments" data-category-id="DIC_kwDOHZL5Rs4CR-F6" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="preferred_color_scheme" data-lang="zh-CN" crossorigin="anonymous" async></script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>

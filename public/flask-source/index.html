@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask 0.1 源代码分析 | Python Web 框架原理</title>
+    <meta name="description" content="Flask 0.1 源代码分析：从 WSGI 接口到路由系统，理解 Flask 框架如何工作，不到 700 行代码的 Web 框架设计精髓。">
+    <meta name="keywords" content="Flask,Python,Web框架,源码分析,WSGI,路由">
+    <meta property="og:title" content="Flask 0.1 源代码分析">
+    <meta property="og:description" content="Flask 0.1 源代码分析：理解 Flask 框架如何工作">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/flask-source/">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "Flask 0.1 源代码分析",
+        "description": "Flask 0.1 源代码分析：从 WSGI 接口到路由系统，理解 Flask 框架如何工作。",
+        "author": {"@type": "Person", "name": "EathVader"},
+        "datePublished": "2026-04-02",
+        "publisher": {"@type": "Organization", "name": "EathVader"}
+    }
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <a href="#main" class="skip-link">跳到主要内容</a>
+    <header>
+        <nav class="breadcrumb">
+            <a href="/">首页</a> / <a href="/">后端开发</a> / Python
+        </nav>
+    </header>
+    <main id="main">
+        <article>
+            <h1>Flask 0.1 源代码分析</h1>
+            <p class="meta">来源：Flask 源码分析</p>
+            
+            <section>
+                <h2>为什么读 Flask 源码？</h2>
+                <p>Flask 框架饱受好评的原因就是因为<strong>简洁、明快而且够 Pythonic</strong>。Flask 0.1 的代码量只有不到 <strong>700 行</strong>，但读懂它并不容易。在此之前还需要 WSGI 的一些基础知识。</p>
+                
+                <div class="highlight-box">
+                    <strong>Flask 的核心理念：</strong> 用最少的代码实现最强大的功能。理解 Flask 源码就是理解 Python Web 框架的原理。
+                </div>
+            </section>
+
+            <section>
+                <h2>Web 三层架构</h2>
+                <div class="architecture-diagram">
+                    <div class="layer web-framework">
+                        <div class="layer-icon">🏗️</div>
+                        <h4>Web 框架层</h4>
+                        <p>Flask, Django, Bottle</p>
+                        <p class="layer-desc">管理数据库、Cookies、路由</p>
+                    </div>
+                    <div class="layer-connector">
+                        <span class="connector-label">WSGI 接口（PEP 3333）</span>
+                    </div>
+                    <div class="layer wsgi-layer">
+                        <div class="layer-icon">🔌</div>
+                        <h4>WSGI 层</h4>
+                        <p>application(environ, start_response)</p>
+                        <p class="layer-desc">框架为服务器提供标准接口</p>
+                    </div>
+                    <div class="layer-connector">
+                        <span class="connector-label">TCP/HTTP 连接</span>
+                    </div>
+                    <div class="layer web-server">
+                        <div class="layer-icon">🖥️</div>
+                        <h4>Web 服务器层</h4>
+                        <p>Gunicorn, uWSGI, wsgiref</p>
+                        <p class="layer-desc">处理 HTTP 请求/响应</p>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Flask 快速上手</h2>
+                <p>通过 Flask 框架，我们可以很快地写一个网页：</p>
+                <div class="code-block">
+                    <div class="code-label">最简单的 Flask 应用</div>
+                    <pre><code>from flask import Flask
+app = Flask(__name__)
+
+@app.route("/")
+def hello():
+    return "Hello World!"
+
+if __name__ == "__main__":
+    app.run()</code></pre>
+                </div>
+                <p>就这么简单！<code>@app.route()</code> 装饰器把函数注册到路由表中，<code>app.run()</code> 启动内置服务器。</p>
+            </section>
+
+            <section>
+                <h2>WSGI 接口规范</h2>
+                <p>WSGI 是一种规范，它定义了 Web App 和 Web 服务器的接口。WSGI 层和 Web 框架层可以看为一层——即<strong>在 Web 框架中实现 WSGI 面向 Web 服务器的接口</strong>。</p>
+                
+                <div class="code-block">
+                    <div class="code-label">PEP 3333 中的 WSGI 应用示例</div>
+                    <pre><code>def simple_app(environ, start_response):
+    """Simplest possible application object"""
+    status = '200 OK'
+    response_headers = [('Content-type', 'text/plain')]
+    start_response(status, response_headers)
+    return ['Hello world!\n']</code></pre>
+                </div>
+                
+                <p>这里不用关心 <code>environ</code> 和 <code>start_response</code>，它们由 Web 服务器提供。框架需要为服务器提供标准的接口。</p>
+            </section>
+
+            <section>
+                <h2>Flask 源码核心概念</h2>
+                
+                <h3>1. Flask 应用对象</h3>
+                <p><code>Flask(__name__)</code> 创建了一个 WSGI 应用实例。Flask 类实现了 <code>__call__</code> 方法，使其可以被 WSGI 服务器直接调用：</p>
+                <div class="code-block">
+                    <pre><code>class Flask:
+    def __call__(self, environ, start_response):
+        return self.wsgi_app(environ, start_response)</code></pre>
+                </div>
+
+                <h3>2. 路由系统</h3>
+                <p><code>@app.route()</code> 装饰器把 URL 映射到处理函数：</p>
+                <div class="code-block">
+                    <pre><code>@app.route("/")
+def hello():
+    return "Hello World!"
+
+# 等价于
+app.add_url_rule("/", "hello", hello)</code></pre>
+                </div>
+
+                <h3>3. 请求上下文</h3>
+                <p>Flask 使用 <code>request</code> 对象封装 <code>environ</code> 字典，让开发者不用直接操作 WSGI 细节：</p>
+                <div class="code-block">
+                    <pre><code>from flask import request
+
+@app.route("/hello")
+def hello():
+    name = request.args.get('name', 'World')
+    return f"Hello, {name}!"</code></pre>
+                </div>
+            </section>
+
+            <section>
+                <h2>Web 服务器层</h2>
+                <p>作为服务器端也有必要提供 WSGI 的服务器端接口。最简单的 WSGI 服务器实现：</p>
+                <div class="code-block">
+                    <div class="code-label">WSGI 服务器参考实现</div>
+                    <pre><code>import os, sys
+
+def run_with_cgi(application):
+    environ = dict(os.environ.items())
+    environ['wsgi.input'] = sys.stdin
+    environ['wsgi.errors'] = sys.stderr
+    environ['wsgi.version'] = (1, 0)
+    
+    headers_set = []
+    
+    def start_response(status, response_headers, exc_info=None):
+        headers_set[:] = [status, response_headers]
+        return write
+    
+    result = application(environ, start_response)
+    try:
+        for data in result:
+            if data:
+                write(data)
+    finally:
+        if hasattr(result, 'close'):
+            result.close()</code></pre>
+                </div>
+                
+                <p>通过 WSGI，Web 服务器和框架之间可以连接起来了。</p>
+            </section>
+
+            <section class="summary">
+                <h2>总结</h2>
+                <ul>
+                    <li><strong>WSGI</strong> 是服务器和框架之间的接口规范</li>
+                    <li><strong>Flask</strong> 实现了 WSGI 接口，并在此之上提供了路由、模板、请求封装等功能</li>
+                    <li><strong>Flask 0.1</strong> 只有不到 700 行代码，但设计精巧</li>
+                    <li>理解 WSGI 是理解 Python Web 框架的基础</li>
+                </ul>
+                <p>个中细节只有到源码里才能体会。推荐阅读 Flask 源码和 PEP 3333 规范文档。</p>
+            </section>
+
+            <section class="references">
+                <h2>参考来源</h2>
+                <ul>
+                    <li><a href="https://peps.python.org/pep-3333/" target="_blank" rel="noopener">PEP 3333 - WSGI 规范</a></li>
+                    <li><a href="https://flask.palletsprojects.com/" target="_blank" rel="noopener">Flask 官方文档</a></li>
+                </ul>
+            </section>
+        </article>
+    </main>
+
+    <footer>
+        <div class="giscus"></div>
+    </footer>
+
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDOHZL5Rg"
+        data-category="Comments"
+        data-category-id="DIC_kwDOHZL5Rs4CR-F6"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="preferred_color_scheme"
+        data-lang="zh-CN"
+        crossorigin="anonymous"
+        async>
+    </script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>

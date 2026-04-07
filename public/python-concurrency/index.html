@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>理解 Python 并发编程 — 进程篇</title>
+    <meta name="description" content="Python并发编程进程篇完整指南：GIL问题、多进程vs多线程、进程池Pool、进程间通信（Pipe/Queue/共享内存）">
+    <meta property="og:title" content="理解 Python 并发编程 — 进程篇">
+    <meta property="og:description" content="Python并发编程进程篇完整指南：GIL问题、多进程vs多线程、进程池Pool、进程间通信（Pipe/Queue/共享内存）">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/python-concurrency/">
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"Article","headline":"理解 Python 并发编程 — 进程篇","description":"Python并发编程进程篇完整指南：GIL问题、多进程vs多线程、进程池Pool、进程间通信（Pipe/Queue/共享内存）","author":{"@type":"Person","name":"EathVader"},"datePublished":"2026-04-02","publisher":{"@type":"Organization","name":"EathVader"}}
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header><nav class="breadcrumb"><a href="/">首页</a> / <a href="/">后端开发</a> / Python 并发</nav></header>
+    <main><article>
+        <h1>理解 Python 并发编程 — 进程篇</h1>
+        <p class="meta">来源：Python之美 · 2026-04-02</p>
+
+        <h2>GIL：为什么多线程不够用</h2>
+
+        <p>Python 由于 <strong>GIL（全局解释锁）</strong> 的存在，多线程并不能充分利用多核处理器。GIL 保证同一时刻只有一个线程在执行 Python 字节码。</p>
+
+        <div class="highlight-box">
+            <strong>结论：</strong>如果是 <strong>CPU 计算密集型</strong>任务，应该使用多进程模块 <code>multiprocessing</code>。它给每个进程赋予单独的 Python 解释器，规避了 GIL 问题。
+        </div>
+
+        <h2>单进程 vs 多进程性能对比</h2>
+
+        <p>用计算 Fibonacci 数列来演示性能差异：</p>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python">import time
+import multiprocessing
+
+def profile(func):
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        func(*args, **kwargs)
+        end = time.time()
+        print('COST: {}'.format(end - start))
+    return wrapper
+
+def fib(n):
+    if n <= 2:
+        return 1
+    return fib(n-1) + fib(n-2)
+
+@profile
+def no_multiprocess():
+    fib(35)
+    fib(35)
+
+@profile
+def has_multiprocess():
+    jobs = []
+    for i in range(2):
+        p = multiprocessing.Process(target=fib, args=(35,))
+        p.start()
+        jobs.append(p)
+    for p in jobs:
+        p.join()
+
+no_multiprocess()
+has_multiprocess()</code></pre>
+        </div>
+
+        <div class="code-block">
+            <div class="code-label">运行结果</div>
+            <pre><code>COST: 4.66861510277
+COST: 2.5424861908</code></pre>
+        </div>
+
+        <p>多进程让效率几乎翻倍！但需要注意，这个时间取决于最慢的那个进程的执行时间。</p>
+
+        <h2>进程池 Pool</h2>
+
+        <p>使用 <code>Pool</code> 是更优雅的写法：</p>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python">from multiprocessing import Pool
+
+pool = Pool(2)
+pool.map(fib, [35]*2)</code></pre>
+        </div>
+
+        <p><code>map</code> 方法和内置的 <code>map</code> 用法一样，但有多进程支持。</p>
+
+        <h2>dummy 模块：一套代码，两种模式</h2>
+
+        <p><code>multiprocessing.dummy</code> 虽然在多进程模块中，但接口和多线程基本一样：</p>
+
+        <blockquote>
+            multiprocessing.dummy replicates the API of multiprocessing but is no more than a wrapper around the threading module.
+        </blockquote>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python"># CPU 密集型：用多进程
+from multiprocessing import Pool
+
+# I/O 密集型：用多线程（dummy）
+from multiprocessing.dummy import Pool</code></pre>
+        </div>
+
+        <div class="highlight-box">
+            <strong>经验技巧：</strong>如果拿不准任务是 CPU 密集还是 I/O 密集型，分别用两种方式试一下，哪个快用哪个。现在统一直接用多进程，切换也很方便。
+        </div>
+
+        <h2>基于 Pipe 的 parmap</h2>
+
+        <p>进程间通信（IPC）常用方式：RPC、Socket、Pipe（管道）、消息队列（Queue）。</p>
+
+        <h3>基本管道示例</h3>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python">from multiprocessing import Process, Pipe
+
+def f(conn):
+    conn.send(['hello'])
+    conn.close()
+
+parent_conn, child_conn = Pipe()
+p = Process(target=f, args=(child_conn,))
+p.start()
+print(parent_conn.recv())  # 输出: ['hello']
+p.join()</code></pre>
+        </div>
+
+        <p>Pipe 返回管道两边的对象：「父连接」和「子连接」。</p>
+
+        <h3>解决类方法无法 pickle 的问题</h3>
+
+        <p>当函数放在类里面时，<code>Pool.map</code> 会报错：</p>
+
+        <div class="code-block">
+            <div class="code-label">Python — PicklingError</div>
+            <pre><code class="language-python">PicklingError: Can't pickle <type 'instancemethod'>: 
+attribute lookup __builtin__.instancemethod failed</code></pre>
+        </div>
+
+        <p>使用管道可以解决这个问题：</p>
+
+        <div class="code-block">
+            <div class="code-label">Python — parmap 实现</div>
+            <pre><code class="language-python">from multiprocessing import Pool, Process, Pipe
+from itertools import izip
+
+def spawn(f):
+    def func(pipe, item):
+        pipe.send(f(item))
+        pipe.close()
+    return func
+
+def parmap(f, items):
+    pipe = [Pipe() for _ in items]
+    proc = [Process(target=spawn(f),
+                    args=(child, item))
+            for item, (parent, child) in izip(items, pipe)]
+    [p.start() for p in proc]
+    [p.join() for p in proc]
+    return [parent.recv() for (parent, child) in pipe]
+
+class CalculateFib(object):
+    @classmethod
+    def fib(cls, n):
+        if n <= 2:
+            return 1
+        return cls.fib(n-1) + cls.fib(n-2)
+    
+    def parmap_run(self):
+        print(parmap(self.fib, [35]*2))</code></pre>
+        </div>
+
+        <p>缺点：每个任务创建一个进程，没有使用进程池。</p>
+
+        <h2>基于 Queue 的改进版 parmap</h2>
+
+        <p>使用队列可以支持指定进程池大小：</p>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python">from multiprocessing import Queue, Process, cpu_count
+
+def apply_func(f, q_in, q_out):
+    while not q_in.empty():
+        i, item = q_in.get()
+        q_out.put((i, f(item)))
+
+def parmap(f, items, nprocs=cpu_count()):
+    q_in, q_out = Queue(), Queue()
+    proc = [Process(target=apply_func, args=(f, q_in, q_out))
+            for _ in range(nprocs)]
+    sent = [q_in.put((i, item)) for i, item in enumerate(items)]
+    [p.start() for p in proc]
+    res = [q_out.get() for _ in sent]
+    [p.join() for p in proc]
+    return [item for _, item in sorted(res)]</code></pre>
+        </div>
+
+        <p>使用 <code>enumerate</code> 保留任务顺序，最后排序恢复。</p>
+
+        <h2>生产者/消费者模型</h2>
+
+        <p>使用两个队列：一个存储待完成任务，一个存储结果：</p>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python">from multiprocessing import Process, JoinableQueue, Queue
+from random import random
+import time
+
+tasks_queue = JoinableQueue()
+results_queue = Queue()
+
+def producer(in_queue):
+    while 1:
+        wt = random()
+        time.sleep(wt)
+        in_queue.put((double, wt))
+        if wt > 0.9:
+            in_queue.put(None)  # 结束信号
+            break
+
+def consumer(in_queue, out_queue):
+    while 1:
+        task = in_queue.get()
+        if task is None:
+            break
+        func, arg = task
+        result = func(arg)
+        in_queue.task_done()
+        out_queue.put(result)</code></pre>
+        </div>
+
+        <div class="highlight-box">
+            <strong>注意：</strong>进程的 Queue 类不支持 <code>task_done</code> 和 <code>join</code> 方法，需要使用 <code>JoinableQueue</code>。
+        </div>
+
+        <h2>进程间共享状态</h2>
+
+        <h3>共享内存（Value / Array）</h3>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python">from multiprocessing import Process, Lock
+from multiprocessing.sharedctypes import Value, Array
+from ctypes import Structure, c_bool, c_double
+
+lock = Lock()
+
+class Point(Structure):
+    _fields_ = [('x', c_double), ('y', c_double)]
+
+def modify(n, b, s, arr, A):
+    n.value **= 2
+    b.value = True
+    s.value = s.value.upper()
+    arr[0] = 10
+    for a in A:
+        a.x **= 2
+        a.y **= 2
+
+n = Value('i', 7)
+b = Value(c_bool, False, lock=False)
+s = Array('c', 'hello world', lock=lock)
+arr = Array('i', range(5), lock=True)
+A = Array(Point, [(1.875, -6.25), (-5.75, 2.0)], lock=lock)
+
+p = Process(target=modify, args=(n, b, s, arr, A))
+p.start()
+p.join()
+
+print(n.value)        # 49
+print(b.value)        # True
+print(s.value)        # HELLO WORLD
+print(arr[:])         # [10, 1, 2, 3, 4]
+print([(a.x, a.y) for a in A])  # [(3.515625, 39.0625), (33.0625, 4.0)]</code></pre>
+        </div>
+
+        <p>常见共享类型：</p>
+
+        <table>
+            <tr><th>Type Code</th><th>CTypes Type</th><th>说明</th></tr>
+            <tr><td><code>'i'</code></td><td><code>c_int</code></td><td>整数</td></tr>
+            <tr><td><code>'d'</code></td><td><code>c_double</code></td><td>双精度浮点</td></tr>
+            <tr><td><code>'c'</code></td><td><code>c_char</code></td><td>字符</td></tr>
+            <tr><td><code>'b'</code></td><td><code>c_bool</code></td><td>布尔值</td></tr>
+            <tr><td><code>'f'</code></td><td><code>c_float</code></td><td>浮点数</td></tr>
+        </table>
+
+        <h3>服务器进程（Manager）</h3>
+
+        <p><code>Manager</code> 对象控制一个服务器进程，其他进程通过代理访问：</p>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python">from multiprocessing import Manager, Process
+
+def modify(ns, lproxy, dproxy):
+    ns.a **= 2
+    lproxy.extend(['b', 'c'])
+    dproxy['b'] = 0
+
+manager = Manager()
+ns = manager.Namespace()
+ns.a = 1
+lproxy = manager.list()
+lproxy.append('a')
+dproxy = manager.dict()
+dproxy['b'] = 2
+
+p = Process(target=modify, args=(ns, lproxy, dproxy))
+p.start()
+p.join()
+
+print(ns.a)       # 1
+print(lproxy)     # ['a', 'b', 'c']
+print(dproxy)     # {'b': 0}</code></pre>
+        </div>
+
+        <p>Manager 支持的共享方式：</p>
+        <ul>
+            <li><strong>Namespace</strong>：可分享的命名空间</li>
+            <li><strong>Value/Array</strong>：共享 ctypes 对象</li>
+            <li><strong>dict/list</strong>：可分享的 dict/list，支持对应方法</li>
+            <li><strong>Condition/Event/Lock/Queue/Semaphore</strong>：可分享的同步原语</li>
+        </ul>
+
+        <h2>分布式进程间通信</h2>
+
+        <p>使用 Manager 和 Queue 可以实现简单的分布式通信（C/S 模式）：</p>
+
+        <div class="code-block">
+            <div class="code-label">Python — 服务端</div>
+            <pre><code class="language-python">from multiprocessing.managers import BaseManager
+
+host = '127.0.0.1'
+port = 9030
+authkey = 'secret'
+shared_list = []
+
+class RemoteManager(BaseManager):
+    pass
+
+RemoteManager.register('get_list', callable=lambda: shared_list)
+mgr = RemoteManager(address=(host, port), authkey=authkey)
+server = mgr.get_server()
+server.serve_forever()</code></pre>
+        </div>
+
+        <div class="code-block">
+            <div class="code-label">Python — 客户端</div>
+            <pre><code class="language-python">from multiprocessing.managers import BaseManager
+
+class RemoteManager(BaseManager):
+    pass
+
+RemoteManager.register('get_list')  # 注意：没有 callable 参数
+mgr = RemoteManager(address=(host, port), authkey=authkey)
+mgr.connect()
+l = mgr.get_list()
+print(l)
+l.append(1)
+print(mgr.get_list())</code></pre>
+        </div>
+
+        <h2>总结</h2>
+
+        <div class="summary">
+            <h2>核心要点</h2>
+            <ol>
+                <li><strong>GIL 问题</strong>：多线程不能利用多核，CPU 密集型任务用多进程</li>
+                <li><strong>进程池 Pool</strong>：比手动创建进程更高效，<code>map</code> 方法简单易用</li>
+                <li><strong>dummy 模块</strong>：一套 API，多进程/多线程自由切换</li>
+                <li><strong>进程间通信</strong>：Pipe（简单）、Queue（灵活）、共享内存（高效）、Manager（分布式）</li>
+                <li><strong>同步机制</strong>：Lock、Condition、Event、RLock、Semaphore 等与 threading 类似</li>
+                <li><strong>经验</strong>：拿不准时直接用多进程，通过 dummy 模块方便切换</li>
+            </ol>
+        </div>
+
+        <div class="references">
+            <h3>参考资料</h3>
+            <ul>
+                <li><a href="https://mp.weixin.qq.com/s/Km-HAY9Jbg5hbuTl5Xj8dw" target="_blank">Python之美 - 理解Python并发编程一篇就够了 | 进程篇</a></li>
+                <li><a href="https://docs.python.org/3/library/multiprocessing.html" target="_blank">Python multiprocessing 官方文档</a></li>
+            </ul>
+        </div>
+    </article></main>
+    <footer><div class="giscus"></div></footer>
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDOHZL5Rg" data-category="Comments" data-category-id="DIC_kwDOHZL5Rs4CR-F6" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="preferred_color_scheme" data-lang="zh-CN" crossorigin="anonymous" async></script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>

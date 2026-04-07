@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Requests 深度解析</title>
+    <meta name="description" content="深入理解 Python requests 库：Session对象、PreparedRequest、流式上传/下载、最佳实践">
+    <meta property="og:title" content="Python Requests 深度解析">
+    <meta property="og:description" content="深入理解 Python requests 库：Session对象、PreparedRequest、流式上传/下载、最佳实践">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/python-requests/">
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"Article","headline":"Python Requests 深度解析","description":"深入理解 Python requests 库：Session对象、PreparedRequest、流式上传/下载、最佳实践","author":{"@type":"Person","name":"EathVader"},"datePublished":"2026-04-02","publisher":{"@type":"Organization","name":"EathVader"}}
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header><nav class="breadcrumb"><a href="/">首页</a> / <a href="/">后端开发</a> / Python 网络</nav></header>
+    <main><article>
+        <h1>Python Requests 深度解析</h1>
+        <p class="meta">来源：Anthony Shaw · 2026-04-02</p>
+
+        <p>Requests 是 Python 最流行的 HTTP 库。很多人用它发几个请求就满足了，但它的能力远不止于此。本文将深入解析 requests 的核心机制。</p>
+
+        <h2>发起请求的多种方式</h2>
+
+        <p>Requests 提供了便捷的顶层函数：</p>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python">import requests
+
+# 便捷方法
+r = requests.get('https://api.example.com/data')
+r = requests.post('https://api.example.com/data', json={'key': 'value'})
+r = requests.put('https://api.example.com/data/1', json={'key': 'new'})
+r = requests.delete('https://api.example.com/data/1')</code></pre>
+        </div>
+
+        <p>这些都是 <code>requests.request()</code> 的友好封装，HTTP 动词作为第一个参数传入。不要写冗长的 if/elif 判断 HTTP 动词——<code>request()</code> 本身就是主 API。</p>
+
+        <div class="highlight-box">
+            <strong>关键发现：</strong>调用 <code>requests.get()</code> 等方法时，底层会创建一个 <code>Session</code> 对象。如果你要对同一个端点发起多次请求，直接使用 Session 更好——它能保持 TCP 连接（keep-alive）、维护 cookie jar、记住每次请求的偏好设置。
+        </div>
+
+        <h2>深入理解 Session 对象</h2>
+
+        <h3>常见反模式</h3>
+
+        <div class="code-block">
+            <div class="code-label">Python — 不好的写法</div>
+            <pre><code class="language-python"># ❌ 每次请求都创建新的 TCP 连接
+r = requests.post('https://api.example.com/data',
+                  json={'key': 'value'},
+                  headers={'Authorization': 'Bearer xxx'})
+data = json.loads(r.text)</code></pre>
+        </div>
+
+        <h3>正确的 Session 用法</h3>
+
+        <div class="code-block">
+            <div class="code-label">Python — 好的写法</div>
+            <pre><code class="language-python"># ✅ 使用 Session 保持连接、管理 Cookie
+with requests.Session() as sess:
+    # 设置默认 headers（整个 Session 生效）
+    sess.headers.update({
+        'Authorization': 'Bearer xxx',
+        'Content-Type': 'application/json'
+    })
+    
+    # 多次请求复用同一个 TCP 连接
+    r = sess.post('https://api.example.com/data',
+                  json={'key': 'value'})
+    data = r.json()  # 内置 JSON 解析
+    
+    r = sess.get('https://api.example.com/data/1')
+    item = r.json()</code></pre>
+        </div>
+
+        <h3>Session 的默认 Headers</h3>
+
+        <p>Session 初始化时会设置一组默认 headers：</p>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python">sess = requests.Session()
+print(sess.headers)
+# {
+#     'Accept': '*/*',
+#     'Accept-Encoding': 'gzip, deflate',  # 自动支持 gzip 响应
+#     'Connection': 'keep-alive',           # 默认保持连接
+#     'User-Agent': 'python-requests/x.x.x'
+# }</code></pre>
+        </div>
+
+        <div class="highlight-box" style="background: #fff3cd; border-left-color: #ffd93d;">
+            <strong>⚠️ 注意：</strong>避免直接给 <code>sess.headers</code> 赋新字典（如 <code>sess.headers = {...}</code>），因为默认属性是一个<strong>大小写不敏感</strong>的字典（CaseInsensitiveDict），直接赋值会丢失这个特性。应该使用 <code>sess.headers.update()</code>。
+        </div>
+
+        <h2>深入理解 PreparedRequest</h2>
+
+        <p>当你继续剥开洋葱，<code>Session.request()</code> 会创建一个 <code>PreparedRequest</code> 对象。你可以手动构造这些对象，特别是在需要发送特定二进制 payload 和 headers 时。</p>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python">from requests import Request, Session
+
+sess = Session()
+
+# 创建 Request 对象
+req = Request('POST',
+              'https://api.example.com/upload',
+              headers={'Content-Type': 'application/octet-stream'},
+              data=b'binary payload here')
+
+# 准备请求（PreparedRequest）
+prepared = req.prepare()
+
+# 发送准备好的请求
+response = sess.send(prepared)</code></pre>
+        </div>
+
+        <p>这种方式在你需要对请求进行精细控制时非常有用，比如修改已准备好的请求：</p>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python">prepared = req.prepare()
+# 可以在发送前修改
+prepared.headers['X-Custom-Header'] = 'value'
+prepared.body = modify_payload(prepared.body)
+
+response = sess.send(prepared)</code></pre>
+        </div>
+
+        <h2>处理大型请求：流和迭代器</h2>
+
+        <h3>流式上传</h3>
+
+        <p>Requests 会自动检测 <code>data</code> 参数是否是迭代器（如文件流对象、BytesIO 或 StringIO），并使用流式上传：</p>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python"># 流式上传大文件
+with open('large_file.bin', 'rb') as f:
+    requests.post('https://api.example.com/upload', data=f)
+
+# Requests 自动检测到文件对象，使用 Transfer-Encoding: chunked</code></pre>
+        </div>
+
+        <h3>流式下载</h3>
+
+        <p>使用 <code>stream=True</code> 参数可以让 <code>iter_content</code> 从打开的连接中迭代数据，而不是一次性加载到内存：</p>
+
+        <div class="code-block">
+            <div class="code-label">Python — 流式下载大文件</div>
+            <pre><code class="language-python"># 流式下载
+r = requests.get('https://example.com/large_file.zip', stream=True)
+
+with open('downloaded.zip', 'wb') as f:
+    for chunk in r.iter_content(chunk_size=8192):
+        if chunk:
+            f.write(chunk)</code></pre>
+        </div>
+
+        <div class="highlight-box">
+            <strong>关键区别：</strong>不使用 <code>stream=True</code> 时，<code>iter_content</code> 仍然可以工作，但会先把整个响应下载到内存中（执行时间可能翻倍）。下载大文件时一定要用 <code>stream=True</code>。
+        </div>
+
+        <h3>流式下载 JSON 流</h3>
+
+        <div class="code-block">
+            <div class="code-label">Python — 处理 JSON Lines</div>
+            <pre><code class="language-python">r = requests.get('https://api.example.com/stream', stream=True)
+
+for line in r.iter_lines():
+    if line:
+        data = json.loads(line)
+        process(data)</code></pre>
+        </div>
+
+        <h2>最佳实践总结</h2>
+
+        <table>
+            <tr><th>场景</th><th>推荐做法</th></tr>
+            <tr><td>单个请求</td><td><code>requests.get()</code> 等便捷方法</td></tr>
+            <tr><td>同一端点多次请求</td><td>使用 <code>Session</code>，复用 TCP 连接</td></tr>
+            <tr><td>需要认证</td><td>在 Session 上设置默认 headers 或使用 auth 参数</td></tr>
+            <tr><td>上传大文件</td><td>传入文件对象作为 data，自动流式上传</td></tr>
+            <tr><td>下载大文件</td><td><code>stream=True</code> + <code>iter_content()</code></td></tr>
+            <tr><td>精细控制请求</td><td>手动创建 <code>PreparedRequest</code></td></tr>
+            <tr><td>JSON 请求/响应</td><td>使用 <code>json=</code> 参数和 <code>r.json()</code></td></tr>
+        </table>
+
+        <h2>完整示例：健壮的 API 客户端</h2>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python">import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+class APIClient:
+    def __init__(self, base_url, api_key):
+        self.base_url = base_url
+        self.session = requests.Session()
+        
+        # 设置默认 headers
+        self.session.headers.update({
+            'Authorization': f'Bearer {api_key}',
+            'Accept': 'application/json',
+        })
+        
+        # 配置重试策略
+        retry = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        self.session.mount('https://', adapter)
+        self.session.mount('http://', adapter)
+    
+    def get(self, path, **kwargs):
+        r = self.session.get(
+            f'{self.base_url}/{path}',
+            timeout=10,
+            **kwargs
+        )
+        r.raise_for_status()
+        return r.json()
+    
+    def post(self, path, data=None, json=None):
+        r = self.session.post(
+            f'{self.base_url}/{path}',
+            json=json,
+            data=data,
+            timeout=10,
+        )
+        r.raise_for_status()
+        return r.json()
+    
+    def download(self, path, dest_path):
+        """流式下载文件"""
+        r = self.session.get(
+            f'{self.base_url}/{path}',
+            stream=True,
+            timeout=30,
+        )
+        r.raise_for_status()
+        with open(dest_path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+    
+    def close(self):
+        self.session.close()
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, *args):
+        self.close()</code></pre>
+        </div>
+
+        <h2>总结</h2>
+
+        <div class="summary">
+            <h2>核心要点</h2>
+            <ol>
+                <li><strong>Session 是核心</strong>：多次请求用 Session，复用 TCP 连接、管理 Cookie、保持默认设置</li>
+                <li><strong>不要直接赋值 headers</strong>：用 <code>sess.headers.update()</code> 而不是 <code>sess.headers = {...}</code></li>
+                <li><strong>PreparedRequest</strong>：需要精细控制时手动构造</li>
+                <li><strong>流式上传</strong>：传入文件对象自动流式上传</li>
+                <li><strong>流式下载</strong>：<code>stream=True</code> + <code>iter_content()</code> 避免内存爆炸</li>
+                <li><strong>JSON 原生支持</strong>：<code>json=</code> 参数自动编码，<code>r.json()</code> 自动解析</li>
+            </ol>
+        </div>
+
+        <div class="references">
+            <h3>参考资料</h3>
+            <ul>
+                <li><a href="https://medium.com/@anthonypjshaw/python-requests-deep-dive" target="_blank">Anthony Shaw - Python requests deep dive</a></li>
+                <li><a href="https://docs.python-requests.org/" target="_blank">Python Requests 官方文档</a></li>
+            </ul>
+        </div>
+    </article></main>
+    <footer><div class="giscus"></div></footer>
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDOHZL5Rg" data-category="Comments" data-category-id="DIC_kwDOHZL5Rs4CR-F6" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="preferred_color_scheme" data-lang="zh-CN" crossorigin="anonymous" async></script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>

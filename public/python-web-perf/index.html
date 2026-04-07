@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Web 应用性能调优实战</title>
+    <meta name="description" content="Python Web应用性能调优实战：使用pyflame火焰图定位瓶颈、优化RPC Server和Client、关闭30%无状态服务器的真实案例">
+    <meta property="og:title" content="Python Web 应用性能调优实战">
+    <meta property="og:description" content="Python Web应用性能调优实战：使用pyflame火焰图定位瓶颈、优化RPC Server和Client、关闭30%无状态服务器的真实案例">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/python-web-perf/">
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"Article","headline":"Python Web 应用性能调优实战","description":"Python Web应用性能调优实战：使用pyflame火焰图定位瓶颈、优化RPC Server和Client、关闭30%无状态服务器的真实案例","author":{"@type":"Person","name":"EathVader"},"datePublished":"2026-04-02","publisher":{"@type":"Organization","name":"EathVader"}}
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header><nav class="breadcrumb"><a href="/">首页</a> / <a href="/">后端开发</a> / Python 性能</nav></header>
+    <main><article>
+        <h1>Python Web 应用性能调优实战</h1>
+        <p class="meta">来源：内部技术分享 · 2026-04-02</p>
+
+        <h2>背景与目标</h2>
+
+        <p>为了快速上线，早期代码往往怎么方便怎么来，留下很多性能隐患。Python 因为 GIL 的原因，在性能上有天然劣势——即使用了 gevent/eventlet 协程方案，也很容易因为耗时的 CPU 操作阻塞整个进程。</p>
+
+        <div class="highlight-box">
+            <strong>调优目标：</strong>
+            <ul>
+                <li>用最少的机器处理相同流量，目标关闭 <strong>20%</strong> 的 stateless webserver</li>
+                <li>尽量在框架代码上改动，不动业务逻辑代码</li>
+                <li>低风险（历史经验告诉我们：动态一时爽，重构火葬场）</li>
+            </ul>
+        </div>
+
+        <h2>治标：定位慢接口</h2>
+
+        <p>常见场景：开开心心做完一个 feature，sandbox 测试没问题，上线后 server load 飙升，各种 timeout 来了。</p>
+
+        <h3>最有效的指标</h3>
+
+        <p>看每个接口的 <code>avg_latency × req_count</code>，得到每个接口在一段时间内的总耗时。在柱状图上最长的那块就是对性能影响最大的接口。</p>
+
+        <div class="code-block">
+            <div class="code-label">计算方法</div>
+            <pre><code>总耗时 = 平均延迟 × 请求数
+Total Time = avg_latency × req_count</code></pre>
+        </div>
+
+        <p>进一步的调试靠 <code>cProfile</code> 和读代码。但这种方式只能治标——调试个别慢的业务接口，无法提高整体性能。</p>
+
+        <h2>治本：火焰图定位瓶颈</h2>
+
+        <p>希望对运行时进程状态打 snapshot，每次快照记录当前的函数调用栈，叠合多次采样，出现次数多的函数必然就是瓶颈所在。这就是 <strong>Brendan Gregg 的 flamegraph</strong> 思想。</p>
+
+        <h3>使用 pyflame</h3>
+
+        <p>Uber 开源的 <a href="https://github.com/uber/pyflame" target="_blank">pyflame</a> 可以非侵入式地对运行中的 Python 进程做 snapshot，输出成 SVG 火焰图。</p>
+
+        <div class="code-block">
+            <div class="code-label">Shell</div>
+            <pre><code class="language-bash">pyflame -s 60 -r 0.01 ${pid} | flamegraph.pl > myprofile.svg</code></pre>
+        </div>
+
+        <table>
+            <tr><th>参数</th><th>说明</th></tr>
+            <tr><td><code>-s 60</code></td><td>总采样时间 60 秒</td></tr>
+            <tr><td><code>-r 0.01</code></td><td>以 0.01 秒的频率做采样</td></tr>
+        </table>
+
+        <h3>火焰图解读</h3>
+
+        <ul>
+            <li><strong>横条越长</strong>：被采样到的次数越多，表示耗时占比越大</li>
+            <li><strong>从下往上</strong>：可以看到每一层上的函数耗时分布</li>
+            <li><strong>IDLE 部分</strong>：pyflame 只能捕获当前获取了 GIL 的代码，IDLE 包括 IO wait、C 编写部分、进程空闲时间</li>
+        </ul>
+
+        <div class="highlight-box">
+            <strong>核心优势：</strong>通过 pyflame 可以很快对进程运行时耗时分布有个大概的感觉，即使你完全不了解业务逻辑。
+        </div>
+
+        <h2>重构实战</h2>
+
+        <h3>架构背景</h3>
+
+        <p>线上 Web 应用架构：</p>
+
+        <div class="diagram">
+            <svg viewBox="0 0 700 120" xmlns="http://www.w3.org/2000/svg">
+                <rect x="10" y="30" width="140" height="60" rx="8" fill="#e8f4fd" stroke="#4d96ff" stroke-width="1.5"/>
+                <text x="80" y="55" text-anchor="middle" fill="#2c3e50" font-size="13" font-weight="bold">Flask Web</text>
+                <text x="80" y="72" text-anchor="middle" fill="#2c3e50" font-size="11">(前端页面)</text>
+
+                <rect x="200" y="30" width="140" height="60" rx="8" fill="#e8f4fd" stroke="#4d96ff" stroke-width="1.5"/>
+                <text x="270" y="55" text-anchor="middle" fill="#2c3e50" font-size="13" font-weight="bold">Flask API</text>
+                <text x="270" y="72" text-anchor="middle" fill="#2c3e50" font-size="11">(API Server)</text>
+
+                <rect x="400" y="30" width="140" height="60" rx="8" fill="#d4edda" stroke="#6bcb77" stroke-width="1.5"/>
+                <text x="470" y="55" text-anchor="middle" fill="#2c3e50" font-size="13" font-weight="bold">Flask RPC</text>
+                <text x="470" y="72" text-anchor="middle" fill="#2c3e50" font-size="11">(业务 RPC Server)</text>
+
+                <rect x="580" y="30" width="110" height="60" rx="8" fill="#fff3cd" stroke="#ffd93d" stroke-width="1.5"/>
+                <text x="635" y="55" text-anchor="middle" fill="#2c3e50" font-size="13" font-weight="bold">DB/Cache</text>
+                <text x="635" y="72" text-anchor="middle" fill="#2c3e50" font-size="11">(数据存储)</text>
+
+                <line x1="150" y1="60" x2="200" y2="60" stroke="#4d96ff" stroke-width="1.5"/>
+                <polygon points="200,56 210,60 200,64" fill="#4d96ff"/>
+
+                <line x1="340" y1="60" x2="400" y2="60" stroke="#4d96ff" stroke-width="1.5"/>
+                <polygon points="400,56 410,60 400,64" fill="#4d96ff"/>
+                <text x="370" y="50" text-anchor="middle" fill="#4d96ff" font-size="10">msgpack</text>
+
+                <line x1="540" y1="60" x2="580" y2="60" stroke="#4d96ff" stroke-width="1.5"/>
+                <polygon points="580,56 590,60 580,64" fill="#4d96ff"/>
+            </svg>
+        </div>
+
+        <p>Web 端和 API Server 基于 Flask，后面是几组业务不同的 RPC Server，通过 msgpack 通信。为了方便，RPC Server 也是基于 Flask 的。</p>
+
+        <h3>优化 1：RPC Server — 干掉 Flask</h3>
+
+        <p>通过 pyflame 调试发现：Flask 的 overhead 很高。在 RPC 层，一些接口实际业务代码的采样次数只有总采样的 1/6 左右，其余都耗在了 Flask 层。</p>
+
+        <div class="highlight-box">
+            <strong>决策：</strong>RPC 层不处理 Web 逻辑，Flask 完全用不到，可以干掉。本着不动业务代码和低风险的原则，保持 HTTP + msgpack，直接实现 WSGI。
+        </div>
+
+        <div class="code-block">
+            <div class="code-label">Python — 极简 WSGI RPC Server</div>
+            <pre><code class="language-python">import msgpack
+
+def rpc_application(environ, start_response):
+    """直接实现 WSGI，替代 Flask"""
+    if environ['REQUEST_METHOD'] == 'POST':
+        content_length = int(environ.get('CONTENT_LENGTH', 0))
+        body = environ['wsgi.input'].read(content_length)
+        
+        # msgpack 解码请求
+        data = msgpack.unpackb(body, raw=False)
+        
+        # 路由到对应的业务函数
+        func_name = data.pop('func')
+        result = dispatch(func_name, data)
+        
+        # msgpack 编码响应
+        response_body = msgpack.packb(result, use_bin_type=True)
+        
+        start_response('200 OK', [
+            ('Content-Type', 'application/msgpack'),
+            ('Content-Length', str(len(response_body)))
+        ])
+        return [response_body]
+    
+    start_response('405 Method Not Allowed', [])
+    return [b'Method not allowed']
+
+# 用 gunicorn 启动
+# gunicorn -w 4 rpc_module:rpc_application</code></pre>
+        </div>
+
+        <p>改完 RPC Server 入口代码不到 200 行，用 wrk 做 helloworld benchmark，并发轻松变 <strong>3 倍</strong>。</p>
+
+        <h3>优化 2：RPC Client — 替换 requests</h3>
+
+        <p>在 pyflame 采样图上能看到 requests 代码里的耗时很长。尝试用 <code>geventhttpclient</code> 替换 requests。</p>
+
+        <div class="code-block">
+            <div class="code-label">Shell — Benchmark 结果</div>
+            <pre><code>完成相同请求数：
+geventhttpclient 只用了 requests 1/4 的时间
+(在 gevent patch 过的情况下)</code></pre>
+        </div>
+
+        <h3>踩坑：Latency 反而上升了 30%</h3>
+
+        <p>修改完 RPC Client 上线后，server load 降得很明显，但 latency 却直接上升了 30% 多？？？</p>
+
+        <h4>排查过程</h4>
+
+        <ol>
+            <li><strong>内网流量莫名增加</strong>：拿两台机器做 A/B testing，效果很明显</li>
+            <li><strong>怀疑 connection pool 有问题</strong>：导致 TCP 连接没有复用</li>
+            <li><strong>抓 SYN 包</strong>：<code>tcpdump "tcp[tcpflags] & (tcp-syn) != 0"</code>，对比两台机器，SYN 包数目没有太大差别</li>
+        </ol>
+
+        <h4>根因发现</h4>
+
+        <p>抓包过程中偶然发现：<code>geventhttpclient</code> 在发送 HTTP 请求时，<strong>header 和 body 竟然是用两个 packet 发送的</strong>！</p>
+
+        <p>而 requests 底层用的标准库 httplib，会将 header buffer 起来和 body 通过一个 packet 发出去。所以每发一次请求，geventhttpclient 会多发一个 IP + TCP header（40 字节）。</p>
+
+        <div class="highlight-box" style="background: #fff3cd; border-left-color: #ffd93d;">
+            <strong>教训：</strong>40 字节看起来很小，但在高并发场景下，每个请求多发一个 packet，累积起来流量和延迟的影响非常可观。
+        </div>
+
+        <h4>修复</h4>
+
+        <p>把这个问题修了，上线后 latency 立刻恢复正常。顺手把改动推到了官方。</p>
+
+        <h2>最终成果</h2>
+
+        <div class="summary">
+            <h2>优化成果</h2>
+            <ul>
+                <li>✅ 关闭了 <strong>30%</strong> 的 stateless server（超过原定 20% 的目标）</li>
+                <li>✅ 总共动到的代码也就几百行，业务开发无感知</li>
+                <li>✅ 性价比极高</li>
+            </ul>
+        </div>
+
+        <h2>经验总结</h2>
+
+        <ol>
+            <li><strong>完善监控和工具链</strong>：单机 benchmark QPS 数据只能估个天花板，关键是要有完善的监控帮助快速定位问题</li>
+            <li><strong>火焰图是利器</strong>：pyflame 等非侵入式工具能快速定位瓶颈，即使不了解业务逻辑</li>
+            <li><strong>框架 overhead 不容忽视</strong>：Flask 等 Web 框架在 RPC 场景下 overhead 可能占大头</li>
+            <li><strong>替换库要谨慎</strong>：即使是 benchmark 表现更好的库，也要在生产环境充分验证</li>
+            <li><strong>抓包是排查网络问题的终极手段</strong>：<code>tcpdump</code> 能发现很多意想不到的问题</li>
+        </ol>
+
+        <div class="references">
+            <h3>参考资料</h3>
+            <ul>
+                <li><a href="https://github.com/uber/pyflame" target="_blank">Uber pyflame</a></li>
+                <li><a href="https://github.com/brendangregg/FlameGraph" target="_blank">Brendan Gregg FlameGraph</a></li>
+                <li><a href="https://github.com/gwik/geventhttpclient" target="_blank">geventhttpclient</a></li>
+                <li><a href="https://www.python.org/dev/peps/pep-0333/" target="_blank">PEP 333 - WSGI</a></li>
+            </ul>
+        </div>
+    </article></main>
+    <footer><div class="giscus"></div></footer>
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDOHZL5Rg" data-category="Comments" data-category-id="DIC_kwDOHZL5Rs4CR-F6" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="preferred_color_scheme" data-lang="zh-CN" crossorigin="anonymous" async></script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>

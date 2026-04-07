@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高效 Web 爬虫开发的 6 个技巧 — Python</title>
+    <meta name="description" content="6个实用技巧帮你开发更高效、更健壮的Python Web爬虫：状态码检查、不信任HTML、设置Headers、超时、异常处理、高效文件操作">
+    <meta property="og:title" content="高效 Web 爬虫开发的 6 个技巧 — Python">
+    <meta property="og:description" content="6个实用技巧帮你开发更高效、更健壮的Python Web爬虫：状态码检查、不信任HTML、设置Headers、超时、异常处理、高效文件操作">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/web-scraping/">
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"Article","headline":"高效 Web 爬虫开发的 6 个技巧 — Python","description":"6个实用技巧帮你开发更高效、更健壮的Python Web爬虫：状态码检查、不信任HTML、设置Headers、超时、异常处理、高效文件操作","author":{"@type":"Person","name":"EathVader"},"datePublished":"2026-04-02","publisher":{"@type":"Organization","name":"EathVader"}}
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header><nav class="breadcrumb"><a href="/">首页</a> / <a href="/">后端开发</a> / Python 爬虫</nav></header>
+    <main><article>
+        <h1>高效 Web 爬虫开发的 6 个技巧</h1>
+        <p class="meta">来源：Adnan's Random Bytes · 2026-04-02</p>
+
+        <p>开发一个能抓取百万级数据的 Web 爬虫并不容易。很多爬虫在运行一段时间后就会停止工作，往往是因为缺少一些关键的检查机制。以下是 6 个让你的爬虫更健壮、更高效的技巧。</p>
+
+        <h2>1. 检查 HTTP 状态码</h2>
+
+        <p>在处理响应之前，先检查 HTTP 状态码，避免对无效响应进行解析。</p>
+
+        <div class="code-block">
+            <div class="code-label">Python — 好的写法</div>
+            <pre><code class="language-python">if r.status_code == 200:
+    # 继续处理</code></pre>
+        </div>
+
+        <div class="code-block">
+            <div class="code-label">Python — 更好的写法（提前返回）</div>
+            <pre><code class="language-python">if r.status_code != 200:
+    return False
+# 继续处理</code></pre>
+        </div>
+
+        <div class="highlight-box">
+            <strong>为什么提前返回更好？</strong>减少嵌套层级，让主逻辑保持在最外层，代码更清晰易读（Guard Clause 模式）。
+        </div>
+
+        <h2>2. 永远不要信任 HTML</h2>
+
+        <p>Web 爬虫依赖 HTML DOM，一个简单的元素或类名变更就能让整个脚本崩溃。尤其是你无法控制目标网站的情况下。</p>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python">page_count = soup.select('.pager-pages > li > a')
+if page_count:
+    # 正常处理
+    total_pages = len(page_count)
+else:
+    # 告警！通知管理员
+    print("ALERT!! 页面结构可能已变更")
+    send_notification_to_admin()</code></pre>
+        </div>
+
+        <p>最佳实践：</p>
+        <ul>
+            <li>每次选择器操作后检查是否返回 <code>None</code> 或空列表</li>
+            <li>设置告警机制，当选择器失效时及时通知</li>
+            <li>使用多个备选选择器增加容错性</li>
+        </ul>
+
+        <h2>3. 设置请求头（Headers）</h2>
+
+        <p>Python Requests 不强制设置请求头，但很多网站会检查 headers。曾经遇到过浏览器看到的 HTML 和脚本获取的完全不同的情况。</p>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python">headers = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) '
+                  'AppleWebKit/537.36 (KHTML, like Gecko) '
+                  'Chrome/53.0.2785.143 Safari/537.36'
+}
+r = requests.get(url, headers=headers, timeout=5)</code></pre>
+        </div>
+
+        <p>建议设置的 headers：</p>
+        <table>
+            <tr><th>Header</th><th>说明</th></tr>
+            <tr><td><code>User-Agent</code></td><td>最少也要设置这个，模拟浏览器</td></tr>
+            <tr><td><code>Accept</code></td><td>声明接受的内容类型</td></tr>
+            <tr><td><code>Accept-Language</code></td><td>语言偏好</td></tr>
+            <tr><td><code>Referer</code></td><td>来源页面</td></tr>
+            <tr><td><code>Cookie</code></td><td>需要登录态时设置</td></tr>
+        </table>
+
+        <h2>4. 设置超时（Timeout）</h2>
+
+        <p>如果不设置 timeout，Requests 会一直等待下去。这对大多数场景来说是不可接受的。</p>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python"># 设置 5 秒超时
+r = requests.get(url, headers=headers, timeout=5)
+
+# 也可以分别设置连接超时和读取超时
+r = requests.get(url, timeout=(3.05, 10))  # (connect, read)</code></pre>
+        </div>
+
+        <div class="highlight-box">
+            <strong>建议：</strong>连接超时设为 3-5 秒，读取超时根据页面大小设为 10-30 秒。永远不要使用无超时的请求。
+        </div>
+
+        <h2>5. 异常处理</h2>
+
+        <p>异常处理不仅能避免脚本意外退出，还能记录错误和发送通知。</p>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python">try:
+    # 你的爬虫逻辑
+    r = requests.get(url, timeout=5)
+    r.raise_for_status()
+    data = parse_html(r.text)
+    
+except requests.ConnectionError as e:
+    print("连接错误，请检查网络连接")
+    print(str(e))
+    
+except requests.Timeout as e:
+    print("请求超时")
+    print(str(e))
+    
+except requests.RequestException as e:
+    print("通用请求错误")
+    print(str(e))
+    
+except KeyboardInterrupt:
+    print("用户中断程序，正在保存数据...")
+    # 先保存数据再退出
+    save_data(buffer)
+    sys.exit(0)</code></pre>
+        </div>
+
+        <p>注意最后一个 <code>KeyboardInterrupt</code>：当用户按 Ctrl+C 时，先保存已抓取的数据再退出，避免数据丢失。</p>
+
+        <h2>6. 高效文件处理</h2>
+
+        <p>爬虫通常需要存储数据到数据库或文件（CSV/Text）。如果在循环中进行 I/O 操作，性能会非常差。</p>
+
+        <div class="code-block">
+            <div class="code-label">Python — 不好的写法（循环内 I/O）</div>
+            <pre><code class="language-python"># ❌ 每次循环都打开/写入/关闭文件
+for item in items:
+    with open('data.txt', 'a') as f:
+        f.write(item + '\n')</code></pre>
+        </div>
+
+        <div class="code-block">
+            <div class="code-label">Python — 好的写法（批量写入）</div>
+            <pre><code class="language-python">try:
+    records = []
+    # 在内存中累积数据
+    records.extend(fetch_records())
+    
+except requests.ConnectionError as e:
+    print("连接错误: " + str(e))
+except requests.Timeout as e:
+    print("超时错误: " + str(e))
+except requests.RequestException as e:
+    print("通用错误: " + str(e))
+except KeyboardInterrupt:
+    print("用户中断，保存数据后退出...")
+finally:
+    print("总记录数 = " + str(len(records)))
+    # 一次性批量写入文件
+    try:
+        with open('records_file.txt', 'a+') as f:
+            f.write("\n".join(records))
+    except Exception as ex:
+        print("无法写入文件: " + str(ex))</code></pre>
+        </div>
+
+        <p>核心思路：先在内存中累积数据，程序结束或终止时一次性写入文件，远优于多次 I/O 操作。</p>
+
+        <h2>完整示例：健壮的爬虫模板</h2>
+
+        <div class="code-block">
+            <div class="code-label">Python</div>
+            <pre><code class="language-python">import requests
+from bs4 import BeautifulSoup
+import time
+import sys
+
+class RobustScraper:
+    def __init__(self, base_url):
+        self.base_url = base_url
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                          'AppleWebKit/537.36 (KHTML, like Gecko) '
+                          'Chrome/120.0.0.0 Safari/537.36'
+        }
+        self.data_buffer = []
+        self.session = requests.Session()
+    
+    def fetch_page(self, url):
+        """带完整错误处理的页面获取"""
+        try:
+            r = self.session.get(url, headers=self.headers, timeout=5)
+            if r.status_code != 200:
+                print(f"状态码异常: {r.status_code} - {url}")
+                return None
+            return r.text
+        except requests.ConnectionError:
+            print(f"连接失败: {url}")
+            return None
+        except requests.Timeout:
+            print(f"请求超时: {url}")
+            return None
+        except requests.RequestException as e:
+            print(f"请求错误: {url} - {e}")
+            return None
+    
+    def parse_page(self, html):
+        """安全的 HTML 解析"""
+        if not html:
+            return None
+        
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # 检查关键元素是否存在
+        items = soup.select('.item-list > .item')
+        if not items:
+            print("告警：未找到预期元素，页面结构可能已变更")
+            return None
+        
+        results = []
+        for item in items:
+            title_el = item.select_one('.title')
+            if title_el:
+                results.append({
+                    'title': title_el.get_text(strip=True),
+                    'url': item.select_one('a')['href'] if item.select_one('a') else None
+                })
+        
+        return results
+    
+    def scrape(self, urls):
+        """主爬虫流程"""
+        for url in urls:
+            html = self.fetch_page(url)
+            if html is None:
+                continue
+            
+            results = self.parse_page(html)
+            if results:
+                self.data_buffer.extend(results)
+            
+            # 礼貌延迟
+            time.sleep(1)
+        
+        return self.data_buffer
+    
+    def save(self, filename='output.txt'):
+        """批量保存数据"""
+        if not self.data_buffer:
+            print("没有数据需要保存")
+            return
+        
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                for record in self.data_buffer:
+                    f.write(f"{record['title']}\t{record['url']}\n")
+            print(f"成功保存 {len(self.data_buffer)} 条记录到 {filename}")
+        except Exception as e:
+            print(f"保存失败: {e}")
+
+# 使用示例
+if __name__ == '__main__':
+    scraper = RobustScraper('https://example.com')
+    try:
+        urls = [f'https://example.com/page/{i}' for i in range(1, 10)]
+        data = scraper.scrape(urls)
+    except KeyboardInterrupt:
+        print("\n用户中断，保存已有数据...")
+    finally:
+        scraper.save()</code></pre>
+        </div>
+
+        <h2>总结</h2>
+
+        <div class="summary">
+            <h2>6 个核心技巧</h2>
+            <ol>
+                <li><strong>检查状态码</strong>：提前返回，避免处理无效响应</li>
+                <li><strong>不信任 HTML</strong>：每次选择器操作后检查返回值</li>
+                <li><strong>设置 Headers</strong>：至少设置 User-Agent 模拟浏览器</li>
+                <li><strong>设置 Timeout</strong>：永远不要使用无超时的请求</li>
+                <li><strong>异常处理</strong>：分类捕获异常，处理 KeyboardInterrupt 保存数据</li>
+                <li><strong>批量文件操作</strong>：先在内存累积，最后一次性写入</li>
+            </ol>
+        </div>
+
+        <div class="references">
+            <h3>参考资料</h3>
+            <ul>
+                <li><a href="http://blog.adnansiddiqi.me/6-things-to-develop-an-efficient-web-scraper-in-python/" target="_blank">Adnan's Random Bytes - 6 things to develop an efficient web scraper</a></li>
+                <li><a href="https://docs.python-requests.org/" target="_blank">Python Requests 官方文档</a></li>
+            </ul>
+        </div>
+    </article></main>
+    <footer><div class="giscus"></div></footer>
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDOHZL5Rg" data-category="Comments" data-category-id="DIC_kwDOHZL5Rs4CR-F6" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="preferred_color_scheme" data-lang="zh-CN" crossorigin="anonymous" async></script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>

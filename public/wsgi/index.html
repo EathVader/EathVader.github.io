@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WSGI 接口详解 | Python Web 开发基础</title>
+    <meta name="description" content="WSGI（Web Server Gateway Interface）详解：从 Web 应用本质到三层架构，从 Hello World 到 Flask 框架原理，含交互式 WSGI 服务器模拟。">
+    <meta name="keywords" content="WSGI,Python Web,Web服务器,Flask,PEP3333,Web框架">
+    <meta property="og:title" content="WSGI 接口详解">
+    <meta property="og:description" content="WSGI 接口详解：从 Web 应用本质到三层架构，从 Hello World 到 Flask 框架原理">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/wsgi/">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "WSGI 接口详解",
+        "description": "WSGI（Web Server Gateway Interface）详解：从 Web 应用本质到三层架构，从 Hello World 到 Flask 框架原理。",
+        "author": {"@type": "Person", "name": "EathVader"},
+        "datePublished": "2026-04-02",
+        "publisher": {"@type": "Organization", "name": "EathVader"}
+    }
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <a href="#main" class="skip-link">跳到主要内容</a>
+    <header>
+        <nav class="breadcrumb">
+            <a href="/">首页</a> / <a href="/">后端开发</a> / Python
+        </nav>
+    </header>
+    <main id="main">
+        <article>
+            <h1>WSGI 接口详解</h1>
+            <p class="meta">来源：廖雪峰 · Flask 源码分析</p>
+            
+            <section>
+                <h2>Web 应用的本质</h2>
+                <p>了解了 HTTP 协议和 HTML 文档后，我们其实就明白了一个 Web 应用的本质：</p>
+                <div class="flow-steps">
+                    <div class="flow-step">
+                        <div class="step-icon">🌐</div>
+                        <div class="step-text">浏览器发送 HTTP 请求</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="flow-step">
+                        <div class="step-icon">🖥️</div>
+                        <div class="step-text">服务器收到请求，生成 HTML</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="flow-step">
+                        <div class="step-icon">📤</div>
+                        <div class="step-text">服务器发送 HTTP 响应</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="flow-step">
+                        <div class="step-icon">👁️</div>
+                        <div class="step-text">浏览器渲染页面</div>
+                    </div>
+                </div>
+                <p>最简单的 Web 应用就是把 HTML 文件保存好，用 Apache、Nginx 等静态服务器读取并返回。但如果要<strong>动态生成 HTML</strong>，就需要自己实现上述步骤。然而，接受 HTTP 请求、解析请求、发送响应都是苦力活——所以我们不自己写底层代码，而是需要一个<strong>统一的接口</strong>，让我们专心用 Python 编写 Web 业务。</p>
+                <p><strong>这个接口就是 WSGI：Web Server Gateway Interface。</strong></p>
+            </section>
+
+            <section>
+                <h2>Web 三层架构</h2>
+                <div class="architecture-diagram">
+                    <div class="layer web-framework">
+                        <div class="layer-icon">🏗️</div>
+                        <h4>Web 框架层</h4>
+                        <p>Flask, Django, Bottle</p>
+                        <p class="layer-desc">网站开发者使用，管理数据库、Cookies、路由</p>
+                    </div>
+                    <div class="layer-connector">
+                        <span class="connector-label">WSGI 接口（PEP 3333）</span>
+                    </div>
+                    <div class="layer wsgi-layer">
+                        <div class="layer-icon">🔌</div>
+                        <h4>WSGI 层</h4>
+                        <p>application(environ, start_response)</p>
+                        <p class="layer-desc">框架开发者关心的层面，为服务器提供标准接口</p>
+                    </div>
+                    <div class="layer-connector">
+                        <span class="connector-label">TCP/HTTP 连接</span>
+                    </div>
+                    <div class="layer web-server">
+                        <div class="layer-icon">🖥️</div>
+                        <h4>Web 服务器层</h4>
+                        <p>Gunicorn, uWSGI, wsgiref</p>
+                        <p class="layer-desc">处理 HTTP 请求/响应，调用 WSGI 应用</p>
+                    </div>
+                </div>
+                <div class="highlight-box">
+                    <strong>核心理解：</strong> WSGI 是 Web 服务器和 Web 框架（Python）之间的接口规范。框架实现 WSGI 应用，服务器调用 WSGI 应用，两者通过 WSGI 规范解耦。
+                </div>
+            </section>
+
+            <section>
+                <h2>WSGI 接口定义</h2>
+                <p>WSGI 接口定义非常简单，它只要求 Web 开发者实现一个函数，就可以响应 HTTP 请求：</p>
+                
+                <div class="code-block">
+                    <div class="code-label">最简单的 WSGI 应用</div>
+                    <pre><code>def application(environ, start_response):
+    start_response('200 OK', [('Content-Type', 'text/html')])
+    return '&lt;h1&gt;Hello, web!&lt;/h1&gt;'</code></pre>
+                </div>
+                
+                <p><code>application()</code> 函数接收两个参数：</p>
+                <div class="param-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>参数</th>
+                                <th>类型</th>
+                                <th>说明</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>environ</code></td>
+                                <td>dict</td>
+                                <td>包含所有 HTTP 请求信息的字典，由 WSGI 服务器提供</td>
+                            </tr>
+                            <tr>
+                                <td><code>start_response</code></td>
+                                <td>callable</td>
+                                <td>发送 HTTP 响应头的函数，只能调用一次</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <p><code>start_response()</code> 接收两个参数：</p>
+                <ul>
+                    <li><strong>HTTP 响应码</strong>：如 <code>'200 OK'</code></li>
+                    <li><strong>HTTP Headers</strong>：一组 list，每个 Header 用两个 str 的 tuple 表示</li>
+                </ul>
+                
+                <p>函数的<strong>返回值</strong>将作为 HTTP 响应的 Body 发送给浏览器。</p>
+            </section>
+
+            <section>
+                <h2>运行 WSGI 服务</h2>
+                <p><code>application()</code> 函数必须由 WSGI 服务器来调用。Python 内置了一个 WSGI 服务器 <code>wsgiref</code>，它是纯 Python 编写的参考实现，仅供开发和测试使用。</p>
+                
+                <div class="code-block">
+                    <div class="code-label">hello.py —— WSGI 处理函数</div>
+                    <pre><code>def application(environ, start_response):
+    start_response('200 OK', [('Content-Type', 'text/html')])
+    return '&lt;h1&gt;Hello, %s!&lt;/h1&gt;' % (environ['PATH_INFO'][1:] or 'web')</code></pre>
+                </div>
+                
+                <div class="code-block">
+                    <div class="code-label">server.py —— WSGI 服务器</div>
+                    <pre><code>from wsgiref.simple_server import make_server
+from hello import application
+
+# 创建服务器，IP 为空，端口 8000
+httpd = make_server('', 8000, application)
+print("Serving HTTP on port 8000...")
+httpd.serve_forever()</code></pre>
+                </div>
+                
+                <p>启动后，打开浏览器访问 <code>http://localhost:8000/</code>，可以看到 <code>Hello, web!</code>。输入 <code>http://localhost:8000/Alice</code>，会显示 <code>Hello, Alice!</code>。</p>
+            </section>
+
+            <section>
+                <h2>交互式：WSGI 请求处理模拟</h2>
+                <div class="interactive-demo">
+                    <p>输入 URL 路径，观察 WSGI 如何处理请求：</p>
+                    <div class="wsgi-simulator">
+                        <div class="simulator-input">
+                            <label>URL 路径：</label>
+                            <input type="text" id="pathInput" value="/Alice" placeholder="/name">
+                            <button onclick="simulateWSGI()">发送请求</button>
+                        </div>
+                        <div class="simulator-flow">
+                            <div class="sim-step browser">
+                                <div class="sim-icon">🌐</div>
+                                <div class="sim-label">浏览器</div>
+                                <div class="sim-detail" id="browserDetail">等待请求...</div>
+                            </div>
+                            <div class="sim-arrow">→</div>
+                            <div class="sim-step server">
+                                <div class="sim-icon">🖥️</div>
+                                <div class="sim-label">WSGI 服务器</div>
+                                <div class="sim-detail" id="serverDetail">等待请求...</div>
+                            </div>
+                            <div class="sim-arrow">→</div>
+                            <div class="sim-step app">
+                                <div class="sim-icon">🐍</div>
+                                <div class="sim-label">WSGI 应用</div>
+                                <div class="sim-detail" id="appDetail">等待请求...</div>
+                            </div>
+                        </div>
+                        <div class="sim-output" id="simOutput">
+                            <div class="output-label">响应结果：</div>
+                            <div class="output-content" id="outputContent">-</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>environ 字典详解</h2>
+                <p><code>environ</code> 是 WSGI 服务器提供的字典，包含所有 HTTP 请求信息。常用字段：</p>
+                <div class="environ-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>字段</th>
+                                <th>说明</th>
+                                <th>示例值</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>REQUEST_METHOD</code></td>
+                                <td>HTTP 请求方法</td>
+                                <td><code>'GET'</code>, <code>'POST'</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>PATH_INFO</code></td>
+                                <td>URL 路径</td>
+                                <td><code>'/hello'</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>QUERY_STRING</code></td>
+                                <td>URL 查询参数</td>
+                                <td><code>'name=Alice&age=25'</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>CONTENT_TYPE</code></td>
+                                <td>请求体类型</td>
+                                <td><code>'application/json'</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>CONTENT_LENGTH</code></td>
+                                <td>请求体长度</td>
+                                <td><code>'42'</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>SERVER_NAME</code></td>
+                                <td>服务器主机名</td>
+                                <td><code>'localhost'</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>SERVER_PORT</code></td>
+                                <td>服务器端口</td>
+                                <td><code>'8000'</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>HTTP_HOST</code></td>
+                                <td>Host 头</td>
+                                <td><code>'localhost:8000'</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>wsgi.input</code></td>
+                                <td>请求体文件对象</td>
+                                <td>文件流</td>
+                            </tr>
+                            <tr>
+                                <td><code>wsgi.errors</code></td>
+                                <td>错误输出流</td>
+                                <td>stderr</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section>
+                <h2>从 WSGI 到 Web 框架</h2>
+                <p>无论多么复杂的 Web 应用程序，入口都是一个 WSGI 处理函数。但光靠一个 WSGI 函数来处理还是太底层了，我们需要在 WSGI 之上再抽象出 <strong>Web 框架</strong>，进一步简化 Web 开发。</p>
+                
+                <div class="framework-evolution">
+                    <div class="evo-step">
+                        <div class="evo-num">1</div>
+                        <div class="evo-content">
+                            <h4>原始 WSGI</h4>
+                            <p>手动解析 <code>environ['PATH_INFO']</code>，手动构造 HTML</p>
+                            <pre><code>def app(environ, start_response):
+    path = environ['PATH_INFO']
+    if path == '/':
+        return ['&lt;h1&gt;Home&lt;/h1&gt;']
+    elif path == '/about':
+        return ['&lt;h1&gt;About&lt;/h1&gt;']
+    start_response('404 Not Found', [])
+    return ['Not Found']</code></pre>
+                        </div>
+                    </div>
+                    <div class="evo-step">
+                        <div class="evo-num">2</div>
+                        <div class="evo-content">
+                            <h4>简单路由</h4>
+                            <p>用字典映射 URL 到处理函数</p>
+                            <pre><code>routes = {
+    '/': home_handler,
+    '/about': about_handler,
+}
+def app(environ, start_response):
+    handler = routes.get(environ['PATH_INFO'])
+    if handler:
+        return handler(environ, start_response)
+    start_response('404', [])
+    return ['Not Found']</code></pre>
+                        </div>
+                    </div>
+                    <div class="evo-step">
+                        <div class="evo-num">3</div>
+                        <div class="evo-content">
+                            <h4>Flask 框架</h4>
+                            <p>使用装饰器声明路由，框架自动处理 WSGI 细节</p>
+                            <pre><code>from flask import Flask
+app = Flask(__name__)
+
+@app.route("/")
+def hello():
+    return "Hello World!"
+
+@app.route("/&lt;name&gt;")
+def greet(name):
+    return f"Hello, {name}!"</code></pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="highlight-box">
+                    <strong>Flask 的本质：</strong> Flask 框架内部实现了 WSGI 接口，<code>@app.route()</code> 装饰器把函数注册到路由表中。当 WSGI 服务器调用 Flask 的 <code>application(environ, start_response)</code> 时，Flask 根据 URL 查找对应的处理函数并调用。
+                </div>
+            </section>
+
+            <section>
+                <h2>常见 WSGI 服务器</h2>
+                <div class="server-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>服务器</th>
+                                <th>特点</th>
+                                <th>适用场景</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>wsgiref</code></td>
+                                <td>Python 内置，纯 Python 实现</td>
+                                <td>开发测试，不用于生产</td>
+                            </tr>
+                            <tr>
+                                <td><code>Gunicorn</code></td>
+                                <td>预 fork worker 模型，稳定</td>
+                                <td>生产环境，Linux 首选</td>
+                            </tr>
+                            <tr>
+                                <td><code>uWSGI</code></td>
+                                <td>功能丰富，性能高</td>
+                                <td>生产环境，功能全面</td>
+                            </tr>
+                            <tr>
+                                <td><code>Waitress</code></td>
+                                <td>纯 Python，跨平台</td>
+                                <td>Windows 生产环境</td>
+                            </tr>
+                            <tr>
+                                <td><code>mod_wsgi</code></td>
+                                <td>Apache 模块</td>
+                                <td>Apache 部署</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="summary">
+                <h2>总结</h2>
+                <ul>
+                    <li><strong>WSGI</strong> 是 Web 服务器和 Web 框架之间的接口规范（PEP 3333）</li>
+                    <li>WSGI 应用是一个函数：<code>application(environ, start_response) → body</code></li>
+                    <li><code>environ</code> 包含所有 HTTP 请求信息，<code>start_response</code> 发送响应头</li>
+                    <li>无论多复杂的 Web 应用，入口都是一个 WSGI 处理函数</li>
+                    <li>Web 框架（Flask/Django）在 WSGI 之上抽象出路由、模板、ORM 等功能</li>
+                    <li>生产环境使用 Gunicorn/uWSGI，开发测试使用 wsgiref</li>
+                </ul>
+            </section>
+
+            <section class="references">
+                <h2>参考来源</h2>
+                <ul>
+                    <li><a href="https://www.liaoxuefeng.com/wiki/001374738125095c955c1e6d8bb493182103fac9270762a000/001386832689740b04430a98f614b6da89da2157ea3efe2000" target="_blank" rel="noopener">廖雪峰 - WSGI 接口</a></li>
+                    <li><a href="https://peps.python.org/pep-3333/" target="_blank" rel="noopener">PEP 3333 - WSGI 规范</a></li>
+                </ul>
+            </section>
+        </article>
+    </main>
+
+    <footer>
+        <div class="giscus"></div>
+    </footer>
+
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script>
+    function simulateWSGI() {
+        const path = document.getElementById('pathInput').value || '/';
+        const browserDetail = document.getElementById('browserDetail');
+        const serverDetail = document.getElementById('serverDetail');
+        const appDetail = document.getElementById('appDetail');
+        const outputContent = document.getElementById('outputContent');
+
+        browserDetail.textContent = `GET ${path} HTTP/1.1`;
+        serverDetail.textContent = '解析请求，构建 environ...';
+        appDetail.textContent = '等待调用...';
+        outputContent.textContent = '-';
+
+        setTimeout(() => {
+            serverDetail.textContent = '调用 application(environ, start_response)';
+            appDetail.textContent = '处理中...';
+
+            setTimeout(() => {
+                const name = path.substring(1) || 'web';
+                const body = `<h1>Hello, ${name}!</h1>`;
+                appDetail.textContent = `PATH_INFO="${path}"\n返回: ${body}`;
+                serverDetail.textContent = '收到响应，发送 HTTP 响应';
+                outputContent.innerHTML = `HTTP/1.1 200 OK\nContent-Type: text/html\n\n${body}`;
+                browserDetail.textContent = `收到 200 OK，渲染页面`;
+            }, 800);
+        }, 600);
+    }
+    </script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js"
+        data-repo="EathVader/EathVader.github.io"
+        data-repo-id="R_kgDOHZL5Rg"
+        data-category="Comments"
+        data-category-id="DIC_kwDOHZL5Rs4CR-F6"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="preferred_color_scheme"
+        data-lang="zh-CN"
+        crossorigin="anonymous"
+        async>
+    </script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>

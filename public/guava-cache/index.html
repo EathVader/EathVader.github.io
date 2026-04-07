@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guava Cache 源码分析 — 引用回收与移除通知</title>
+    <meta name="description" content="Guava Cache源码深度分析：Java四种引用类型、事件回调机制、弱引用/软引用回收原理、RemovalListener回调实现">
+    <meta property="og:title" content="Guava Cache 源码分析 — 引用回收与移除通知">
+    <meta property="og:description" content="Guava Cache源码深度分析：Java四种引用类型、事件回调机制、弱引用/软引用回收原理、RemovalListener回调实现">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/guava-cache/">
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"Article","headline":"Guava Cache 源码分析 — 引用回收与移除通知","description":"Guava Cache源码深度分析：Java四种引用类型、事件回调机制、弱引用/软引用回收原理、RemovalListener回调实现","author":{"@type":"Person","name":"EathVader"},"datePublished":"2026-04-02","publisher":{"@type":"Organization","name":"EathVader"}}
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header><nav class="breadcrumb"><a href="/">首页</a> / <a href="/">后端开发</a> / Java 缓存</nav></header>
+    <main><article>
+        <h1>Guava Cache 源码分析 — 引用回收与移除通知</h1>
+        <p class="meta">来源：crossoverJie · 2026-04-02</p>
+
+        <h2>前言</h2>
+
+        <p>Guava Cache 是 Google 开源的本地缓存实现。在分析其原理之前，需要先了解 Java 自带的两个特性——<strong>引用类型</strong>和<strong>事件回调</strong>，Guava 中都有具体的应用。</p>
+
+        <h2>Java 中的四种引用</h2>
+
+        <p>JVM 根据可达性分析算法找出需要回收的对象，判断对象存活状态都和"引用"有关。JDK 1.2 之后新增了四种引用状态，用于更细粒度地划分引用关系：</p>
+
+        <table>
+            <tr><th>引用类型</th><th>强度</th><th>GC 行为</th><th>典型场景</th></tr>
+            <tr><td><strong>强引用</strong> (Strong)</td><td>最强</td><td>不会被 GC 回收</td><td><code>A a = new A()</code>，最常见</td></tr>
+            <tr><td><strong>软引用</strong> (Soft)</td><td>较强</td><td>内存不足时才回收</td><td>缓存：有用但非必需的对象</td></tr>
+            <tr><td><strong>弱引用</strong> (Weak)</td><td>较弱</td><td>GC 时无论内存是否足够都回收</td><td>WeakHashMap、Guava weakKeys</td></tr>
+            <tr><td><strong>虚引用</strong> (Phantom)</td><td>最弱</td><td>被回收时获得通知</td><td>DirectByteBuffer 的 Cleaner</td></tr>
+        </table>
+
+        <div class="code-block">
+            <div class="code-label">Java — 四种引用示例</div>
+            <pre><code class="language-java">// 强引用 — 不会被 GC 回收
+A a = new A();
+
+// 软引用 — 内存不足时才被回收
+SoftReference<String> softRef = new SoftReference<>("soft");
+
+// 弱引用 — GC 时一定被回收
+WeakReference<String> weakRef = new WeakReference<>("weak");
+
+// 虚引用 — 无法通过引用获取对象，仅用于回收通知
+ReferenceQueue<String> queue = new ReferenceQueue<>();
+PhantomReference<String> phantomRef = new PhantomReference<>("phantom", queue);</code></pre>
+        </div>
+
+        <h2>事件回调机制</h2>
+
+        <p>事件回调是一种常见的设计模式。在 Java 中利用接口来实现回调：</p>
+
+        <div class="code-block">
+            <div class="code-label">Java — 回调接口定义</div>
+            <pre><code class="language-java">public interface CallBackListener {
+    /** 回调通知函数 */
+    void callBackNotify(String msg);
+}</code></pre>
+        </div>
+
+        <div class="code-block">
+            <div class="code-label">Java — Caller（调用方）</div>
+            <pre><code class="language-java">public class Caller {
+    private CallBackListener callBackListener;
+    private Notifier notifier;
+    private String question;
+
+    public void call() {
+        // 新建线程，达到异步效果
+        new Thread(() -> {
+            notifier.execute(Caller.this, question);
+        }).start();
+        // 提问完毕，继续做其他事
+    }
+}</code></pre>
+        </div>
+
+        <div class="code-block">
+            <div class="code-label">Java — Notifier（响应方）</div>
+            <pre><code class="language-java">public class Notifier {
+    public void execute(Caller caller, String msg) throws InterruptedException {
+        // 执行计算（耗时操作）
+        TimeUnit.SECONDS.sleep(2);
+        // 回调 Caller 告知结果
+        caller.getCallBackListener().callBackNotify("我在北京！");
+    }
+}</code></pre>
+        </div>
+
+        <div class="code-block">
+            <div class="code-label">Java — 使用示例</div>
+            <pre><code class="language-java">Notifier notifier = new Notifier();
+Caller caller = new Caller();
+caller.setNotifier(notifier);
+caller.setQuestion("你在哪儿！");
+caller.setCallBackListener(new CallBackListener() {
+    @Override
+    public void callBackNotify(String msg) {
+        System.out.println("回复=【" + msg + "】");
+    }
+});
+caller.call();</code></pre>
+        </div>
+
+        <div class="code-block">
+            <div class="code-label">输出结果</div>
+            <pre><code>[main] Caller - 开始提问
+[main] Caller - 提问完毕，我去干其他事了
+[Thread-0] Notifier - 收到消息=【你在哪儿！】
+[Thread-0] Notifier - 等待响应中。。。。。
+[Thread-0] Main - 回复=【我在北京！】</code></pre>
+        </div>
+
+        <h2>Guava Cache 的引用回收</h2>
+
+        <p>Guava 利用 Java 的引用类型，可以在初始化缓存时自定义键和值的引用关系：</p>
+
+        <div class="code-block">
+            <div class="code-label">Java</div>
+            <pre><code class="language-java">LoadingCache<Integer, AtomicLong> loadingCache = CacheBuilder.newBuilder()
+    .expireAfterWrite(2, TimeUnit.SECONDS)
+    .weakKeys()      // 键使用弱引用
+    .weakValues()    // 值使用弱引用
+    // .softValues()  // 或者使用软引用
+    .removalListener(new RemovalListener<Object, Object>() {
+        @Override
+        public void onRemoval(RemovalNotification<Object, Object> notification) {
+            System.out.println("删除原因=" + notification.getCause()
+                + "，删除 key=" + notification.getKey()
+                + "，删除 value=" + notification.getValue());
+        }
+    })
+    .build(new CacheLoader<Integer, AtomicLong>() {
+        @Override
+        public AtomicLong load(Integer key) throws Exception {
+            return new AtomicLong(0);
+        }
+    });</code></pre>
+        </div>
+
+        <h3>ReferenceEntry 的定义</h3>
+
+        <p>Guava Cache 中的 <code>ReferenceEntry</code> 类似于 HashMap 的 Entry，用来存放数据：</p>
+
+        <div class="code-block">
+            <div class="code-label">Java — ReferenceEntry 接口</div>
+            <pre><code class="language-java">interface ReferenceEntry<K, V> {
+    ValueReference<K, V> getValueReference();
+    void setValueReference(ValueReference<K, V> valueReference);
+    ReferenceEntry<K, V> getNext();
+    int getHash();
+    K getKey();
+    long getAccessTime();
+    void setAccessTime(long time);
+}</code></pre>
+        </div>
+
+        <p>根据 <code>ValueReference</code> 的实现，具有强引用和弱引用的不同实现，key 也是同样的道理。当使用弱引用构造方式时，弱引用的 key 和 value 都会被垃圾回收。</p>
+
+        <h3>显式回收</h3>
+
+        <div class="code-block">
+            <div class="code-label">Java</div>
+            <pre><code class="language-java">// 回收单个 key
+cache.invalidate(key);
+
+// 回收多个 key
+cache.invalidateAll(keys);
+
+// 回收所有条目
+cache.invalidateAll();</code></pre>
+        </div>
+
+        <h2>Guava Cache 的回调机制</h2>
+
+        <p>当缓存被删除时，Guava 会回调我们自定义的函数，并告知删除原因。</p>
+
+        <div class="code-block">
+            <div class="code-label">Java — 使用 RemovalListener</div>
+            <pre><code class="language-java">LoadingCache<Integer, AtomicLong> loadingCache = CacheBuilder.newBuilder()
+    .expireAfterWrite(2, TimeUnit.SECONDS)
+    .removalListener(new RemovalListener<Object, Object>() {
+        @Override
+        public void onRemoval(RemovalNotification<Object, Object> notification) {
+            LOGGER.info("删除原因={}，删除 key={}, 删除 value={}",
+                notification.getCause(),
+                notification.getKey(),
+                notification.getValue());
+        }
+    })
+    .build(new CacheLoader<Integer, AtomicLong>() {
+        @Override
+        public AtomicLong load(Integer key) throws Exception {
+            return new AtomicLong(0);
+        }
+    });</code></pre>
+        </div>
+
+        <div class="code-block">
+            <div class="code-label">输出结果</div>
+            <pre><code>当前缓存值=0, 缓存大小=1
+缓存的所有内容={1000=0}
+job running times=10
+删除原因=EXPIRED，删除 key=1000, 删除 value=1
+当前缓存值=0, 缓存大小=1
+缓存的所有内容={1000=0}</code></pre>
+        </div>
+
+        <h3>回调实现原理</h3>
+
+        <p>Guava 是如何实现回调的？跟着源码走一遍：</p>
+
+        <ol>
+            <li><code>LocalCache.getLiveValue()</code> 中判断缓存过期</li>
+            <li>跟着调用关系一直跟到 <code>removeValueFromChain()</code></li>
+            <li><code>enqueueNotification()</code> 方法将回收的缓存（包含 key、value）以及回收原因包装成事件通知，加入到一个<strong>本地队列</strong>中</li>
+        </ol>
+
+        <div class="diagram">
+            <svg viewBox="0 0 700 280" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <marker id="arrow-gc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#4d96ff"/></marker>
+                </defs>
+
+                <!-- Step 1 -->
+                <rect x="10" y="10" width="160" height="50" rx="8" fill="#e8f4fd" stroke="#4d96ff" stroke-width="1.5"/>
+                <text x="90" y="30" text-anchor="middle" fill="#2c3e50" font-size="12" font-weight="bold">① getLiveValue()</text>
+                <text x="90" y="48" text-anchor="middle" fill="#2c3e50" font-size="10">判断缓存过期</text>
+
+                <!-- Step 2 -->
+                <rect x="200" y="10" width="160" height="50" rx="8" fill="#e8f4fd" stroke="#4d96ff" stroke-width="1.5"/>
+                <text x="280" y="30" text-anchor="middle" fill="#2c3e50" font-size="12" font-weight="bold">② removeValueFromChain()</text>
+                <text x="280" y="48" text-anchor="middle" fill="#2c3e50" font-size="10">从链表中移除</text>
+
+                <!-- Step 3 -->
+                <rect x="390" y="10" width="160" height="50" rx="8" fill="#e8f4fd" stroke="#4d96ff" stroke-width="1.5"/>
+                <text x="470" y="30" text-anchor="middle" fill="#2c3e50" font-size="12" font-weight="bold">③ enqueueNotification()</text>
+                <text x="470" y="48" text-anchor="middle" fill="#2c3e50" font-size="10">包装通知入队</text>
+
+                <!-- Queue -->
+                <rect x="390" y="90" width="160" height="60" rx="8" fill="#fff3cd" stroke="#ffd93d" stroke-width="1.5"/>
+                <text x="470" y="115" text-anchor="middle" fill="#2c3e50" font-size="12" font-weight="bold">本地队列 (Queue)</text>
+                <text x="470" y="135" text-anchor="middle" fill="#2c3e50" font-size="10">RemovalNotification</text>
+
+                <line x1="470" y1="60" x2="470" y2="90" stroke="#ffd93d" stroke-width="1.5" marker-end="url(#arrow-gc)"/>
+
+                <!-- Step 4 -->
+                <rect x="580" y="10" width="110" height="50" rx="8" fill="#d4edda" stroke="#6bcb77" stroke-width="1.5"/>
+                <text x="635" y="30" text-anchor="middle" fill="#2c3e50" font-size="12" font-weight="bold">④ postReadCleanup()</text>
+                <text x="635" y="48" text-anchor="middle" fill="#2c3e50" font-size="10">消费队列</text>
+
+                <line x1="550" y1="35" x2="580" y2="35" stroke="#4d96ff" stroke-width="1.5" marker-end="url(#arrow-gc)"/>
+
+                <!-- Step 5 -->
+                <rect x="580" y="90" width="110" height="60" rx="8" fill="#d4edda" stroke="#6bcb77" stroke-width="1.5"/>
+                <text x="635" y="112" text-anchor="middle" fill="#2c3e50" font-size="12" font-weight="bold">⑤ 回调</text>
+                <text x="635" y="130" text-anchor="middle" fill="#2c3e50" font-size="10">RemovalListener</text>
+                <text x="635" y="145" text-anchor="middle" fill="#2c3e50" font-size="10">.onRemoval()</text>
+
+                <line x1="635" y1="60" x2="635" y2="90" stroke="#6bcb77" stroke-width="1.5" marker-end="url(#arrow-gc)"/>
+
+                <!-- 流程说明 -->
+                <rect x="10" y="180" width="680" height="90" rx="8" fill="#f0f7ff" stroke="#4d96ff" stroke-width="1"/>
+                <text x="350" y="205" text-anchor="middle" fill="#2c3e50" font-size="13" font-weight="bold">回调流程总结</text>
+                <text x="350" y="228" text-anchor="middle" fill="#2c3e50" font-size="11">① 获取缓存时判断过期 → ② 从链表中移除 → ③ 包装通知加入本地队列</text>
+                <text x="350" y="248" text-anchor="middle" fill="#2c3e50" font-size="11">④ get() 方法的 finally 中执行 postReadCleanup() → ⑤ 消费队列，调用自定义的 RemovalListener</text>
+                <text x="350" y="263" text-anchor="middle" fill="#4d96ff" font-size="11">关键：回调不是在移除时立即执行，而是延迟到下次 get() 时消费队列触发</text>
+            </svg>
+        </div>
+
+        <p>这样一看，似乎也没有立即回调我们初始化时候的事件。但用过队列的同学应该能猜到：既然写入队列，那就肯定有消费。</p>
+
+        <p>回到获取缓存的地方，在 <code>finally</code> 中执行了 <code>postReadCleanup()</code> 方法——这里面就是对刚才的队列进行了消费。一直跟进来就会发现，这里消费了队列，将之前包装好的移除消息调用了我们自定义的事件，这样就完成了一次事件回调。</p>
+
+        <div class="highlight-box">
+            <strong>关键设计：</strong>回调不是在移除时立即执行，而是将通知加入队列，在下次 <code>get()</code> 时消费队列并触发回调。这种异步设计避免了在 GC 线程或移除操作的上下文中执行用户代码，保证了线程安全性。
+        </div>
+
+        <h2>总结</h2>
+
+        <div class="summary">
+            <h2>核心要点</h2>
+            <ol>
+                <li><strong>四种引用</strong>：强引用（不回收）、软引用（内存不足回收）、弱引用（GC 时回收）、虚引用（回收通知）</li>
+                <li><strong>Guava 引用配置</strong>：<code>weakKeys()</code>、<code>weakValues()</code>、<code>softValues()</code> 自定义键值引用关系</li>
+                <li><strong>事件回调</strong>：通过 <code>RemovalListener</code> 接口，缓存被删除时回调并告知原因</li>
+                <li><strong>回调实现</strong>：移除时将通知加入本地队列，在 <code>get()</code> 的 <code>postReadCleanup()</code> 中消费队列触发回调</li>
+                <li><strong>异步设计</strong>：回调延迟执行，避免在 GC 线程中执行用户代码</li>
+            </ol>
+        </div>
+
+        <div class="references">
+            <h3>参考资料</h3>
+            <ul>
+                <li><a href="https://crossoverjie.top/2018/07/16/guava/guava-cache-2/" target="_blank">crossoverJie - Guava 源码分析（Cache 原理【二阶段】）</a></li>
+                <li><a href="https://github.com/crossoverJie/Java-Interview" target="_blank">Java-Interview 源码</a></li>
+                <li><a href="https://github.com/google/guava" target="_blank">Google Guava 官方仓库</a></li>
+            </ul>
+        </div>
+    </article></main>
+    <footer><div class="giscus"></div></footer>
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDOHZL5Rg" data-category="Comments" data-category-id="DIC_kwDOHZL5Rs4CR-F6" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="preferred_color_scheme" data-lang="zh-CN" crossorigin="anonymous" async></script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>
