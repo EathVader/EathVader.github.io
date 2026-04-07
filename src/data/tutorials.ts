@@ -391,4 +391,60 @@ export const tutorials: Tutorial[] = [
       'Guava Cache 源码分析：LRU 策略、并发读写、过期机制、回收机制。深入理解本地缓存的设计与实现。',
     meta: '基于 Guava 源码 · 2026-04',
   },
+  {
+    slug: 'gunicorn-lru',
+    tag: '🐍 Python',
+    title: 'Gunicorn 与 LRU Cache 陷阱',
+    description:
+      'Gunicorn 多 worker 模式下 @lru_cache 的陷阱：每个 worker 独立缓存导致命中率低。分析原因并提供 Memcached/Redis 替代方案。',
+    meta: '基于 Krzysztof Zuraw 博客 · 2026-04',
+  },
+  {
+    slug: 'consistent-hash',
+    tag: '🏗️ 分布式',
+    title: '一致性 Hash 算法与 Python 实现',
+    description:
+      '一致性 Hash 算法详解：传统 Hash 的问题、Hash 环原理、虚拟节点、Python HashRing 完整实现。应用于 Memcached、Amazon Dynamo。',
+    meta: '基于阿笨猫博客 · 2026-04',
+  },
+  {
+    slug: 'python-exceptions',
+    tag: '🐍 Python',
+    title: 'Python 异常处理最佳实践',
+    description:
+      'Python 异常处理 6 种模式对比：Giant Try-Except、Fine-Grained、Nested、While True、User-Defined、Encapsulating Function。含优缺点分析和推荐方案。',
+    meta: '基于 Naftali Harris 博客 · 2026-04',
+  },
+  {
+    slug: 'python-mro',
+    tag: '🐍 Python',
+    title: 'Python MRO 方法解析顺序',
+    description:
+      'Python C3 线性化算法详解：单继承 vs 多继承、merge 算法逐步演示、经典类 vs 新式类、MRO 冲突示例。深入理解 Python 方法查找顺序。',
+    meta: '基于 Michele Simionato · 2026-04',
+  },
+  {
+    slug: 'python-super',
+    tag: '🐍 Python',
+    title: 'Python super() 深入理解',
+    description:
+      'Python super() 原理和最佳实践：super() 不是调用父类、多继承中的调用顺序、合作式继承、常见误区。',
+    meta: '基于 Python 官方文档/技术博客 · 2026-04',
+  },
+  {
+    slug: 'bplustree',
+    tag: '🐍 Python',
+    title: 'Python3 在磁盘上的 B+ 树',
+    description:
+      'B+ 树原理与磁盘存储实现：B+ 树结构、节点分裂合并、磁盘 vs 内存、Python 实现要点。数据库索引的核心数据结构。',
+    meta: '基于 Bplustree 项目 · 2026-04',
+  },
+  {
+    slug: 'pinyin-input',
+    tag: '🐍 Python',
+    title: '用 Python 实现中文拼音输入法',
+    description:
+      '中文拼音输入法原理与 Python 实现：拼音到汉字映射、Bigram 语言模型、Viterbi 候选排序、交互式拼音输入演示。',
+    meta: '基于程序师 · 2026-04',
+  },
 ];

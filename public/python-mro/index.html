@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Python MRO方法解析顺序详解：C3线性化算法、单继承vs多继承、merge算法逐步演示、经典类vs新式类">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Python MRO 方法解析顺序详解">
+<meta property="og:description" content="Python MRO方法解析顺序详解：C3线性化算法、单继承vs多继承、merge算法逐步演示">
+<meta property="og:url" content="https://eathvader.github.io/python-mro/">
+<link rel="canonical" href="https://eathvader.github.io/python-mro/">
+<title>Python MRO 方法解析顺序详解</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Article","headline":"Python MRO 方法解析顺序详解","description":"Python MRO方法解析顺序详解：C3线性化算法、单继承vs多继承、merge算法逐步演示","author":{"@type":"Person","name":"EathVader"},"datePublished":"2026-04-02","dateModified":"2026-04-07","url":"https://eathvader.github.io/python-mro/"}
+</script>
+</head>
+<body>
+<header class="hero">
+  <h1>🐍 <span>Python MRO</span> 方法解析顺序</h1>
+  <p class="subtitle">C3 线性化算法详解，单继承 vs 多继承，merge 算法逐步演示<br>
+  Method Resolution Order in Python</p>
+  <span class="badge">🐍 Python</span>
+  <span class="badge">🧬 继承</span>
+  <span class="badge">🔬 C3 算法</span>
+</header>
+<div class="container">
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-what">什么是 MRO？</a></li>
+    <li><a href="#sec-single">单继承的 MRO</a></li>
+    <li><a href="#sec-multi">多继承的 MRO</a></li>
+    <li><a href="#sec-c3">C3 线性化算法详解</a></li>
+    <li><a href="#sec-merge">Merge 算法逐步演示</a></li>
+    <li><a href="#sec-conflict">MRO 冲突示例</a></li>
+    <li><a href="#sec-classic">经典类 vs 新式类</a></li>
+    <li><a href="#sec-summary">总结</a></li>
+  </ol>
+</nav>
+
+<section id="sec-what">
+<h2 class="section-title"><span class="num">1</span>什么是 MRO？</h2>
+<p><strong>MRO（Method Resolution Order）</strong> 是 Python 在多继承情况下，决定调用哪个父类方法的查找顺序。</p>
+<div class="code-label">Python</div>
+<pre><code>class A:
+    def greet(self):
+        return "Hello from A"
+
+class B(A):
+    pass
+
+b = B()
+print(b.greet())  # "Hello from A" — B 没有 greet，向上找 A</code></pre>
+<p>单继承很简单，但多继承就复杂了：</p>
+<div class="diagram">
+  <svg viewBox="0 0 500 250" xmlns="http://www.w3.org/2000/svg">
+    <text x="250" y="25" text-anchor="middle" fill="#f8fafc" font-size="14" font-weight="700" font-family="Inter">菱形继承（Diamond Problem）</text>
+    <rect x="200" y="45" width="100" height="45" rx="8" fill="#172554" stroke="#3b82f6"/>
+    <text x="250" y="73" text-anchor="middle" fill="#93c5fd" font-size="13" font-weight="600" font-family="Inter">A</text>
+    <line x1="220" y1="90" x2="120" y2="130" stroke="#60a5fa" stroke-width="1.5"/>
+    <line x1="280" y1="90" x2="380" y2="130" stroke="#60a5fa" stroke-width="1.5"/>
+    <rect x="50" y="130" width="100" height="45" rx="8" fill="#2e1065" stroke="#a78bfa"/>
+    <text x="100" y="158" text-anchor="middle" fill="#c4b5fd" font-size="13" font-weight="600" font-family="Inter">B</text>
+    <rect x="350" y="130" width="100" height="45" rx="8" fill="#451a03" stroke="#f59e0b"/>
+    <text x="400" y="158" text-anchor="middle" fill="#fcd34d" font-size="13" font-weight="600" font-family="Inter">C</text>
+    <line x1="100" y1="175" x2="200" y2="215" stroke="#60a5fa" stroke-width="1.5"/>
+    <line x1="400" y1="175" x2="300" y2="215" stroke="#60a5fa" stroke-width="1.5"/>
+    <rect x="200" y="215" width="100" height="45" rx="8" fill="#14532d" stroke="#22c55e"/>
+    <text x="250" y="243" text-anchor="middle" fill="#86efac" font-size="13" font-weight="600" font-family="Inter">D</text>
+  </svg>
+  <div class="caption">菱形继承：D 继承 B 和 C，B 和 C 都继承 A。D.greet() 应该调用哪个？</div>
+</div>
+<div class="code-label">Python</div>
+<pre><code>class A:
+    def greet(self):
+        return "Hello from A"
+
+class B(A):
+    def greet(self):
+        return "Hello from B"
+
+class C(A):
+    def greet(self):
+        return "Hello from C"
+
+class D(B, C):
+    pass
+
+d = D()
+print(d.greet())  # "Hello from B" — 为什么？看 MRO</code></pre>
+<div class="box box-blue">
+  <div class="title">💡 查看 MRO</div>
+  <pre><code>print(D.__mro__)
+# (&lt;class '__main__.D'&gt;, &lt;class '__main__.B'&gt;, &lt;class '__main__.C'&gt;, &lt;class '__main__.A'&gt;, &lt;class 'object'&gt;)
+
+print(D.mro())
+# 同上</code></pre>
+</div>
+</section>
+
+<section id="sec-single">
+<h2 class="section-title"><span class="num">2</span>单继承的 MRO</h2>
+<p>单继承的 MRO 很简单，就是从子类到父类再到 object 的线性顺序：</p>
+<div class="code-label">Python</div>
+<pre><code>class A: pass
+class B(A): pass
+class C(B): pass
+
+print(C.__mro__)
+# (C, B, A, object)</code></pre>
+<div class="flow">
+  <div class="step" style="border-color:#22c55e">C<br><small>子类</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#3b82f6">B<br><small>父类</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#a78bfa">A<br><small>祖父类</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#64748b">object<br><small>根类</small></div>
+</div>
+</section>
+
+<section id="sec-multi">
+<h2 class="section-title"><span class="num">3</span>多继承的 MRO</h2>
+<p>多继承时，Python 使用 <strong>C3 线性化算法</strong>（Python 2.3+）来确定 MRO。C3 算法保证：</p>
+<ul>
+  <li><strong>单调性</strong>：子类的 MRO 中，父类的相对顺序不变</li>
+  <li><strong>局部优先</strong>：声明时靠前的父类优先</li>
+  <li><strong>一致性扩展</strong>：MRO 与父类的 MRO 一致</li>
+</ul>
+<div class="code-label">Python</div>
+<pre><code>class A: pass
+class B(A): pass
+class C(A): pass
+class D(B, C): pass
+
+# C3 算法计算结果：
+# D.__mro__ = (D, B, C, A, object)
+# 注意：B 在 C 前面（声明顺序），A 在 B 和 C 后面（局部优先）</code></pre>
+</section>
+
+<section id="sec-c3">
+<h2 class="section-title"><span class="num">4</span>C3 线性化算法详解</h2>
+<p>C3 算法的公式：</p>
+<div class="box box-purple">
+  <div class="title">📐 C3 线性化公式</div>
+  <pre><code>L[C(B1...BN)] = C + merge(L[B1]...L[BN], B1...BN)</code></pre>
+  <p>其中：</p>
+  <ul>
+    <li><code>L[C]</code> 是类 C 的线性化（MRO）</li>
+    <li><code>L[object] = [object]</code></li>
+    <li><code>merge</code> 是合并操作，从多个列表中按规则提取元素</li>
+  </ul>
+</div>
+<h3>Merge 算法规则</h3>
+<p>merge 操作从多个列表中按顺序提取元素：</p>
+<ol>
+  <li>取第一个列表的<strong>第一个元素</strong>（称为 head）</li>
+  <li>检查这个 head 是否出现在其他列表的<strong>尾部</strong>（tail）</li>
+  <li>如果不在任何尾部，提取它，从所有列表中删除，继续</li>
+  <li>如果在某个尾部，跳过它，检查下一个列表的 head</li>
+  <li>如果所有 head 都在某个尾部，说明 MRO 冲突，无法线性化</li>
+</ol>
+</section>
+
+<section id="sec-merge">
+<h2 class="section-title"><span class="num">5</span>Merge 算法逐步演示</h2>
+<p>以 <code>class D(B, C)</code> 为例，其中 <code>B(A)</code>，<code>C(A)</code>：</p>
+<div class="code-label">计算过程</div>
+<pre><code># 已知：
+L[object] = [object]
+L[A] = A + merge(L[object], [object]) = [A, object]
+L[B] = B + merge(L[A], [A]) = B + merge([A, object], [A])
+     = B + [A, object] = [B, A, object]
+L[C] = C + merge(L[A], [A]) = C + merge([A, object], [A])
+     = C + [A, object] = [C, A, object]
+
+# 计算 L[D]：
+L[D] = D + merge(L[B], L[C], [B, C])
+     = D + merge([B, A, object], [C, A, object], [B, C])
+
+# merge 步骤：
+# 1. head = B, B 不在 [C, A, object] 或 [C] 的尾部 → 取 B
+#    剩余: merge([A, object], [C, A, object], [C])
+# 2. head = A, A 在 [C, A, object] 的尾部 → 跳过
+# 3. head = C, C 不在 [A, object] 或 [] 的尾部 → 取 C
+#    剩余: merge([A, object], [A, object], [])
+# 4. head = A, A 不在 [A, object] 或 [] 的尾部 → 取 A
+#    剩余: merge([object], [object], [])
+# 5. head = object → 取 object
+#    剩余: merge([], [], [])
+
+# 最终结果：
+L[D] = [D, B, C, A, object]  ✅</code></pre>
+<div class="diagram">
+  <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="20" text-anchor="middle" fill="#f8fafc" font-size="14" font-weight="700" font-family="Inter">Merge 过程可视化</text>
+    <!-- Initial -->
+    <text x="10" y="50" fill="#94a3b8" font-size="10" font-family="Inter">L[B]:</text>
+    <rect x="60" y="38" width="50" height="25" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="85" y="55" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">B</text>
+    <rect x="115" y="38" width="50" height="25" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="140" y="55" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">A</text>
+    <rect x="170" y="38" width="60" height="25" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="200" y="55" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">object</text>
+
+    <text x="10" y="85" fill="#94a3b8" font-size="10" font-family="Inter">L[C]:</text>
+    <rect x="60" y="73" width="50" height="25" rx="4" fill="#2e1065" stroke="#a78bfa"/>
+    <text x="85" y="90" text-anchor="middle" fill="#c4b5fd" font-size="10" font-family="Inter">C</text>
+    <rect x="115" y="73" width="50" height="25" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="140" y="90" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">A</text>
+    <rect x="170" y="73" width="60" height="25" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="200" y="90" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">object</text>
+
+    <text x="10" y="120" fill="#94a3b8" font-size="10" font-family="Inter">[B,C]:</text>
+    <rect x="60" y="108" width="50" height="25" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="85" y="125" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">B</text>
+    <rect x="115" y="108" width="50" height="25" rx="4" fill="#2e1065" stroke="#a78bfa"/>
+    <text x="140" y="125" text-anchor="middle" fill="#c4b5fd" font-size="10" font-family="Inter">C</text>
+
+    <!-- Result -->
+    <text x="10" y="165" fill="#94a3b8" font-size="10" font-family="Inter">MRO:</text>
+    <rect x="60" y="153" width="50" height="25" rx="4" fill="#14532d" stroke="#22c55e"/>
+    <text x="85" y="170" text-anchor="middle" fill="#86efac" font-size="10" font-family="Inter">D</text>
+    <rect x="115" y="153" width="50" height="25" rx="4" fill="#172554" stroke="#3b82f6"/>
+    <text x="140" y="170" text-anchor="middle" fill="#93c5fd" font-size="10" font-family="Inter">B</text>
+    <rect x="170" y="153" width="50" height="25" rx="4" fill="#2e1065" stroke="#a78bfa"/>
+    <text x="195" y="170" text-anchor="middle" fill="#c4b5fd" font-size="10" font-family="Inter">C</text>
+    <rect x="225" y="153" width="50" height="25" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="250" y="170" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">A</text>
+    <rect x="280" y="153" width="60" height="25" rx="4" fill="#1e293b" stroke="#334155"/>
+    <text x="310" y="170" text-anchor="middle" fill="#64748b" font-size="10" font-family="Inter">object</text>
+  </svg>
+  <div class="caption">Merge 过程：从三个列表中按规则提取元素，得到最终 MRO</div>
+</div>
+</section>
+
+<section id="sec-conflict">
+<h2 class="section-title"><span class="num">6</span>MRO 冲突示例</h2>
+<p>不是所有的多继承都能计算出 MRO。当父类顺序矛盾时，Python 会抛出 <code>TypeError</code>：</p>
+<div class="code-label">Python（MRO 冲突）</div>
+<pre><code>class A: pass
+class B(A): pass
+class C(A): pass
+
+# 冲突！D 要求 B 在 C 前面，但 E 要求 C 在 B 前面
+class D(B, C): pass  # MRO: D, B, C, A, object
+class E(C, B): pass  # MRO: E, C, B, A, object
+
+class F(D, E): pass  # ❌ TypeError!
+# D 说 B 在 C 前面，E 说 C 在 B 前面，矛盾！</code></pre>
+<div class="box box-red">
+  <div class="title">🚨 错误信息</div>
+  <pre><code>TypeError: Cannot create a consistent method resolution
+order (MRO) for bases B, C</code></pre>
+  <p>解决方法：统一父类声明顺序，避免矛盾。</p>
+</div>
+</section>
+
+<section id="sec-classic">
+<h2 class="section-title"><span class="num">7</span>经典类 vs 新式类</h2>
+<table>
+  <tr><th>特性</th><th>经典类（Python 2）</th><th>新式类（Python 2.2+ / Python 3）</th></tr>
+  <tr><td>定义</td><td><code>class A:</code></td><td><code>class A(object):</code></td></tr>
+  <tr><td>Python 3</td><td>不存在（所有类都是新式类）</td><td>默认</td></tr>
+  <tr><td>MRO 算法</td><td>深度优先（DFS）</td><td>C3 线性化</td></tr>
+  <tr><td>菱形继承</td><td>可能重复访问基类</td><td>每个类只出现一次</td></tr>
+  <tr><td>super()</td><td>不支持</td><td>支持</td></tr>
+</table>
+<div class="code-label">Python</div>
+<pre><code># Python 2 经典类（深度优先）
+class A: pass
+class B(A): pass
+class C(A): pass
+class D(B, C): pass
+# 经典类 MRO: D → B → A → C → A（A 出现两次！）
+
+# Python 3 新式类（C3 线性化）
+class A: pass  # 等价于 class A(object):
+class B(A): pass
+class C(A): pass
+class D(B, C): pass
+# 新式类 MRO: D → B → C → A → object（每个类只出现一次）</code></pre>
+<div class="box box-green">
+  <div class="title">✅ Python 3 中的新式类</div>
+  <p>Python 3 中所有类默认继承 <code>object</code>，都是新式类。经典类只在 Python 2 中存在。</p>
+</div>
+</section>
+
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">8</span>总结</h2>
+<table>
+  <tr><th>要点</th><th>说明</th></tr>
+  <tr><td>MRO 是什么</td><td>方法解析顺序，决定多继承时调用哪个父类方法</td></tr>
+  <tr><td>C3 算法</td><td>保证单调性、局部优先、一致性扩展</td></tr>
+  <tr><td>Merge 规则</td><td>取 head，检查不在其他尾部，提取并删除</td></tr>
+  <tr><td>查看 MRO</td><td><code>ClassName.__mro__</code> 或 <code>ClassName.mro()</code></td></tr>
+  <tr><td>MRO 冲突</td><td>父类声明顺序矛盾时抛出 TypeError</td></tr>
+  <tr><td>经典类 vs 新式类</td><td>Python 3 只有新式类，使用 C3 算法</td></tr>
+</table>
+<div class="box box-green">
+  <div class="title">✅ 最佳实践</div>
+  <ul>
+    <li>避免过深的继承层次（不超过 3 层）</li>
+    <li>多继承时保持父类声明顺序一致</li>
+    <li>使用 <code>super()</code> 调用父类方法，而不是直接调用</li>
+    <li>用 <code>ClassName.__mro__</code> 调试继承问题</li>
+    <li>优先使用组合而非继承</li>
+  </ul>
+</div>
+</section>
+</div>
+<footer>
+  <p>基于多篇技术文章综合改编为交互式教程</p>
+  <p><a href="/">← 返回主页 / Back to Home</a></p>
+</footer>
+<a href="#" class="back-top" id="backTop">↑</a>
+<script>const btn=document.getElementById('backTop');window.addEventListener('scroll',()=>{btn.classList.toggle('show',window.scrollY>400)});</script>
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDORuTVww" data-category="General" data-category-id="DIC_kwDORuTVw84C5OW8" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="dark_dimmed" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous" async></script>
+</div>
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

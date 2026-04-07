@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Python3实现磁盘B+树：B+树原理、磁盘存储vs内存存储、Python实现要点，含交互式B+树可视化">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Python3 在磁盘上的 B+ 树">
+<meta property="og:description" content="Python3实现磁盘B+树：B+树原理、磁盘存储vs内存存储、Python实现要点">
+<meta property="og:url" content="https://eathvader.github.io/bplustree/">
+<link rel="canonical" href="https://eathvader.github.io/bplustree/">
+<title>Python3 在磁盘上的 B+ 树</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Article","headline":"Python3 在磁盘上的 B+ 树","description":"Python3实现磁盘B+树：B+树原理、磁盘存储vs内存存储、Python实现要点","author":{"@type":"Person","name":"EathVader"},"datePublished":"2026-04-02","dateModified":"2026-04-07","url":"https://eathvader.github.io/bplustree/"}
+</script>
+</head>
+<body>
+<header class="hero">
+  <h1>🌳 <span>Python3</span> 在磁盘上的 B+ 树</h1>
+  <p class="subtitle">B+ 树原理、磁盘存储 vs 内存存储、Python 实现要点<br>
+  B+ Tree on Disk in Python3</p>
+  <span class="badge">🐍 Python</span>
+  <span class="badge">🗄️ 数据库</span>
+  <span class="badge">📦 磁盘存储</span>
+</header>
+<div class="container">
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-why">为什么需要 B+ 树？</a></li>
+    <li><a href="#sec-structure">B+ 树的结构</a></li>
+    <li><a href="#sec-disk">磁盘存储 vs 内存存储</a></li>
+    <li><a href="#sec-insert">插入操作与节点分裂</a></li>
+    <li><a href="#sec-search">查找操作</a></li>
+    <li><a href="#sec-python">Python 实现要点</a></li>
+    <li><a href="#sec-demo">交互式 B+ 树可视化</a></li>
+    <li><a href="#sec-summary">总结</a></li>
+  </ol>
+</nav>
+
+<section id="sec-why">
+<h2 class="section-title"><span class="num">1</span>为什么需要 B+ 树？</h2>
+<p>数据库和文件系统需要高效地存储和检索大量数据。二叉搜索树（BST）在数据量大时树高过大，导致大量磁盘 I/O。</p>
+<table>
+  <tr><th>数据结构</th><th>树高 (100万数据)</th><th>磁盘 I/O 次数</th><th>适用场景</th></tr>
+  <tr><td>二叉搜索树</td><td>~20 层</td><td>~20 次</td><td>内存数据</td></tr>
+  <tr><td>AVL / 红黑树</td><td>~20 层</td><td>~20 次</td><td>内存数据</td></tr>
+  <tr><td style="color:#86efac">B+ 树 (阶数=100)</td><td style="color:#86efac">~3 层</td><td style="color:#86efac">~3 次</td><td style="color:#86efac">磁盘存储</td></tr>
+</table>
+<div class="box box-blue">
+  <div class="title">💡 核心优势</div>
+  <p>B+ 树是<strong>多路平衡搜索树</strong>，每个节点可以有多个子节点（通常 100+），树高很低。对于磁盘存储，每次 I/O 读取一个节点（通常 4KB），树高越低，I/O 越少。</p>
+</div>
+</section>
+
+<section id="sec-structure">
+<h2 class="section-title"><span class="num">2</span>B+ 树的结构</h2>
+<p>B+ 树的特点：</p>
+<ul>
+  <li><strong>所有数据</strong>都存储在叶子节点</li>
+  <li><strong>内部节点</strong>只存储键值和子节点指针（索引）</li>
+  <li><strong>叶子节点</strong>通过链表连接，支持范围查询</li>
+  <li><strong>所有叶子节点</strong>在同一层</li>
+  <li>每个节点最多有 <strong>m 个子节点</strong>（m 为阶数）</li>
+</ul>
+<div class="diagram">
+  <svg viewBox="0 0 700 300" xmlns="http://www.w3.org/2000/svg">
+    <text x="350" y="20" text-anchor="middle" fill="#f8fafc" font-size="14" font-weight="700" font-family="Inter">B+ 树结构示意（阶数 m=3）</text>
+    <!-- Root -->
+    <rect x="280" y="35" width="140" height="40" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="310" y="53" text-anchor="middle" fill="#93c5fd" font-size="11" font-family="Inter">[10]</text>
+    <text x="350" y="70" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">内部节点（索引）</text>
+    <!-- Level 2 -->
+    <line x1="310" y1="75" x2="150" y2="110" stroke="#60a5fa" stroke-width="1.5"/>
+    <line x1="390" y1="75" x2="550" y2="110" stroke="#60a5fa" stroke-width="1.5"/>
+    <rect x="80" y="110" width="140" height="40" rx="6" fill="#2e1065" stroke="#a78bfa"/>
+    <text x="115" y="128" text-anchor="middle" fill="#c4b5fd" font-size="11" font-family="Inter">[3, 7]</text>
+    <text x="150" y="145" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">内部节点</text>
+    <rect x="480" y="110" width="140" height="40" rx="6" fill="#2e1065" stroke="#a78bfa"/>
+    <text x="515" y="128" text-anchor="middle" fill="#c4b5fd" font-size="11" font-family="Inter">[15, 20]</text>
+    <text x="550" y="145" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">内部节点</text>
+    <!-- Level 3 (Leaves) -->
+    <line x1="110" y1="150" x2="60" y2="190" stroke="#60a5fa" stroke-width="1.5"/>
+    <line x1="150" y1="150" x2="190" y2="190" stroke="#60a5fa" stroke-width="1.5"/>
+    <line x1="190" y1="150" x2="320" y2="190" stroke="#60a5fa" stroke-width="1.5"/>
+    <line x1="515" y1="150" x2="450" y2="190" stroke="#60a5fa" stroke-width="1.5"/>
+    <line x1="550" y1="150" x2="580" y2="190" stroke="#60a5fa" stroke-width="1.5"/>
+    <line x1="585" y1="150" x2="650" y2="190" stroke="#60a5fa" stroke-width="1.5"/>
+    <!-- Leaf nodes -->
+    <rect x="10" y="190" width="100" height="40" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="60" y="208" text-anchor="middle" fill="#86efac" font-size="11" font-family="Inter">[1, 2, 3]</text>
+    <text x="60" y="225" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">叶子节点</text>
+    <rect x="140" y="190" width="100" height="40" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="190" y="208" text-anchor="middle" fill="#86efac" font-size="11" font-family="Inter">[5, 7]</text>
+    <text x="190" y="225" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">叶子节点</text>
+    <rect x="270" y="190" width="100" height="40" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="320" y="208" text-anchor="middle" fill="#86efac" font-size="11" font-family="Inter">[8, 10]</text>
+    <text x="320" y="225" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">叶子节点</text>
+    <rect x="400" y="190" width="100" height="40" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="450" y="208" text-anchor="middle" fill="#86efac" font-size="11" font-family="Inter">[12, 15]</text>
+    <text x="450" y="225" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">叶子节点</text>
+    <rect x="530" y="190" width="100" height="40" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="580" y="208" text-anchor="middle" fill="#86efac" font-size="11" font-family="Inter">[17, 20]</text>
+    <text x="580" y="225" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">叶子节点</text>
+    <rect x="600" y="190" width="90" height="40" rx="6" fill="#14532d" stroke="#22c55e"/>
+    <text x="645" y="208" text-anchor="middle" fill="#86efac" font-size="11" font-family="Inter">[22]</text>
+    <text x="645" y="225" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">叶子节点</text>
+    <!-- Leaf links -->
+    <line x1="110" y1="230" x2="140" y2="230" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4"/>
+    <line x1="240" y1="230" x2="270" y2="230" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4"/>
+    <line x1="370" y1="230" x2="400" y2="230" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4"/>
+    <line x1="500" y1="230" x2="530" y2="230" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4"/>
+    <line x1="630" y1="230" x2="640" y2="230" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4"/>
+    <text x="350" y="270" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Inter">← 叶子节点通过链表连接，支持范围查询 →</text>
+  </svg>
+  <div class="caption">B+ 树：内部节点只存索引，数据全在叶子节点，叶子节点用链表连接</div>
+</div>
+</section>
+
+<section id="sec-disk">
+<h2 class="section-title"><span class="num">3</span>磁盘存储 vs 内存存储</h2>
+<p>磁盘 B+ 树与内存 B+ 树的关键区别：</p>
+<table>
+  <tr><th>特性</th><th>内存 B+ 树</th><th>磁盘 B+ 树</th></tr>
+  <tr><td>节点大小</td><td>动态分配</td><td>固定大小（通常 4KB 页）</td></tr>
+  <tr><td>节点标识</td><td>内存指针</td><td>磁盘偏移量（offset）</td></tr>
+  <tr><td>缓存</td><td>无需缓存</td><td>需要 Buffer Pool 缓存热点页</td></tr>
+  <tr><td>序列化</td><td>无需</td><td>节点需要序列化/反序列化</td></tr>
+  <tr><td>持久化</td><td>重启丢失</td><td>写入磁盘，重启可恢复</td></tr>
+</table>
+<div class="code-label">Python</div>
+<pre><code># 磁盘 B+ 树的节点表示
+PAGE_SIZE = 4096  # 4KB 页大小
+
+class DiskNode:
+    def __init__(self, is_leaf=False, order=32):
+        self.is_leaf = is_leaf
+        self.order = order
+        self.keys = []          # 键列表
+        self.values = []        # 值列表（仅叶子节点）
+        self.children = []      # 子节点偏移量（仅内部节点）
+        self.next_leaf = None   # 下一个叶子节点偏移量
+
+    def to_bytes(self):
+        """序列化节点到字节（写入磁盘）"""
+        data = struct.pack('?I', self.is_leaf, len(self.keys))
+        for key in self.keys:
+            data += struct.pack('q', key)  # 8 字节整数
+        if self.is_leaf:
+            for val in self.values:
+                data += struct.pack('q', val)
+        else:
+            for child in self.children:
+                data += struct.pack('q', child)  # 子节点偏移量
+        # 填充到 PAGE_SIZE
+        data += b'\x00' * (PAGE_SIZE - len(data))
+        return data
+
+    @classmethod
+    def from_bytes(cls, data):
+        """从字节反序列化节点（从磁盘读取）"""
+        is_leaf, key_count = struct.unpack('?I', data[:5])
+        node = cls(is_leaf=is_leaf)
+        offset = 5
+        for _ in range(key_count):
+            key = struct.unpack('q', data[offset:offset+8])[0]
+            node.keys.append(key)
+            offset += 8
+        # ... 反序列化 values 和 children
+        return node</code></pre>
+</section>
+
+<section id="sec-insert">
+<h2 class="section-title"><span class="num">4</span>插入操作与节点分裂</h2>
+<p>插入操作的流程：</p>
+<ol>
+  <li>从根节点开始，找到合适的叶子节点</li>
+  <li>将键值插入叶子节点（保持有序）</li>
+  <li>如果叶子节点溢出（键数 > order-1），进行<strong>节点分裂</strong></li>
+  <li>分裂可能导致父节点溢出，递归向上分裂</li>
+  <li>如果根节点分裂，创建新的根节点，树高 +1</li>
+</ol>
+<div class="diagram">
+  <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+    <text x="300" y="20" text-anchor="middle" fill="#f8fafc" font-size="14" font-weight="700" font-family="Inter">节点分裂过程（order=3）</text>
+    <!-- Before split -->
+    <text x="150" y="50" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Inter">分裂前</text>
+    <rect x="50" y="60" width="200" height="50" rx="8" fill="#450a0a" stroke="#ef4444"/>
+    <text x="150" y="82" text-anchor="middle" fill="#fca5a5" font-size="13" font-family="Inter">[3, 7, 10, 15]</text>
+    <text x="150" y="100" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">溢出！4 > order-1=2</text>
+    <!-- Arrow -->
+    <line x1="280" y1="85" x2="320" y2="85" stroke="#60a5fa" stroke-width="2"/>
+    <text x="300" y="75" text-anchor="middle" fill="#60a5fa" font-size="10" font-family="Inter">分裂</text>
+    <!-- After split -->
+    <text x="450" y="50" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Inter">分裂后</text>
+    <rect x="350" y="60" width="100" height="50" rx="8" fill="#14532d" stroke="#22c55e"/>
+    <text x="400" y="82" text-anchor="middle" fill="#86efac" font-size="13" font-family="Inter">[3, 7]</text>
+    <text x="400" y="100" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">左节点</text>
+    <rect x="470" y="60" width="100" height="50" rx="8" fill="#14532d" stroke="#22c55e"/>
+    <text x="520" y="82" text-anchor="middle" fill="#86efac" font-size="13" font-family="Inter">[10, 15]</text>
+    <text x="520" y="100" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">右节点</text>
+    <!-- Middle key goes up -->
+    <rect x="420" y="130" width="60" height="35" rx="6" fill="#172554" stroke="#3b82f6"/>
+    <text x="450" y="152" text-anchor="middle" fill="#93c5fd" font-size="12" font-weight="600" font-family="Inter">[10]</text>
+    <text x="450" y="180" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter">中间键上移到父节点</text>
+    <line x1="400" y1="110" x2="430" y2="130" stroke="#60a5fa" stroke-width="1.5" stroke-dasharray="3"/>
+    <line x1="500" y1="110" x2="470" y2="130" stroke="#60a5fa" stroke-width="1.5" stroke-dasharray="3"/>
+  </svg>
+  <div class="caption">节点分裂：溢出节点分裂为两个，中间键上移到父节点</div>
+</div>
+</section>
+
+<section id="sec-search">
+<h2 class="section-title"><span class="num">5</span>查找操作</h2>
+<p>B+ 树的查找非常高效：</p>
+<div class="code-label">Python</div>
+<pre><code>class BPlusTree:
+    def search(self, key):
+        """查找键对应的值"""
+        node = self.root
+        while not node.is_leaf:
+            # 在内部节点中找到合适的子节点
+            i = 0
+            while i < len(node.keys) and key >= node.keys[i]:
+                i += 1
+            node = self.load_node(node.children[i])  # 从磁盘加载
+        # 在叶子节点中查找
+        for i, k in enumerate(node.keys):
+            if k == key:
+                return node.values[i]  # 找到！
+        return None  # 未找到
+
+    def range_query(self, start, end):
+        """范围查询：利用叶子节点的链表"""
+        results = []
+        node = self._find_leaf(start)
+        while node:
+            for i, k in enumerate(node.keys):
+                if start <= k <= end:
+                    results.append((k, node.values[i]))
+                elif k > end:
+                    return results
+            node = self.load_node(node.next_leaf) if node.next_leaf else None
+        return results</code></pre>
+<div class="box box-green">
+  <div class="title">✅ 范围查询优势</div>
+  <p>B+ 树的叶子节点通过链表连接，范围查询只需找到起始位置，然后沿链表遍历即可。这是 B+ 树相比 B 树的主要优势。</p>
+</div>
+</section>
+
+<section id="sec-python">
+<h2 class="section-title"><span class="num">6</span>Python 实现要点</h2>
+<div class="code-label">Python</div>
+<pre><code>import struct
+import os
+
+class DiskBPlusTree:
+    def __init__(self, db_path, order=32):
+        self.db_path = db_path
+        self.order = order
+        self.page_size = 4096
+        self.root_offset = 0
+        self.free_list = []  # 空闲页列表
+        if not os.path.exists(db_path):
+            self._create_new_tree()
+        else:
+            self._load_metadata()
+
+    def _create_new_tree(self):
+        """创建新的 B+ 树文件"""
+        with open(self.db_path, 'wb') as f:
+            # 页 0: 元数据
+            meta = struct.pack('qqq', self.order, self.root_offset, len(self.free_list))
+            f.write(meta.ljust(self.page_size, b'\x00'))
+            # 页 1: 根节点（初始为空叶子）
+            root = self._serialize_node(is_leaf=True, keys=[], values=[], next_leaf=0)
+            f.write(root)
+        self.root_offset = self.page_size
+
+    def _serialize_node(self, is_leaf, keys, values=None, children=None, next_leaf=0):
+        """序列化节点"""
+        data = struct.pack('?I', is_leaf, len(keys))
+        for k in keys:
+            data += struct.pack('q', k)
+        if is_leaf:
+            for v in (values or []):
+                data += struct.pack('q', v)
+            data += struct.pack('q', next_leaf)
+        else:
+            for c in (children or []):
+                data += struct.pack('q', c)
+        return data.ljust(self.page_size, b'\x00')
+
+    def insert(self, key, value):
+        """插入键值对"""
+        # 1. 找到叶子节点
+        path = self._find_path(key)
+        leaf = self._load_node(path[-1])
+        # 2. 插入键值
+        idx = self._bisect_left(leaf.keys, key)
+        leaf.keys.insert(idx, key)
+        leaf.values.insert(idx, value)
+        # 3. 检查是否需要分裂
+        if len(leaf.keys) > self.order - 1:
+            self._split_leaf(path, leaf)
+
+    def _split_leaf(self, path, leaf):
+        """分裂叶子节点"""
+        mid = len(leaf.keys) // 2
+        # 创建新右节点
+        right_keys = leaf.keys[mid:]
+        right_values = leaf.values[mid:]
+        right_next = leaf.next_leaf
+        # 更新左节点
+        leaf.keys = leaf.keys[:mid]
+        leaf.values = leaf.values[:mid]
+        leaf.next_leaf = self._allocate_page()
+        # 写入右节点
+        right_data = self._serialize_node(True, right_keys, right_values, next_leaf=right_next)
+        self._write_page(leaf.next_leaf, right_data)
+        # 上移中间键
+        self._insert_into_parent(path, leaf, right_keys[0], leaf.next_leaf)
+
+    def _allocate_page(self):
+        """分配新页"""
+        if self.free_list:
+            return self.free_list.pop()
+        # 追加到文件末尾
+        return os.path.getsize(self.db_path)
+
+    def _write_page(self, offset, data):
+        """写入页到磁盘"""
+        with open(self.db_path, 'r+b') as f:
+            f.seek(offset)
+            f.write(data)</code></pre>
+<div class="box box-blue">
+  <div class="title">💡 实现要点</div>
+  <ul>
+    <li><strong>固定页大小</strong>：每个节点占用固定大小的页（4KB），方便磁盘寻址</li>
+    <li><strong>偏移量代替指针</strong>：用文件偏移量（offset）代替内存指针</li>
+    <li><strong>序列化/反序列化</strong>：节点需要序列化为字节写入磁盘</li>
+    <li><strong>空闲页管理</strong>：删除节点后的页加入空闲列表，复用空间</li>
+    <li><strong>Buffer Pool</strong>：生产环境需要缓存热点页，减少磁盘 I/O</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-demo">
+<h2 class="section-title"><span class="num">7</span>交互式 B+ 树可视化</h2>
+<div class="demo">
+  <h4>🎮 B+ 树插入演示</h4>
+  <p>输入键值，观察 B+ 树的插入和分裂过程：</p>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem">
+    <input type="number" id="bp-key" value="10" style="width:80px" placeholder="键">
+    <input type="text" id="bp-val" value="A" style="width:60px" placeholder="值">
+    <button onclick="bpInsert()">➕ 插入</button>
+    <button onclick="bpBatchInsert()">📊 批量插入</button>
+    <button onclick="bpSearch()">🔍 查找</button>
+    <button onclick="bpReset()" style="background:linear-gradient(135deg,#ef4444,#dc2626)">🗑️ 重置</button>
+  </div>
+  <div id="bp-tree-viz" style="min-height:200px;margin:1rem 0"></div>
+  <div class="output" id="bp-output">点击"插入"开始构建 B+ 树...</div>
+</div>
+
+<script>
+let bpTree = { root: { isLeaf: true, keys: [], values: [], children: [] }, order: 4 };
+
+function bpInsert() {
+  const key = parseInt(document.getElementById('bp-key').value);
+  const val = document.getElementById('bp-val').value;
+  if (isNaN(key)) return;
+  insertKey(bpTree.root, key, val, bpTree.order);
+  renderBPTree();
+  document.getElementById('bp-output').textContent = `已插入: key=${key}, value="${val}" | 当前树高: ${getTreeHeight(bpTree.root)}`;
+}
+
+function insertKey(node, key, val, order) {
+  if (node.isLeaf) {
+    const idx = node.keys.findIndex(k => k >= key);
+    const i = idx === -1 ? node.keys.length : idx;
+    node.keys.splice(i, 0, key);
+    node.values.splice(i, 0, val);
+    if (node.keys.length >= order) {
+      return splitLeaf(node, order);
+    }
+    return null;
+  }
+  let i = 0;
+  while (i < node.keys.length && key >= node.keys[i]) i++;
+  const result = insertKey(node.children[i], key, val, order);
+  if (result) {
+    node.keys.splice(i, 0, result.key);
+    node.children.splice(i + 1, 0, result.right);
+    if (node.keys.length >= order) {
+      return splitInternal(node, order);
+    }
+  }
+  return null;
+}
+
+function splitLeaf(node, order) {
+  const mid = Math.ceil(order / 2);
+  const right = { isLeaf: true, keys: node.keys.slice(mid), values: node.values.slice(mid), children: [] };
+  node.keys = node.keys.slice(0, mid);
+  node.values = node.values.slice(0, mid);
+  return { key: right.keys[0], right };
+}
+
+function splitInternal(node, order) {
+  const mid = Math.floor(order / 2);
+  const upKey = node.keys[mid];
+  const right = { isLeaf: false, keys: node.keys.slice(mid + 1), values: [], children: node.children.slice(mid + 1) };
+  node.keys = node.keys.slice(0, mid);
+  node.children = node.children.slice(0, mid + 1);
+  return { key: upKey, right };
+}
+
+function getTreeHeight(node) {
+  if (node.isLeaf) return 1;
+  return 1 + getTreeHeight(node.children[0]);
+}
+
+function renderBPTree() {
+  const container = document.getElementById('bp-tree-viz');
+  container.innerHTML = renderBPLevel(bpTree.root);
+}
+
+function renderBPLevel(node) {
+  if (node.isLeaf) {
+    return `<div style="display:flex;gap:4px;justify-content:center;margin:8px 0">${node.keys.map((k, i) =>
+      `<div style="background:#14532d;border:1px solid #22c55e;border-radius:6px;padding:6px 12px;text-align:center;min-width:50px"><div style="color:#86efac;font-size:12px;font-weight:600">${k}</div><div style="color:#64748b;font-size:10px">${node.values[i]}</div></div>`
+    ).join('')}</div>`;
+  }
+  let html = `<div style="display:flex;gap:4px;justify-content:center;margin:8px 0">${node.keys.map(k =>
+    `<div style="background:#172554;border:1px solid #3b82f6;border-radius:6px;padding:6px 12px;color:#93c5fd;font-size:12px;font-weight:600">${k}</div>`
+  ).join('')}</div>`;
+  html += `<div style="display:flex;justify-content:center;gap:16px;margin:4px 0">${node.children.map(child => renderBPLevel(child)).join('')}</div>`;
+  return html;
+}
+
+function bpSearch() {
+  const key = parseInt(document.getElementById('bp-key').value);
+  const result = searchBP(bpTree.root, key);
+  document.getElementById('bp-output').textContent = result !== null ? `✅ 找到: key=${key}, value="${result}"` : `❌ 未找到 key=${key}`;
+}
+
+function searchBP(node, key) {
+  if (node.isLeaf) {
+    const idx = node.keys.indexOf(key);
+    return idx !== -1 ? node.values[idx] : null;
+  }
+  let i = 0;
+  while (i < node.keys.length && key >= node.keys[i]) i++;
+  return searchBP(node.children[i], key);
+}
+
+function bpBatchInsert() {
+  const keys = [10, 20, 5, 6, 12, 30, 7, 17];
+  keys.forEach(k => insertKey(bpTree.root, k, `V${k}`, bpTree.order));
+  renderBPTree();
+  document.getElementById('bp-output').textContent = `批量插入 ${keys.length} 个键: [${keys.join(', ')}] | 树高: ${getTreeHeight(bpTree.root)}`;
+}
+
+function bpReset() {
+  bpTree = { root: { isLeaf: true, keys: [], values: [], children: [] }, order: 4 };
+  document.getElementById('bp-tree-viz').innerHTML = '';
+  document.getElementById('bp-output').textContent = 'B+ 树已重置';
+}
+</script>
+</section>
+
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">8</span>总结</h2>
+<table>
+  <tr><th>特性</th><th>说明</th></tr>
+  <tr><td>多路平衡</td><td>每个节点有多个子节点，树高很低</td></tr>
+  <tr><td>磁盘友好</td><td>节点大小 = 磁盘页大小，一次 I/O 读一个节点</td></tr>
+  <tr><td>范围查询</td><td>叶子节点链表连接，范围查询高效</td></tr>
+  <tr><td>节点分裂</td><td>插入溢出时分裂节点，中间键上移</td></tr>
+  <tr><td>磁盘实现</td><td>用偏移量代替指针，序列化节点到固定页</td></tr>
+</table>
+<div class="box box-green">
+  <div class="title">✅ 核心要点</div>
+  <ul>
+    <li>B+ 树是数据库索引的核心数据结构</li>
+    <li>所有数据在叶子节点，内部节点只做索引</li>
+    <li>磁盘实现需要固定页大小、偏移量寻址、序列化</li>
+    <li>叶子节点链表支持高效的范围查询</li>
+    <li>Python 实现可以用 <code>struct</code> 模块序列化节点</li>
+  </ul>
+</div>
+</section>
+</div>
+<footer>
+  <p>基于多篇技术文章综合改编为交互式教程</p>
+  <p><a href="/">← 返回主页 / Back to Home</a></p>
+</footer>
+<a href="#" class="back-top" id="backTop">↑</a>
+<script>const btn=document.getElementById('backTop');window.addEventListener('scroll',()=>{btn.classList.toggle('show',window.scrollY>400)});</script>
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDORuTVww" data-category="General" data-category-id="DIC_kwDORuTVw84C5OW8" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="dark_dimmed" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous" async></script>
+</div>
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

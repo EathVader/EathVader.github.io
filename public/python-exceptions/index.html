@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Python异常处理最佳实践：6种异常处理方式对比，从巨型try-except到封装函数，含优缺点分析表格和推荐方案">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Python 异常处理最佳实践">
+<meta property="og:description" content="Python异常处理最佳实践：6种异常处理方式对比，含优缺点分析和推荐方案">
+<meta property="og:url" content="https://eathvader.github.io/python-exceptions/">
+<link rel="canonical" href="https://eathvader.github.io/python-exceptions/">
+<title>Python 异常处理最佳实践</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Article","headline":"Python 异常处理最佳实践","description":"Python异常处理最佳实践：6种异常处理方式对比，含优缺点分析和推荐方案","author":{"@type":"Person","name":"EathVader"},"datePublished":"2026-04-02","dateModified":"2026-04-07","url":"https://eathvader.github.io/python-exceptions/"}
+</script>
+</head>
+<body>
+<header class="hero">
+  <h1>🐍 <span>Python 异常处理</span> 最佳实践</h1>
+  <p class="subtitle">6 种异常处理方式对比，从巨型 try-except 到封装函数<br>
+  含优缺点分析和推荐方案</p>
+  <span class="badge">🐍 Python</span>
+  <span class="badge">📝 最佳实践</span>
+  <span class="badge">🔧 代码质量</span>
+</header>
+<div class="container">
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-why">为什么需要异常处理？</a></li>
+    <li><a href="#sec-giant">方案一：巨型 Try-Except</a></li>
+    <li><a href="#sec-fine">方案二：细粒度异常处理</a></li>
+    <li><a href="#sec-nested">方案三：嵌套异常处理</a></li>
+    <li><a href="#sec-while">方案四：While True 模式</a></li>
+    <li><a href="#sec-custom">方案五：自定义异常</a></li>
+    <li><a href="#sec-encap">方案六：封装函数（推荐）</a></li>
+    <li><a href="#sec-compare">6 种方案对比</a></li>
+    <li><a href="#sec-summary">总结</a></li>
+  </ol>
+</nav>
+
+<section id="sec-why">
+<h2 class="section-title"><span class="num">1</span>为什么需要异常处理？</h2>
+<p>Python 使用 <strong>EAFP</strong>（Easier to Ask for Forgiveness than Permission）哲学，即"先做，出错再处理"，而不是 LBYL（Look Before You Leap）。</p>
+<div class="code-label">Python</div>
+<pre><code># LBYL 风格（不推荐）
+if os.path.exists(filename):
+    with open(filename) as f:
+        data = f.read()
+
+# EAFP 风格（推荐）
+try:
+    with open(filename) as f:
+        data = f.read()
+except FileNotFoundError:
+    print(f"文件 {filename} 不存在")</code></pre>
+<div class="box box-blue">
+  <div class="title">💡 EAFP vs LBYL</div>
+  <ul>
+    <li><strong>EAFP</strong>：直接尝试操作，捕获异常处理错误（Python 风格）</li>
+    <li><strong>LBYL</strong>：先检查条件，再执行操作（防御性编程）</li>
+    <li>Python 官方推荐 EAFP，因为更简洁、更高效（避免重复检查）</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-giant">
+<h2 class="section-title"><span class="num">2</span>方案一：巨型 Try-Except</h2>
+<p>把所有代码放在一个巨大的 try 块中，用一个 except 捕获所有异常：</p>
+<div class="code-label">Python</div>
+<pre><code>def process_data(filepath):
+    try:
+        # 读取文件
+        with open(filepath) as f:
+            data = f.read()
+        # 解析 JSON
+        parsed = json.loads(data)
+        # 处理数据
+        result = transform(parsed)
+        # 写入结果
+        with open('output.json', 'w') as f:
+            json.dump(result, f)
+        print("处理成功")
+    except Exception as e:
+        print(f"出错了: {e}")</code></pre>
+<table>
+  <tr><th>优点</th><th>缺点</th></tr>
+  <tr><td>代码简洁，一个 try 块搞定</td><td>无法区分具体是哪一步出错</td></tr>
+  <tr><td>不会遗漏任何异常</td><td>可能掩盖不应该捕获的异常（如 KeyboardInterrupt）</td></tr>
+  <tr><td>适合快速原型</td><td>调试困难，错误信息不明确</td></tr>
+</table>
+<div class="box box-red">
+  <div class="title">🚨 不推荐</div>
+  <p>捕获 <code>Exception</code> 过于宽泛，会掩盖所有异常，包括 <code>KeyboardInterrupt</code> 和 <code>SystemExit</code>。无法针对不同错误采取不同处理策略。</p>
+</div>
+</section>
+
+<section id="sec-fine">
+<h2 class="section-title"><span class="num">3</span>方案二：细粒度异常处理</h2>
+<p>为每个可能出错的操作分别添加 try-except：</p>
+<div class="code-label">Python</div>
+<pre><code>def process_data(filepath):
+    try:
+        with open(filepath) as f:
+            data = f.read()
+    except FileNotFoundError:
+        print(f"文件不存在: {filepath}")
+        return
+    except PermissionError:
+        print(f"无权限读取: {filepath}")
+        return
+
+    try:
+        parsed = json.loads(data)
+    except json.JSONDecodeError as e:
+        print(f"JSON 解析失败: {e}")
+        return
+
+    try:
+        result = transform(parsed)
+    except ValueError as e:
+        print(f"数据转换失败: {e}")
+        return
+
+    try:
+        with open('output.json', 'w') as f:
+            json.dump(result, f)
+    except IOError as e:
+        print(f"写入文件失败: {e}")
+        return
+
+    print("处理成功")</code></pre>
+<table>
+  <tr><th>优点</th><th>缺点</th></tr>
+  <tr><td>精确捕获每种异常</td><td>代码冗长，重复的 return 语句</td></tr>
+  <tr><td>针对不同错误有不同处理</td><td>正常逻辑被异常处理代码打断</td></tr>
+  <tr><td>调试友好</td><td>难以维护，添加新步骤需要加新的 try-except</td></tr>
+</table>
+</section>
+
+<section id="sec-nested">
+<h2 class="section-title"><span class="num">4</span>方案三：嵌套异常处理</h2>
+<p>将 try-except 嵌套，只有上一步成功才执行下一步：</p>
+<div class="code-label">Python</div>
+<pre><code>def process_data(filepath):
+    try:
+        with open(filepath) as f:
+            data = f.read()
+        try:
+            parsed = json.loads(data)
+            try:
+                result = transform(parsed)
+                try:
+                    with open('output.json', 'w') as f:
+                        json.dump(result, f)
+                    print("处理成功")
+                except IOError as e:
+                    print(f"写入失败: {e}")
+            except ValueError as e:
+                print(f"转换失败: {e}")
+        except json.JSONDecodeError as e:
+            print(f"解析失败: {e}")
+    except FileNotFoundError:
+        print(f"文件不存在: {filepath}")</code></pre>
+<table>
+  <tr><th>优点</th><th>缺点</th></tr>
+  <tr><td>逻辑清晰，依赖关系明确</td><td>缩进层级过深（箭头反模式）</td></tr>
+  <tr><td>精确控制错误处理</td><td>代码可读性差，难以维护</td></tr>
+  <tr><td>不会执行后续步骤</td><td>超过 3 层嵌套后几乎无法阅读</td></tr>
+</table>
+<div class="box box-amber">
+  <div class="title">⚠️ 箭头反模式（Arrow Anti-Pattern）</div>
+  <p>嵌套过深导致代码形成"箭头"形状，可读性极差。一般建议嵌套不超过 3 层。</p>
+</div>
+</section>
+
+<section id="sec-while">
+<h2 class="section-title"><span class="num">5</span>方案四：While True 模式</h2>
+<p>使用 while True 循环，成功时 break，失败时 continue 或 return：</p>
+<div class="code-label">Python</div>
+<pre><code>def process_data(filepath):
+    while True:
+        try:
+            with open(filepath) as f:
+                data = f.read()
+            parsed = json.loads(data)
+            result = transform(parsed)
+            with open('output.json', 'w') as f:
+                json.dump(result, f)
+            print("处理成功")
+            break
+        except FileNotFoundError:
+            print(f"文件不存在: {filepath}")
+            return
+        except json.JSONDecodeError as e:
+            print(f"解析失败: {e}")
+            return
+        except ValueError as e:
+            print(f"转换失败: {e}")
+            return
+        except IOError as e:
+            print(f"写入失败: {e}")
+            return</code></pre>
+<table>
+  <tr><th>优点</th><th>缺点</th></tr>
+  <tr><td>避免嵌套，扁平化代码</td><td>while True 看起来像无限循环，容易误解</td></tr>
+  <tr><td>所有异常处理集中在一起</td><td>break 和 return 混用，控制流不清晰</td></tr>
+  <tr><td>适合需要重试的场景</td><td>不适合不需要重试的场景</td></tr>
+</table>
+</section>
+
+<section id="sec-custom">
+<h2 class="section-title"><span class="num">6</span>方案五：自定义异常</h2>
+<p>定义业务异常类，将底层异常转换为业务异常：</p>
+<div class="code-label">Python</div>
+<pre><code>class DataProcessingError(Exception):
+    """数据处理异常基类"""
+    pass
+
+class FileReadError(DataProcessingError):
+    pass
+
+class ParseError(DataProcessingError):
+    pass
+
+class TransformError(DataProcessingError):
+    pass
+
+class WriteError(DataProcessingError):
+    pass
+
+def process_data(filepath):
+    try:
+        try:
+            with open(filepath) as f:
+                data = f.read()
+        except FileNotFoundError as e:
+            raise FileReadError(f"文件不存在: {filepath}") from e
+        except PermissionError as e:
+            raise FileReadError(f"无权限: {filepath}") from e
+
+        try:
+            parsed = json.loads(data)
+        except json.JSONDecodeError as e:
+            raise ParseError(f"JSON 解析失败") from e
+
+        try:
+            result = transform(parsed)
+        except ValueError as e:
+            raise TransformError(f"数据转换失败") from e
+
+        try:
+            with open('output.json', 'w') as f:
+                json.dump(result, f)
+        except IOError as e:
+            raise WriteError("写入文件失败") from e
+
+    except DataProcessingError as e:
+        print(f"处理失败 [{type(e).__name__}]: {e}")
+        raise</code></pre>
+<table>
+  <tr><th>优点</th><th>缺点</th></tr>
+  <tr><td>异常层次清晰，便于分类处理</td><td>需要定义大量异常类</td></tr>
+  <tr><td>保留原始异常链（from e）</td><td>代码量增加</td></tr>
+  <tr><td>调用方可以针对性捕获</td><td>过度设计，小项目不适用</td></tr>
+</table>
+</section>
+
+<section id="sec-encap">
+<h2 class="section-title"><span class="num">7</span>方案六：封装函数（推荐）</h2>
+<p>将每个可能出错的操作封装成独立函数，每个函数只处理自己的异常：</p>
+<div class="code-label">Python</div>
+<pre><code>def read_file(filepath):
+    """读取文件内容"""
+    try:
+        with open(filepath) as f:
+            return f.read()
+    except FileNotFoundError:
+        raise ValueError(f"文件不存在: {filepath}")
+    except PermissionError:
+        raise PermissionError(f"无权限读取: {filepath}")
+
+def parse_json(data):
+    """解析 JSON 数据"""
+    try:
+        return json.loads(data)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"JSON 解析失败: {e}")
+
+def write_json(filepath, data):
+    """写入 JSON 文件"""
+    try:
+        with open(filepath, 'w') as f:
+            json.dump(data, f)
+    except IOError as e:
+        raise IOError(f"写入文件失败: {filepath}") from e
+
+def process_data(filepath):
+    """主处理函数：清晰、简洁、易读"""
+    data = read_file(filepath)
+    parsed = parse_json(data)
+    result = transform(parsed)
+    write_json('output.json', result)
+    print("处理成功")</code></pre>
+<div class="box box-green">
+  <div class="title">✅ 为什么推荐？</div>
+  <ul>
+    <li><strong>单一职责</strong>：每个函数只做一件事，异常处理也集中在一处</li>
+    <li><strong>可读性强</strong>：主函数 <code>process_data</code> 像伪代码一样清晰</li>
+    <li><strong>可测试</strong>：每个函数可以独立测试</li>
+    <li><strong>可复用</strong>：<code>read_file</code>、<code>parse_json</code> 可在其他地方复用</li>
+    <li><strong>易于扩展</strong>：添加新步骤只需添加新函数</li>
+    <li><strong>异常链完整</strong>：使用 <code>raise ... from e</code> 保留原始异常信息</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-compare">
+<h2 class="section-title"><span class="num">8</span>6 种方案对比</h2>
+<table>
+  <tr><th>方案</th><th>可读性</th><th>可维护性</th><th>可测试性</th><th>推荐度</th></tr>
+  <tr><td>巨型 Try-Except</td><td>⭐⭐</td><td>⭐</td><td>⭐</td><td style="color:#fca5a5">❌ 不推荐</td></tr>
+  <tr><td>细粒度异常</td><td>⭐⭐</td><td>⭐⭐</td><td>⭐⭐</td><td>🟡 可用</td></tr>
+  <tr><td>嵌套异常</td><td>⭐</td><td>⭐</td><td>⭐⭐</td><td style="color:#fca5a5">❌ 不推荐</td></tr>
+  <tr><td>While True</td><td>⭐⭐</td><td>⭐⭐</td><td>⭐⭐</td><td>🟡 适合重试</td></tr>
+  <tr><td>自定义异常</td><td>⭐⭐⭐</td><td>⭐⭐⭐</td><td>⭐⭐⭐</td><td>🟢 大型项目</td></tr>
+  <tr><td style="color:#86efac;font-weight:600">封装函数</td><td style="color:#86efac">⭐⭐⭐⭐⭐</td><td style="color:#86efac">⭐⭐⭐⭐⭐</td><td style="color:#86efac">⭐⭐⭐⭐⭐</td><td style="color:#86efac">✅ 推荐</td></tr>
+</table>
+</section>
+
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">9</span>总结</h2>
+<div class="box box-green">
+  <div class="title">✅ 最佳实践要点</div>
+  <ul>
+    <li>使用 <strong>EAFP</strong> 风格：先尝试，再捕获异常</li>
+    <li>捕获<strong>具体异常</strong>，不要裸用 <code>except:</code> 或 <code>except Exception:</code></li>
+    <li>使用 <code>raise ... from e</code> 保留异常链</li>
+    <li>将异常处理<strong>封装到独立函数</strong>中，保持主逻辑清晰</li>
+    <li>自定义异常用于大型项目，小项目用内置异常即可</li>
+    <li>使用 <code>contextlib</code> 管理资源（如 <code>with</code> 语句）</li>
+  </ul>
+</div>
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">❌ 巨型 try<br><small>过于宽泛</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">⚠️ 嵌套/细粒度<br><small>代码冗长</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">✅ 封装函数<br><small>清晰可维护</small></div>
+</div>
+</section>
+</div>
+<footer>
+  <p>基于多篇技术文章综合改编为交互式教程</p>
+  <p><a href="/">← 返回主页 / Back to Home</a></p>
+</footer>
+<a href="#" class="back-top" id="backTop">↑</a>
+<script>const btn=document.getElementById('backTop');window.addEventListener('scroll',()=>{btn.classList.toggle('show',window.scrollY>400)});</script>
+<div class="container" style="margin-top:2rem">
+<script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDORuTVww" data-category="General" data-category-id="DIC_kwDORuTVw84C5OW8" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="dark_dimmed" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous" async></script>
+</div>
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>
