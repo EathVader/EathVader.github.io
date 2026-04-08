@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAT 穿透与 P2P 通信 — STUN/TURN 协议原理与实战</title>
+    <meta name="description" content="深入讲解 NAT 穿透原理、STUN/TURN 协议、四种 NAT 类型、PyPunchP2P 工作流程，以及 TCP vs UDP 穿透的区别。">
+    <meta property="og:title" content="NAT 穿透与 P2P 通信 — STUN/TURN 协议原理与实战">
+    <meta property="og:description" content="深入讲解 NAT 穿透原理、STUN/TURN 协议、四种 NAT 类型、PyPunchP2P 工作流程，以及 TCP vs UDP 穿透的区别。">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/p2p-nat/">
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"Article","headline":"NAT 穿透与 P2P 通信 — STUN/TURN 协议原理与实战","description":"深入讲解 NAT 穿透原理、STUN/TURN 协议、四种 NAT 类型、PyPunchP2P 工作流程，以及 TCP vs UDP 穿透的区别。","author":{"@type":"Person","name":"EathVader"},"datePublished":"2026-04-02","publisher":{"@type":"Organization","name":"EathVader"}}
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header><nav class="breadcrumb"><a href="/">首页</a> / <a href="/">网络</a> / P2P 通信</nav></header>
+    <main><article>
+        <h1>NAT 穿透与 P2P 通信</h1>
+        <p class="meta">原创 · 2026-04-02 · 阅读约 20 分钟</p>
+
+        <section class="intro">
+            <h2>什么是 NAT 穿透？</h2>
+            <p><strong>NAT</strong>（Network Address Translation，网络地址转换）是 IPv4 时代解决 IP 地址短缺的核心技术。它让多个内网设备共享一个公网 IP，但也带来了副作用：<strong>内网设备无法直接被外网访问</strong>。</p>
+
+            <div class="diagram-container">
+                <svg viewBox="0 0 700 300" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:16px auto;display:block;">
+                    <!-- Client A -->
+                    <rect x="20" y="60" width="140" height="180" rx="12" fill="#e3f2fd" stroke="#4d96ff" stroke-width="2"/>
+                    <text x="90" y="90" text-anchor="middle" fill="#4d96ff" font-size="14" font-weight="bold">内网 A</text>
+                    <rect x="40" y="105" width="100" height="30" rx="6" fill="#4d96ff"/>
+                    <text x="90" y="125" text-anchor="middle" fill="white" font-size="12">192.168.1.10</text>
+                    <rect x="40" y="145" width="100" height="30" rx="6" fill="#4d96ff"/>
+                    <text x="90" y="165" text-anchor="middle" fill="white" font-size="12">:5000</text>
+                    <rect x="40" y="185" width="100" height="30" rx="6" fill="#6bcb77"/>
+                    <text x="90" y="205" text-anchor="middle" fill="white" font-size="12">Client A</text>
+
+                    <!-- NAT A -->
+                    <rect x="190" y="80" width="100" height="140" rx="8" fill="#ffd93d" stroke="#e6a800" stroke-width="2"/>
+                    <text x="240" y="110" text-anchor="middle" fill="#333" font-size="13" font-weight="bold">NAT A</text>
+                    <text x="240" y="135" text-anchor="middle" fill="#333" font-size="11">映射表:</text>
+                    <text x="240" y="155" text-anchor="middle" fill="#333" font-size="10">192.168.1.10</text>
+                    <text x="240" y="170" text-anchor="middle" fill="#333" font-size="10">:5000 →</text>
+                    <text x="240" y="185" text-anchor="middle" fill="#333" font-size="10">公网IP:6000</text>
+                    <text x="240" y="205" text-anchor="middle" fill="#333" font-size="11">公网: 1.2.3.4</text>
+
+                    <!-- Internet -->
+                    <ellipse cx="370" cy="150" rx="80" ry="60" fill="#f0f0f0" stroke="#999" stroke-width="2" stroke-dasharray="5,5"/>
+                    <text x="370" y="145" text-anchor="middle" fill="#666" font-size="14" font-weight="bold">Internet</text>
+                    <text x="370" y="165" text-anchor="middle" fill="#999" font-size="11">公网</text>
+
+                    <!-- NAT B -->
+                    <rect x="450" y="80" width="100" height="140" rx="8" fill="#ffd93d" stroke="#e6a800" stroke-width="2"/>
+                    <text x="500" y="110" text-anchor="middle" fill="#333" font-size="13" font-weight="bold">NAT B</text>
+                    <text x="500" y="135" text-anchor="middle" fill="#333" font-size="11">映射表:</text>
+                    <text x="500" y="155" text-anchor="middle" fill="#333" font-size="10">10.0.0.5</text>
+                    <text x="500" y="170" text-anchor="middle" fill="#333" font-size="10">:7000 →</text>
+                    <text x="500" y="185" text-anchor="middle" fill="#333" font-size="10">公网IP:8000</text>
+                    <text x="500" y="205" text-anchor="middle" fill="#333" font-size="11">公网: 5.6.7.8</text>
+
+                    <!-- Client B -->
+                    <rect x="580" y="60" width="140" height="180" rx="12" fill="#e8f5e9" stroke="#6bcb77" stroke-width="2"/>
+                    <text x="650" y="90" text-anchor="middle" fill="#6bcb77" font-size="14" font-weight="bold">内网 B</text>
+                    <rect x="600" y="105" width="100" height="30" rx="6" fill="#6bcb77"/>
+                    <text x="650" y="125" text-anchor="middle" fill="white" font-size="12">10.0.0.5</text>
+                    <rect x="600" y="145" width="100" height="30" rx="6" fill="#6bcb77"/>
+                    <text x="650" y="165" text-anchor="middle" fill="white" font-size="12">:7000</text>
+                    <rect x="600" y="185" width="100" height="30" rx="6" fill="#ff6b6b"/>
+                    <text x="650" y="205" text-anchor="middle" fill="white" font-size="12">Client B</text>
+
+                    <!-- Arrows -->
+                    <defs>
+                        <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                            <path d="M0,0 L0,6 L9,3 z" fill="#666"/>
+                        </marker>
+                    </defs>
+                    <line x1="160" y1="150" x2="188" y2="150" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+                    <line x1="290" y1="150" x2="340" y2="150" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+                    <line x1="400" y1="150" x2="448" y2="150" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+                    <line x1="550" y1="150" x2="578" y2="150" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+
+                    <!-- Problem label -->
+                    <rect x="230" y="250" width="280" height="36" rx="18" fill="#ff6b6b"/>
+                    <text x="370" y="273" text-anchor="middle" fill="white" font-size="13" font-weight="bold">❌ A 无法直接连接 B（双方都在 NAT 后）</text>
+                </svg>
+            </div>
+
+            <p><strong>NAT 穿透</strong>（NAT Traversal）就是要解决这个「两个都在 NAT 后面的设备如何直接通信」的问题。核心思路是借助一台<strong>公网服务器</strong>作为中介，帮助双方交换地址信息，然后建立直连。</p>
+        </section>
+
+        <section>
+            <h2>四种 NAT 类型</h2>
+            <p>NAT 的行为不是标准化的，不同厂商实现不同。按映射规则可分为四类：</p>
+
+            <div class="diagram-container">
+                <svg viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:16px auto;display:block;">
+                    <!-- Full Cone -->
+                    <rect x="10" y="10" width="160" height="180" rx="8" fill="#d4edda" stroke="#6bcb77" stroke-width="2"/>
+                    <text x="90" y="35" text-anchor="middle" fill="#6bcb77" font-size="14" font-weight="bold">Full Cone NAT</text>
+                    <text x="90" y="55" text-anchor="middle" fill="#333" font-size="11">全锥型</text>
+                    <text x="90" y="80" text-anchor="middle" fill="#333" font-size="11">内网 (IP:Port)</text>
+                    <text x="90" y="100" text-anchor="middle" fill="#333" font-size="11">→ 固定公网 (IP:Port)</text>
+                    <text x="90" y="130" text-anchor="middle" fill="#333" font-size="11">✅ 任何外网地址</text>
+                    <text x="90" y="150" text-anchor="middle" fill="#333" font-size="11">都可通过该映射</text>
+                    <text x="90" y="175" text-anchor="middle" fill="#6bcb77" font-size="12" font-weight="bold">最容易穿透 ✅</text>
+
+                    <!-- Restrict NAT -->
+                    <rect x="185" y="10" width="160" height="180" rx="8" fill="#fff3cd" stroke="#ffd93d" stroke-width="2"/>
+                    <text x="265" y="35" text-anchor="middle" fill="#e6a800" font-size="14" font-weight="bold">Address-Restrict</text>
+                    <text x="265" y="55" text-anchor="middle" fill="#333" font-size="11">地址限制锥型</text>
+                    <text x="265" y="80" text-anchor="middle" fill="#333" font-size="11">内网 (IP:Port)</text>
+                    <text x="265" y="100" text-anchor="middle" fill="#333" font-size="11">→ 固定公网 (IP:Port)</text>
+                    <text x="265" y="130" text-anchor="middle" fill="#333" font-size="11">⚠️ 仅已通信的</text>
+                    <text x="265" y="150" text-anchor="middle" fill="#333" font-size="11">外网 IP 可访问</text>
+                    <text x="265" y="175" text-anchor="middle" fill="#e6a800" font-size="12" font-weight="bold">较容易穿透 ⚠️</text>
+
+                    <!-- RestrictPort NAT -->
+                    <rect x="360" y="10" width="160" height="180" rx="8" fill="#ffe5e5" stroke="#ff6b6b" stroke-width="2"/>
+                    <text x="440" y="35" text-anchor="middle" fill="#ff6b6b" font-size="14" font-weight="bold">Port-Restrict</text>
+                    <text x="440" y="55" text-anchor="middle" fill="#333" font-size="11">端口限制锥型</text>
+                    <text x="440" y="80" text-anchor="middle" fill="#333" font-size="11">内网 (IP:Port)</text>
+                    <text x="440" y="100" text-anchor="middle" fill="#333" font-size="11">→ 固定公网 (IP:Port)</text>
+                    <text x="440" y="130" text-anchor="middle" fill="#333" font-size="11">⚠️ 仅已通信的</text>
+                    <text x="440" y="150" text-anchor="middle" fill="#333" font-size="11">外网 IP:Port 可访问</text>
+                    <text x="440" y="175" text-anchor="middle" fill="#ff6b6b" font-size="12" font-weight="bold">中等难度 ⚠️</text>
+
+                    <!-- Symmetric NAT -->
+                    <rect x="535" y="10" width="160" height="180" rx="8" fill="#f8d7da" stroke="#dc3545" stroke-width="2"/>
+                    <text x="615" y="35" text-anchor="middle" fill="#dc3545" font-size="14" font-weight="bold">Symmetric NAT</text>
+                    <text x="615" y="55" text-anchor="middle" fill="#333" font-size="11">对称型</text>
+                    <text x="615" y="80" text-anchor="middle" fill="#333" font-size="11">内网 (IP:Port)</text>
+                    <text x="615" y="100" text-anchor="middle" fill="#333" font-size="11">→ 不同目标不同映射</text>
+                    <text x="615" y="130" text-anchor="middle" fill="#333" font-size="11">❌ 每个目标地址</text>
+                    <text x="615" y="150" text-anchor="middle" fill="#333" font-size="11">分配不同公网端口</text>
+                    <text x="615" y="175" text-anchor="middle" fill="#dc3545" font-size="12" font-weight="bold">最难穿透 ❌</text>
+
+                    <!-- Comparison arrows -->
+                    <text x="90" y="230" text-anchor="middle" fill="#666" font-size="12">映射规则:</text>
+                    <text x="90" y="250" text-anchor="middle" fill="#333" font-size="11">1:1 固定映射</text>
+
+                    <text x="265" y="230" text-anchor="middle" fill="#666" font-size="12">映射规则:</text>
+                    <text x="265" y="250" text-anchor="middle" fill="#333" font-size="11">1:1 固定映射</text>
+
+                    <text x="440" y="230" text-anchor="middle" fill="#666" font-size="12">映射规则:</text>
+                    <text x="440" y="250" text-anchor="middle" fill="#333" font-size="11">1:1 固定映射</text>
+
+                    <text x="615" y="230" text-anchor="middle" fill="#666" font-size="12">映射规则:</text>
+                    <text x="615" y="250" text-anchor="middle" fill="#333" font-size="11">1:N 动态映射</text>
+
+                    <!-- Restriction rules -->
+                    <text x="90" y="290" text-anchor="middle" fill="#666" font-size="12">过滤规则:</text>
+                    <text x="90" y="310" text-anchor="middle" fill="#333" font-size="11">无限制</text>
+
+                    <text x="265" y="290" text-anchor="middle" fill="#666" font-size="12">过滤规则:</text>
+                    <text x="265" y="310" text-anchor="middle" fill="#333" font-size="11">按 IP 过滤</text>
+
+                    <text x="440" y="290" text-anchor="middle" fill="#666" font-size="12">过滤规则:</text>
+                    <text x="440" y="310" text-anchor="middle" fill="#333" font-size="11">按 IP:Port 过滤</text>
+
+                    <text x="615" y="290" text-anchor="middle" fill="#666" font-size="12">过滤规则:</text>
+                    <text x="615" y="310" text-anchor="middle" fill="#333" font-size="11">按 IP:Port 过滤</text>
+
+                    <!-- Difficulty scale -->
+                    <rect x="10" y="350" width="680" height="40" rx="8" fill="#f0f0f0"/>
+                    <text x="350" y="375" text-anchor="middle" fill="#666" font-size="13">穿透难度: Full Cone ← 容易 —————— 困难 → Symmetric NAT</text>
+                </svg>
+            </div>
+
+            <table>
+                <thead>
+                    <tr><th>NAT 类型</th><th>映射规则</th><th>过滤规则</th><th>穿透难度</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>Full Cone</strong></td><td>内网地址 → 固定公网地址</td><td>任何外网地址都可访问</td><td>⭐</td></tr>
+                    <tr><td><strong>Address-Restrict</strong></td><td>内网地址 → 固定公网地址</td><td>仅已通信的外网 IP 可访问</td><td>⭐⭐</td></tr>
+                    <tr><td><strong>Port-Restrict</strong></td><td>内网地址 → 固定公网地址</td><td>仅已通信的外网 IP:Port 可访问</td><td>⭐⭐⭐</td></tr>
+                    <tr><td><strong>Symmetric</strong></td><td>不同目标 → 不同公网映射</td><td>仅已通信的外网 IP:Port 可访问</td><td>⭐⭐⭐⭐</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>STUN / TURN 协议原理</h2>
+
+            <h3>STUN（Session Traversal Utilities for NAT）</h3>
+            <p>STUN 协议让客户端发现自己的 <strong>公网 IP 和端口</strong>。工作流程：</p>
+
+            <ol>
+                <li>客户端向 STUN 服务器发送请求</li>
+                <li>NAT 设备将源地址替换为公网地址</li>
+                <li>STUN 服务器看到公网地址，将其返回给客户端</li>
+                <li>客户端得知自己的公网映射地址</li>
+            </ol>
+
+            <div class="diagram-container">
+                <svg viewBox="0 0 600 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:600px;margin:16px auto;display:block;">
+                    <!-- Client -->
+                    <rect x="20" y="100" width="120" height="80" rx="8" fill="#4d96ff"/>
+                    <text x="80" y="130" text-anchor="middle" fill="white" font-size="13" font-weight="bold">Client</text>
+                    <text x="80" y="155" text-anchor="middle" fill="white" font-size="11">192.168.1.10:5000</text>
+
+                    <!-- NAT -->
+                    <rect x="200" y="80" width="100" height="120" rx="8" fill="#ffd93d"/>
+                    <text x="250" y="115" text-anchor="middle" fill="#333" font-size="13" font-weight="bold">NAT</text>
+                    <text x="250" y="140" text-anchor="middle" fill="#333" font-size="10">映射:</text>
+                    <text x="250" y="155" text-anchor="middle" fill="#333" font-size="10">:5000 → :6000</text>
+                    <text x="250" y="170" text-anchor="middle" fill="#333" font-size="10">1.2.3.4</text>
+
+                    <!-- STUN Server -->
+                    <rect x="400" y="100" width="140" height="80" rx="8" fill="#6bcb77"/>
+                    <text x="470" y="130" text-anchor="middle" fill="white" font-size="13" font-weight="bold">STUN Server</text>
+                    <text x="470" y="155" text-anchor="middle" fill="white" font-size="11">stun.example.com</text>
+
+                    <!-- Arrows -->
+                    <defs>
+                        <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                            <path d="M0,0 L0,6 L9,3 z" fill="#666"/>
+                        </marker>
+                        <marker id="arrow-rev" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                            <path d="M0,0 L0,6 L9,3 z" fill="#ff6b6b"/>
+                        </marker>
+                    </defs>
+
+                    <!-- Request -->
+                    <line x1="140" y1="120" x2="198" y2="120" stroke="#4d96ff" stroke-width="2" marker-end="url(#arrow)"/>
+                    <text x="169" y="110" text-anchor="middle" fill="#4d96ff" font-size="10">Binding Request</text>
+
+                    <line x1="300" y1="120" x2="398" y2="120" stroke="#4d96ff" stroke-width="2" marker-end="url(#arrow)"/>
+                    <text x="349" y="110" text-anchor="middle" fill="#4d96ff" font-size="10">1.2.3.4:6000</text>
+
+                    <!-- Response -->
+                    <line x1="398" y1="160" x2="300" y2="160" stroke="#ff6b6b" stroke-width="2" marker-end="url(#arrow-rev)"/>
+                    <text x="349" y="180" text-anchor="middle" fill="#ff6b6b" font-size="10">XOR-MAPPED-ADDRESS</text>
+
+                    <line x1="198" y1="160" x2="140" y2="160" stroke="#ff6b6b" stroke-width="2" marker-end="url(#arrow-rev)"/>
+
+                    <!-- Result -->
+                    <rect x="30" y="220" width="540" height="40" rx="8" fill="#d4edda"/>
+                    <text x="300" y="245" text-anchor="middle" fill="#333" font-size="13">✅ 客户端得知自己的公网地址: <strong>1.2.3.4:6000</strong></text>
+                </svg>
+            </div>
+
+            <h3>TURN（Traversal Using Relays around NAT）</h3>
+            <p>当 STUN 无法穿透时（如双方都是 Symmetric NAT），需要 TURN 服务器作为<strong>中继</strong>：</p>
+
+            <div class="warning-box">
+                <strong>⚠️ 注意</strong>：TURN 不是真正的 P2P，所有流量都经过中继服务器，会带来额外的延迟和带宽成本。通常作为最后手段（fallback）。
+            </div>
+
+            <div class="code-block">
+                <div class="code-label">STUN vs TURN 对比</div>
+                <pre><code>STUN:  Client A ←——直连——→ Client B
+              (通过 STUN 交换地址后直接通信)
+
+TURN:  Client A ←→ TURN Server ←→ Client B
+              (所有流量经服务器中转)</code></pre>
+            </div>
+        </section>
+
+        <section>
+            <h2>PyPunchP2P 工作流程</h2>
+            <p><a href="https://github.com/cesarbr/pypunchp2p" target="_blank">PyPunchP2P</a> 是一个 Python 实现的 UDP 打洞库，展示了典型的 P2P 穿透流程。</p>
+
+            <h3>阶段一：连接阶段（STUN Server 配对）</h3>
+            <div class="diagram-container">
+                <svg viewBox="0 0 700 350" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:16px auto;display:block;">
+                    <!-- Participants -->
+                    <rect x="20" y="20" width="120" height="50" rx="8" fill="#4d96ff"/>
+                    <text x="80" y="50" text-anchor="middle" fill="white" font-size="13" font-weight="bold">Client A</text>
+
+                    <rect x="290" y="20" width="120" height="50" rx="8" fill="#ffd93d"/>
+                    <text x="350" y="50" text-anchor="middle" fill="#333" font-size="13" font-weight="bold">STUN Server</text>
+
+                    <rect x="560" y="20" width="120" height="50" rx="8" fill="#6bcb77"/>
+                    <text x="620" y="50" text-anchor="middle" fill="white" font-size="13" font-weight="bold">Client B</text>
+
+                    <!-- Step 1 -->
+                    <line x1="80" y1="70" x2="80" y2="120" stroke="#4d96ff" stroke-width="2"/>
+                    <text x="80" y="95" text-anchor="middle" fill="#4d96ff" font-size="11">① 连接 STUN</text>
+
+                    <line x1="620" y1="70" x2="620" y2="120" stroke="#6bcb77" stroke-width="2"/>
+                    <text x="620" y="95" text-anchor="middle" fill="#6bcb77" font-size="11">① 连接 STUN</text>
+
+                    <!-- Step 2 -->
+                    <line x1="140" y1="140" x2="288" y2="140" stroke="#4d96ff" stroke-width="2" marker-end="url(#arrow)"/>
+                    <text x="214" y="132" text-anchor="middle" fill="#333" font-size="11">② Binding Request</text>
+
+                    <line x1="560" y1="160" x2="412" y2="160" stroke="#6bcb77" stroke-width="2" marker-end="url(#arrow)"/>
+                    <text x="486" y="152" text-anchor="middle" fill="#333" font-size="11">② Binding Request</text>
+
+                    <!-- Step 3 -->
+                    <line x1="288" y1="180" x2="140" y2="180" stroke="#ff6b6b" stroke-width="2" marker-end="url(#arrow)"/>
+                    <text x="214" y="172" text-anchor="middle" fill="#333" font-size="11">③ 返回 A 的公网地址</text>
+
+                    <line x1="412" y1="200" x2="560" y2="200" stroke="#ff6b6b" stroke-width="2" marker-end="url(#arrow)"/>
+                    <text x="486" y="192" text-anchor="middle" fill="#333" font-size="11">③ 返回 B 的公网地址</text>
+
+                    <!-- Step 4 -->
+                    <line x1="200" y1="230" x2="558" y2="230" stroke="#9b59b6" stroke-width="2" marker-end="url(#arrow)"/>
+                    <text x="379" y="222" text-anchor="middle" fill="#9b59b6" font-size="11">④ STUN 将 B 的地址告诉 A</text>
+
+                    <line x1="558" y1="250" x2="200" y2="250" stroke="#9b59b6" stroke-width="2" marker-end="url(#arrow)"/>
+                    <text x="379" y="242" text-anchor="middle" fill="#9b59b6" font-size="11">④ STUN 将 A 的地址告诉 B</text>
+
+                    <!-- Hole punching -->
+                    <rect x="150" y="280" width="400" height="50" rx="8" fill="#e8f5e9" stroke="#6bcb77" stroke-width="2"/>
+                    <text x="350" y="300" text-anchor="middle" fill="#333" font-size="13" font-weight="bold">⑤ 双方同时向对方公网地址发送 UDP 包（打洞）</text>
+                    <text x="350" y="320" text-anchor="middle" fill="#666" font-size="11">NAT 设备记录映射关系，后续包可通过</text>
+                </svg>
+            </div>
+
+            <h3>阶段二：通信阶段</h3>
+            <p>打洞成功后，双方即可直接 P2P 通信，不再需要 STUN 服务器：</p>
+
+            <div class="code-block">
+                <div class="code-label">打洞成功后的直连</div>
+                <pre><code>Client A (公网: 1.2.3.4:6000) ←—— UDP 直连 ——→ Client B (公网: 5.6.7.8:8000)
+
+# NAT 映射表已建立:
+# NAT A: 192.168.1.10:5000 ↔ 1.2.3.4:6000 → 允许 5.6.7.8:8000 的入站
+# NAT B: 10.0.0.5:7000     ↔ 5.6.7.8:8000 → 允许 1.2.3.4:6000 的入站</code></pre>
+            </div>
+        </section>
+
+        <section>
+            <h2>三种 NAT 组合的处理策略</h2>
+            <p>实际场景中，两个客户端的 NAT 类型组合决定了穿透策略：</p>
+
+            <table>
+                <thead>
+                    <tr><th>Client A</th><th>Client B</th><th>能否穿透</th><th>策略</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Full Cone</td><td>任意类型</td><td>✅ 可以</td><td>A 的映射固定，B 可直接连接</td></tr>
+                    <tr><td>Restrict / Port-Restrict</td><td>Restrict / Port-Restrict</td><td>✅ 可以</td><td>双方同时打洞即可</td></tr>
+                    <tr><td>Symmetric</td><td>Full Cone</td><td>✅ 可以</td><td>Full Cone 端无需打洞</td></tr>
+                    <tr><td>Symmetric</td><td>Symmetric</td><td>❌ 无法</td><td>双方映射都不固定，必须用 TURN 中继</td></tr>
+                </tbody>
+            </table>
+
+            <div class="highlight-box">
+                <strong>💡 经验法则</strong>：约 80% 的 NAT 组合可以通过 STUN 打洞成功。剩余 20%（主要是 Symmetric + Symmetric）需要 TURN 中继。
+            </div>
+        </section>
+
+        <section>
+            <h2>TCP vs UDP 穿透的区别</h2>
+            <table>
+                <thead>
+                    <tr><th>维度</th><th>UDP 穿透</th><th>TCP 穿透</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>连接模型</td><td>无连接，直接发包即可</td><td>需要三次握手建立连接</td></tr>
+                    <tr><td>打洞方式</td><td>双方同时发送 UDP 包</td><td>双方同时发送 SYN 包</td></tr>
+                    <tr><td>成功率</td><td>较高（~80%）</td><td>较低（~50-60%）</td></tr>
+                    <tr><td>NAT 支持</td><td>大多数 NAT 支持</td><td>部分 NAT 不支持 TCP 打洞</td></tr>
+                    <tr><td>超时时间</td><td>映射保持时间短（~30s）</td><td>映射保持时间长（连接期间）</td></tr>
+                    <tr><td>典型应用</td><td>WebRTC、VoIP、游戏</td><td>较少使用，多回退到 TURN</td></tr>
+                </tbody>
+            </table>
+
+            <h3>UDP 打洞代码示例</h3>
+            <div class="code-block">
+                <div class="code-label">udp_hole_punch.py</div>
+                <pre><code>import socket
+import threading
+
+def create_udp_socket(port):
+    """创建 UDP socket 并绑定到指定端口"""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind(('0.0.0.0', port))
+    return sock
+
+def punch_hole(sock, target_addr):
+    """向目标地址发送打洞包"""
+    # 持续发送 UDP 包，触发 NAT 建立映射
+    while True:
+        sock.sendto(b'PUNCH', target_addr)
+        time.sleep(0.5)
+
+def listen_for_peer(sock):
+    """监听对端发来的数据"""
+    while True:
+        data, addr = sock.recvfrom(1024)
+        print(f"收到来自 {addr} 的消息: {data.decode()}")
+        # 收到数据后，NAT 已建立映射，可以回复
+        sock.sendto(b'ACK', addr)
+
+# 使用流程:
+# 1. 从 STUN/信令服务器获取对端公网地址
+# 2. 同时启动打洞和监听
+peer_addr = ('5.6.7.8', 8000)  # 从信令服务器获取
+sock = create_udp_socket(5000)
+
+threading.Thread(target=punch_hole, args=(sock, peer_addr), daemon=True).start()
+listen_for_peer(sock)</code></pre>
+            </div>
+
+            <h3>TCP 打洞代码示例</h3>
+            <div class="code-block">
+                <div class="code-label">tcp_hole_punch.py</div>
+                <pre><code>import socket
+import threading
+
+def tcp_hole_punch(local_port, target_addr):
+    """TCP 打洞：同时发起 SYN 连接"""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind(('0.0.0.0', local_port))
+
+    # 设置非阻塞，因为 connect 可能成功也可能失败
+    sock.setblocking(False)
+
+    try:
+        # 同时发起连接（打洞）
+        sock.connect_ex(target_addr)
+    except BlockingIOError:
+        pass  # 预期行为：连接正在进行中
+
+    return sock
+
+# TCP 打洞的关键:
+# 1. 双方必须使用相同的本地端口
+# 2. 双方必须同时发起 connect
+# 3. 如果 NAT 支持，SYN 包会穿透并建立连接
+# 4. 否则 connect 会超时，需要回退到 TURN</code></pre>
+            </div>
+
+            <div class="warning-box">
+                <strong>⚠️ TCP 打洞注意事项</strong>：TCP 打洞要求两端使用相同的本地端口，且同时发起连接。很多 NAT 设备不支持这种行为，因此实际项目中 TCP P2P 通常直接回退到 TURN 中继。
+            </div>
+        </section>
+
+        <section>
+            <h2>WebRTC 中的 ICE 框架</h2>
+            <p>现代 WebRTC 使用 <strong>ICE</strong>（Interactive Connectivity Establishment）框架，自动组合 STUN 和 TURN：</p>
+
+            <div class="code-block">
+                <div class="code-label">ICE 候选收集流程</div>
+                <pre><code>ICE 候选收集顺序:
+1. Host Candidate     → 本地 IP（直连）
+2. Server Reflexive   → STUN 获取的公网 IP
+3. Relayed Candidate  → TURN 中继地址
+
+ICE 尝试顺序:
+Host → Server Reflexive → Relayed
+(优先直连，失败后逐级回退)</code></pre>
+            </div>
+        </section>
+
+        <section class="summary">
+            <h2>总结</h2>
+            <ul>
+                <li><strong>NAT 穿透</strong>解决的是「两个 NAT 后设备如何直接通信」的问题</li>
+                <li>四种 NAT 类型：<strong>Full Cone → Restrict → Port-Restrict → Symmetric</strong>，穿透难度递增</li>
+                <li><strong>STUN</strong> 用于发现公网地址并打洞，<strong>TURN</strong> 用于无法穿透时的中继</li>
+                <li>UDP 打洞成功率约 80%，TCP 打洞成功率约 50-60%</li>
+                <li><strong>Symmetric + Symmetric</strong> 组合无法穿透，必须使用 TURN</li>
+                <li>WebRTC 的 <strong>ICE 框架</strong>自动组合多种候选地址，优先直连、失败回退</li>
+            </ul>
+        </section>
+
+        <section class="references">
+            <h2>参考来源</h2>
+            <ul>
+                <li><a href="https://datatracker.ietf.org/doc/html/rfc5389" target="_blank">RFC 5389 - STUN Protocol</a></li>
+                <li><a href="https://datatracker.ietf.org/doc/html/rfc5766" target="_blank">RFC 5766 - TURN Protocol</a></li>
+                <li><a href="https://datatracker.ietf.org/doc/html/rfc8445" target="_blank">RFC 8445 - ICE Protocol</a></li>
+                <li><a href="https://github.com/cesarbr/pypunchp2p" target="_blank">PyPunchP2P - Python P2P Library</a></li>
+                <li><a href="https://webrtc.org/" target="_blank">WebRTC 官方网站</a></li>
+                <li><a href="https://tools.ietf.org/html/draft-ford-midcom-01" target="_blank">Midcom P2P - NAT Traversal Techniques</a></li>
+            </ul>
+        </section>
+    </article></main>
+    <footer><div class="giscus"></div></footer>
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDOHZL5Rg" data-category="Comments" data-category-id="DIC_kwDOHZL5Rs4CR-F6" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="preferred_color_scheme" data-lang="zh-CN" crossorigin="anonymous" async></script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>

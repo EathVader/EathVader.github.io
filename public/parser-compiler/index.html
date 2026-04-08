@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编译器原理与 Parser 实战 — 从 Regex 到 AST</title>
+    <meta name="description" content="从正则表达式的局限引入，深入讲解编译器架构、BNF/CFG 文法、Parser 生成器对比，并用 Jison 实战编写一个 Todo 文件 Parser。">
+    <meta property="og:title" content="编译器原理与 Parser 实战 — 从 Regex 到 AST">
+    <meta property="og:description" content="从正则表达式的局限引入，深入讲解编译器架构、BNF/CFG 文法、Parser 生成器对比，并用 Jison 实战编写一个 Todo 文件 Parser。">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/parser-compiler/">
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"Article","headline":"编译器原理与 Parser 实战 — 从 Regex 到 AST","description":"从正则表达式的局限引入，深入讲解编译器架构、BNF/CFG 文法、Parser 生成器对比，并用 Jison 实战编写一个 Todo 文件 Parser。","author":{"@type":"Person","name":"EathVader"},"datePublished":"2026-04-02","publisher":{"@type":"Organization","name":"EathVader"}}
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header><nav class="breadcrumb"><a href="/">首页</a> / <a href="/">编译原理</a> / Parser 实战</nav></header>
+    <main><article>
+        <h1>编译器原理与 Parser 实战</h1>
+        <p class="meta">原创 · 2026-04-02 · 阅读约 25 分钟</p>
+
+        <section class="intro">
+            <h2>为什么需要 Parser？</h2>
+            <p>很多人第一次接触 Parser 时都会问：<strong>正则表达式不是能匹配一切文本吗？</strong> 让我们从一个经典场景说起。</p>
+
+            <h3>Regex 的局限：Nginx 配置文件的困境</h3>
+            <p>假设你要解析一段 Nginx 配置文件：</p>
+
+            <div class="code-block">
+                <div class="code-label">nginx.conf</div>
+                <pre><code>server {
+    listen 80;
+    server_name example.com;
+
+    location /api {
+        proxy_pass http://backend:8080;
+        if ($request_method = POST) {
+            return 405;
+        }
+    }
+
+    location /static {
+        root /var/www/html;
+    }
+}</code></pre>
+            </div>
+
+            <p>这段配置有以下几个特点让正则表达式无能为力：</p>
+            <ul>
+                <li><strong>嵌套结构</strong>：<code>server</code> 块内嵌套 <code>location</code> 块，<code>location</code> 内又嵌套 <code>if</code> 块</li>
+                <li><strong>上下文依赖</strong>：同一个指令在不同块中的含义可能不同</li>
+                <li><strong>递归定义</strong>：块可以无限嵌套</li>
+            </ul>
+
+            <div class="warning-box">
+                <strong>⚠️ 核心结论</strong>：正则表达式对应的是<strong>正则语言</strong>（Regular Language），而嵌套结构属于<strong>上下文无关语言</strong>（Context-Free Language）。正则表达式无法处理任意深度的嵌套——这是计算理论中的经典结论（泵引理可证）。
+            </div>
+        </section>
+
+        <section>
+            <h2>编译器架构：从源码到目标代码</h2>
+            <p>一个完整的编译器通常包含以下阶段：</p>
+
+            <div class="diagram-container">
+                <svg viewBox="0 0 800 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:800px;margin:16px auto;display:block;">
+                    <!-- Boxes -->
+                    <rect x="10" y="60" width="120" height="80" rx="8" fill="#4d96ff" opacity="0.9"/>
+                    <text x="70" y="95" text-anchor="middle" fill="white" font-size="14" font-weight="bold">源代码</text>
+                    <text x="70" y="115" text-anchor="middle" fill="white" font-size="12">Source Code</text>
+
+                    <rect x="160" y="60" width="120" height="80" rx="8" fill="#6bcb77" opacity="0.9"/>
+                    <text x="220" y="90" text-anchor="middle" fill="white" font-size="14" font-weight="bold">词法分析</text>
+                    <text x="220" y="110" text-anchor="middle" fill="white" font-size="12">Lexer</text>
+
+                    <rect x="310" y="60" width="120" height="80" rx="8" fill="#ff6b6b" opacity="0.9"/>
+                    <text x="370" y="90" text-anchor="middle" fill="white" font-size="14" font-weight="bold">语法分析</text>
+                    <text x="370" y="110" text-anchor="middle" fill="white" font-size="12">Parser</text>
+
+                    <rect x="460" y="60" width="120" height="80" rx="8" fill="#ffd93d" opacity="0.9"/>
+                    <text x="520" y="90" text-anchor="middle" fill="#333" font-size="14" font-weight="bold">语义分析</text>
+                    <text x="520" y="110" text-anchor="middle" fill="#333" font-size="12">Semantic</text>
+
+                    <rect x="610" y="60" width="120" height="80" rx="8" fill="#9b59b6" opacity="0.9"/>
+                    <text x="670" y="90" text-anchor="middle" fill="white" font-size="14" font-weight="bold">目标代码</text>
+                    <text x="670" y="110" text-anchor="middle" fill="white" font-size="12">Target Code</text>
+
+                    <!-- Arrows -->
+                    <defs>
+                        <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                            <path d="M0,0 L0,6 L9,3 z" fill="#666"/>
+                        </marker>
+                    </defs>
+                    <line x1="130" y1="100" x2="158" y2="100" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+                    <line x1="280" y1="100" x2="308" y2="100" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+                    <line x1="430" y1="100" x2="458" y2="100" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+                    <line x1="580" y1="100" x2="608" y2="100" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+
+                    <!-- Output labels -->
+                    <text x="145" y="155" text-anchor="middle" fill="#666" font-size="11">Token 流</text>
+                    <text x="295" y="155" text-anchor="middle" fill="#666" font-size="11">AST</text>
+                    <text x="445" y="155" text-anchor="middle" fill="#666" font-size="11">标注 AST</text>
+                    <text x="595" y="155" text-anchor="middle" fill="#666" font-size="11">IR / 机器码</text>
+                </svg>
+            </div>
+
+            <h3>1. 词法分析（Lexical Analysis）</h3>
+            <p>词法分析器（Lexer / Scanner）将源代码的字符流切分成一个个有意义的词法单元（Token）。每个 Token 包含类型和值：</p>
+
+            <div class="code-block">
+                <div class="code-label">输入: x = 42 + y</div>
+                <pre><code>输出 Token 流:
+[IDENTIFIER, "x"]
+[ASSIGN, "="]
+[NUMBER, "42"]
+[PLUS, "+"]
+[IDENTIFIER, "y"]</code></pre>
+            </div>
+
+            <h3>2. 语法分析（Syntax Analysis）</h3>
+            <p>语法分析器（Parser）接收 Token 流，根据文法规则构建<strong>抽象语法树</strong>（Abstract Syntax Tree, AST）。AST 去除了语法细节（如分号、括号），只保留程序的逻辑结构：</p>
+
+            <div class="diagram-container">
+                <svg viewBox="0 0 400 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:400px;margin:16px auto;display:block;">
+                    <!-- AST for: x = 42 + y -->
+                    <rect x="155" y="10" width="90" height="36" rx="6" fill="#4d96ff"/>
+                    <text x="200" y="33" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Assign</text>
+
+                    <line x1="180" y1="46" x2="100" y2="90" stroke="#666" stroke-width="2"/>
+                    <line x1="220" y1="46" x2="300" y2="90" stroke="#666" stroke-width="2"/>
+
+                    <rect x="55" y="90" width="90" height="36" rx="6" fill="#6bcb77"/>
+                    <text x="100" y="113" text-anchor="middle" fill="white" font-size="14">x</text>
+
+                    <rect x="255" y="90" width="90" height="36" rx="6" fill="#ff6b6b"/>
+                    <text x="300" y="113" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Plus</text>
+
+                    <line x1="280" y1="126" x2="240" y2="170" stroke="#666" stroke-width="2"/>
+                    <line x1="320" y1="126" x2="360" y2="170" stroke="#666" stroke-width="2"/>
+
+                    <rect x="195" y="170" width="90" height="36" rx="6" fill="#ffd93d"/>
+                    <text x="240" y="193" text-anchor="middle" fill="#333" font-size="14">42</text>
+
+                    <rect x="315" y="170" width="90" height="36" rx="6" fill="#6bcb77"/>
+                    <text x="360" y="193" text-anchor="middle" fill="white" font-size="14">y</text>
+
+                    <!-- Labels -->
+                    <text x="200" y="240" text-anchor="middle" fill="#666" font-size="12">AST: x = (42 + y)</text>
+                </svg>
+            </div>
+
+            <h3>3. 语义分析（Semantic Analysis）</h3>
+            <p>语义分析阶段检查程序的语义正确性：</p>
+            <ul>
+                <li><strong>类型检查</strong>：确保操作数类型匹配</li>
+                <li><strong>作用域分析</strong>：变量是否已声明</li>
+                <li><strong>常量折叠</strong>：编译期计算常量表达式</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>BNF / CFG 文法详解</h2>
+            <p>Parser 的核心是<strong>文法</strong>（Grammar）。最常用的是 <strong>BNF</strong>（巴科斯范式）和 <strong>CFG</strong>（上下文无关文法）。</p>
+
+            <h3>BNF 基本语法</h3>
+            <table>
+                <thead>
+                    <tr><th>符号</th><th>含义</th><th>示例</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>::=</code></td><td>定义为</td><td><code>&lt;expr&gt; ::= &lt;term&gt;</code></td></tr>
+                    <tr><td><code>|</code></td><td>或（选择）</td><td><code>&lt;digit&gt; ::= 0 | 1 | 2</code></td></tr>
+                    <tr><td><code>&lt; &gt;</code></td><td>非终结符</td><td><code>&lt;expression&gt;</code></td></tr>
+                    <tr><td>引号内容</td><td>终结符（字面量）</td><td><code>"+"</code>, <code>"if"</code></td></tr>
+                    <tr><td><code>*</code></td><td>零次或多次（EBNF）</td><td><code>&lt;stmt&gt;*</code></td></tr>
+                    <tr><td><code>[ ]</code></td><td>可选（EBNF）</td><td><code>["else" &lt;stmt&gt;]</code></td></tr>
+                </tbody>
+            </table>
+
+            <h3>四则运算的 BNF 定义</h3>
+            <div class="code-block">
+                <div class="code-label">arithmetic.bnf</div>
+                <pre><code>&lt;expr&gt;   ::= &lt;expr&gt; "+" &lt;term&gt;   /* 加法 */
+          |  &lt;expr&gt; "-" &lt;term&gt;   /* 减法 */
+          |  &lt;term&gt;               /* 递归终止 */
+
+&lt;term&gt;   ::= &lt;term&gt; "*" &lt;factor&gt; /* 乘法 */
+          |  &lt;term&gt; "/" &lt;factor&gt; /* 除法 */
+          |  &lt;factor&gt;             /* 递归终止 */
+
+&lt;factor&gt; ::= "(" &lt;expr&gt; ")"      /* 括号 */
+          |  NUMBER               /* 数字 */</code></pre>
+            </div>
+
+            <div class="highlight-box">
+                <strong>💡 为什么需要分层？</strong> 通过 <code>&lt;expr&gt;</code> → <code>&lt;term&gt;</code> → <code>&lt;factor&gt;</code> 的分层，自然实现了运算符优先级：乘除（term）比加减（expr）绑定更紧，括号（factor）优先级最高。
+            </div>
+
+            <h3>左递归问题</h3>
+            <p>上面的文法是<strong>左递归</strong>的（<code>&lt;expr&gt;</code> 的第一个产生式以 <code>&lt;expr&gt;</code> 开头）。LL 解析器（递归下降）无法处理左递归，需要改写为右递归或使用 LR 解析器。</p>
+        </section>
+
+        <section>
+            <h2>Parser 生成器对比</h2>
+            <p>手写 Parser 工作量大且容易出错，实际项目中通常使用 <strong>Parser 生成器</strong>（Parser Generator）。</p>
+
+            <table>
+                <thead>
+                    <tr><th>工具</th><th>语言</th><th>算法</th><th>特点</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>Flex + Bison</strong></td><td>C/C++</td><td>LR(1)</td><td>工业标准，性能极高，Linux/Unix 生态标配</td></tr>
+                    <tr><td><strong>Jison</strong></td><td>JavaScript</td><td>LR(1)/LALR</td><td>Bison 的 JS 移植版，浏览器/Node.js 均可用</td></tr>
+                    <tr><td><strong>ANTLR</strong></td><td>Java/多语言</td><td>ALL(*)</td><td>支持左递归，目标语言丰富，生态完善</td></tr>
+                    <tr><td><strong>Yacc</strong></td><td>C</td><td>LALR(1)</td><td>Bison 的前身，历史意义大于实用</td></tr>
+                    <tr><td><strong>Menhir</strong></td><td>OCaml</td><td>LR(1)</td><td>OCaml 生态首选，错误信息友好</td></tr>
+                    <tr><td><strong>Tree-sitter</strong></td><td>C（多语言绑定）</td><td>GLR</td><td>增量解析，编辑器/IDE 广泛使用</td></tr>
+                    <tr><td><strong>PEG.js</strong></td><td>JavaScript</td><td>PEG</td><td>语法简洁，适合简单场景</td></tr>
+                </tbody>
+            </table>
+
+            <div class="highlight-box">
+                <strong>💡 如何选择？</strong> 如果是 C/C++ 项目选 Flex+Bison；JavaScript 项目选 Jison 或 ANTLR；需要多语言输出选 ANTLR；编辑器插件选 Tree-sitter。
+            </div>
+        </section>
+
+        <section>
+            <h2>实战：用 Jison 写一个 Todo 文件 Parser</h2>
+            <p>我们来设计一个 Todo 文件格式，并用 Jison 实现完整的 Parser。</p>
+
+            <h3>Todo 文件格式设计</h3>
+            <div class="code-block">
+                <div class="code-label">tasks.todo</div>
+                <pre><code># 我的任务列表
+project "工作" {
+    task "完成 Parser 教程" @high due 2026-04-10
+    task "写单元测试" @medium due 2026-04-15
+    task "部署到 GitHub Pages" @low
+}
+
+project "生活" {
+    task "买菜" @low
+    task "健身" @medium due 2026-04-03
+}</code></pre>
+            </div>
+
+            <h3>第一步：定义词法规则（Lexer）</h3>
+            <div class="code-block">
+                <div class="code-label">todo.jison — Lex 部分</div>
+                <pre><code>%lex
+
+%%
+\s+                   /* 跳过空白 */
+"//".*                /* 跳过单行注释 */
+"project"             return 'PROJECT'
+"task"                return 'TASK'
+"due"                 return 'DUE'
+"@"[a-z]+             return 'PRIORITY'
+[0-9]{4}-[0-9]{2}-[0-9]{2}  return 'DATE'
+\"[^\"]*\"            return 'STRING'
+"{"                   return '{'
+"}"                   return '}'
+&lt;&lt;EOF&gt;&gt;               return 'EOF'
+/lex</code></pre>
+            </div>
+
+            <h3>第二步：定义语法规则（BNF）</h3>
+            <div class="code-block">
+                <div class="code-label">todo.jison — Grammar 部分</div>
+                <pre><code>%start todo
+
+%%
+
+todo
+    : projects EOF
+        { return $1; }
+    ;
+
+projects
+    : project
+        { $$ = [$1]; }
+    | projects project
+        { $$ = $1.concat($2); }
+    ;
+
+project
+    : PROJECT STRING '{' tasks '}'
+        { $$ = { type: 'project', name: $2, tasks: $4 }; }
+    ;
+
+tasks
+    : %empty
+        { $$ = []; }
+    | tasks task
+        { $$ = $1.concat($2); }
+    ;
+
+task
+    : TASK STRING PRIORITY
+        { $$ = [{ type: 'task', title: $2, priority: $3.slice(1) }]; }
+    | TASK STRING PRIORITY DUE DATE
+        { $$ = [{ type: 'task', title: $2, priority: $3.slice(1), due: $5 }]; }
+    ;</code></pre>
+            </div>
+
+            <h3>第三步：生成 Parser 并渲染 AST</h3>
+            <div class="code-block">
+                <div class="code-label">main.js — 使用生成的 Parser</div>
+                <pre><code>const parser = require('./todo-parser');
+
+const source = `
+project "工作" {
+    task "完成 Parser 教程" @high due 2026-04-10
+    task "写单元测试" @medium
+}
+`;
+
+const ast = parser.parse(source);
+console.log(JSON.stringify(ast, null, 2));
+
+// 渲染为 HTML
+function renderTodo(ast) {
+    return ast.map(project => `
+        &lt;div class="project"&gt;
+            &lt;h2&gt;${project.name}&lt;/h2&gt;
+            &lt;ul&gt;
+                ${project.tasks.map(task => `
+                    &lt;li class="priority-${task.priority}"&gt;
+                        ${task.title}
+                        ${task.due ? ` &lt;span class="due"&gt;截止: ${task.due}&lt;/span&gt;` : ''}
+                    &lt;/li&gt;
+                `).join('')}
+            &lt;/ul&gt;
+        &lt;/div&gt;
+    `).join('');
+}</code></pre>
+            </div>
+
+            <h3>完整工作流程</h3>
+            <div class="diagram-container">
+                <svg viewBox="0 0 700 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:16px auto;display:block;">
+                    <!-- Step 1 -->
+                    <rect x="10" y="10" width="160" height="60" rx="8" fill="#4d96ff"/>
+                    <text x="90" y="35" text-anchor="middle" fill="white" font-size="13" font-weight="bold">1. 词法分析</text>
+                    <text x="90" y="55" text-anchor="middle" fill="white" font-size="11">Lexer (.l 文件)</text>
+
+                    <rect x="10" y="80" width="160" height="60" rx="8" fill="#e3f2fd"/>
+                    <text x="90" y="105" text-anchor="middle" fill="#333" font-size="11">输入: 源代码文本</text>
+                    <text x="90" y="125" text-anchor="middle" fill="#333" font-size="11">输出: Token 流</text>
+
+                    <!-- Arrow -->
+                    <line x1="170" y1="40" x2="230" y2="40" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+
+                    <!-- Step 2 -->
+                    <rect x="240" y="10" width="160" height="60" rx="8" fill="#ff6b6b"/>
+                    <text x="320" y="35" text-anchor="middle" fill="white" font-size="13" font-weight="bold">2. 语法分析</text>
+                    <text x="320" y="55" text-anchor="middle" fill="white" font-size="11">Parser (.y/.jison)</text>
+
+                    <rect x="240" y="80" width="160" height="60" rx="8" fill="#ffebee"/>
+                    <text x="320" y="105" text-anchor="middle" fill="#333" font-size="11">输入: Token 流</text>
+                    <text x="320" y="125" text-anchor="middle" fill="#333" font-size="11">输出: AST</text>
+
+                    <!-- Arrow -->
+                    <line x1="400" y1="40" x2="460" y2="40" stroke="#666" stroke-width="2" marker-end="url(#arrow)"/>
+
+                    <!-- Step 3 -->
+                    <rect x="470" y="10" width="160" height="60" rx="8" fill="#6bcb77"/>
+                    <text x="550" y="35" text-anchor="middle" fill="white" font-size="13" font-weight="bold">3. AST 渲染</text>
+                    <text x="550" y="55" text-anchor="middle" fill="white" font-size="11">Renderer (JS)</text>
+
+                    <rect x="470" y="80" width="160" height="60" rx="8" fill="#e8f5e9"/>
+                    <text x="550" y="105" text-anchor="middle" fill="#333" font-size="11">输入: AST</text>
+                    <text x="550" y="125" text-anchor="middle" fill="#333" font-size="11">输出: HTML/JSON</text>
+
+                    <!-- Jison box -->
+                    <rect x="200" y="180" width="300" height="120" rx="12" fill="#282c34" stroke="#4d96ff" stroke-width="2"/>
+                    <text x="350" y="210" text-anchor="middle" fill="#4d96ff" font-size="16" font-weight="bold">Jison 生成器</text>
+                    <text x="350" y="235" text-anchor="middle" fill="#abb2bf" font-size="12">todo.jison → todo-parser.js</text>
+                    <text x="350" y="255" text-anchor="middle" fill="#abb2bf" font-size="12">npx jison todo.jison</text>
+                    <text x="350" y="275" text-anchor="middle" fill="#6bcb77" font-size="12">自动合并 Lexer + Grammar</text>
+
+                    <!-- Arrows to Jison -->
+                    <line x1="90" y1="140" x2="90" y2="240" stroke="#666" stroke-width="1.5" stroke-dasharray="5,5"/>
+                    <line x1="320" y1="140" x2="320" y2="180" stroke="#666" stroke-width="1.5" stroke-dasharray="5,5"/>
+                    <line x1="550" y1="140" x2="550" y2="240" stroke="#666" stroke-width="1.5" stroke-dasharray="5,5"/>
+                </svg>
+            </div>
+        </section>
+
+        <section>
+            <h2>不同语言 Parser 生成器对比</h2>
+            <table>
+                <thead>
+                    <tr><th>维度</th><th>Flex+Bison</th><th>Jison</th><th>ANTLR</th><th>Tree-sitter</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>解析算法</td><td>LR(1)</td><td>LALR(1)</td><td>ALL(*)</td><td>GLR</td></tr>
+                    <tr><td>左递归支持</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+                    <tr><td>错误恢复</td><td>基础</td><td>基础</td><td>优秀</td><td>优秀</td></tr>
+                    <tr><td>增量解析</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td></tr>
+                    <tr><td>目标语言</td><td>C/C++</td><td>JavaScript</td><td>40+ 语言</td><td>C（多绑定）</td></tr>
+                    <tr><td>学习曲线</td><td>陡峭</td><td>中等</td><td>中等</td><td>中等</td></tr>
+                    <tr><td>典型应用</td><td>GCC, PHP</td><td>ESLint, CoffeeScript</td><td>Hive, ANTLR</td><td>Neovim, Helix</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="summary">
+            <h2>总结</h2>
+            <ul>
+                <li><strong>正则表达式无法处理嵌套结构</strong>，这是计算理论的限制，不是工具的问题</li>
+                <li>编译器核心流程：<strong>词法分析 → 语法分析 → 语义分析 → 代码生成</strong></li>
+                <li><strong>BNF/CFG</strong> 是描述文法的标准方式，分层定义可自然实现运算符优先级</li>
+                <li>Parser 生成器大幅提升开发效率：<strong>Flex+Bison</strong>（C/C++）、<strong>Jison</strong>（JS）、<strong>ANTLR</strong>（多语言）</li>
+                <li>实战中，定义清晰的 <strong>Lexer 规则 + BNF 语法</strong> 即可生成可用的 Parser</li>
+            </ul>
+        </section>
+
+        <section class="references">
+            <h2>参考来源</h2>
+            <ul>
+                <li><a href="https://en.wikipedia.org/wiki/Compiler" target="_blank">Compiler - Wikipedia</a></li>
+                <li><a href="https://github.com/zaach/jison" target="_blank">Jison - LR/LL Parser Generator for JavaScript</a></li>
+                <li><a href="https://www.antlr.org/" target="_blank">ANTLR - Another Tool for Language Recognition</a></li>
+                <li><a href="https://www.lysator.liu.se/c/ANSI-C-grammar-y.html" target="_blank">ANSI C Grammar (Yacc/Bison)</a></li>
+                <li><a href="https://github.com/tree-sitter/tree-sitter" target="_blank">Tree-sitter - Incremental Parsing Library</a></li>
+                <li>王垠，《<a href="https://www.yinwang.org/blog-cn/2018/04/24/ast" target="_blank">对 Parser 的误解</a>》</li>
+                <li><a href="https://craftinginterpreters.com/" target="_blank">Crafting Interpreters</a> — 免费在线书籍，从零实现解释器</li>
+            </ul>
+        </section>
+    </article></main>
+    <footer><div class="giscus"></div></footer>
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDOHZL5Rg" data-category="Comments" data-category-id="DIC_kwDOHZL5Rs4CR-F6" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="preferred_color_scheme" data-lang="zh-CN" crossorigin="anonymous" async></script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>

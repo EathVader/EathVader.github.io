@@ -8,6 +8,14 @@ export interface Tutorial {
 
 export const tutorials: Tutorial[] = [
   {
+    slug: 'backend-fundamentals',
+    tag: '🏗️ 后端基础',
+    title: '后端基础知识全景总结',
+    description:
+      '网络协议、数据库事务、操作系统——后端工程师三大支柱一网打尽。覆盖 TCP/UDP、ACID、隔离级别、进程线程、虚拟内存、I/O 多路复用、RAID，含交互式知识测验。',
+    meta: '基于编程起跑线笔记 · 2026-04',
+  },
+  {
     slug: 'consistent-hash',
     tag: '🌐 分布式',
     title: '一致性哈希算法',
@@ -446,5 +454,45 @@ export const tutorials: Tutorial[] = [
     description:
       '中文拼音输入法原理与 Python 实现：拼音到汉字映射、Bigram 语言模型、Viterbi 候选排序、交互式拼音输入演示。',
     meta: '基于程序师 · 2026-04',
+  },
+  {
+    slug: 'parser-compiler',
+    tag: '🔧 编译原理',
+    title: '编译器原理与 Parser 实战',
+    description:
+      '从 Regex 的局限引入编译器原理：词法分析、语法分析、AST、BNF 文法。实战用 Jison 写一个 Todo 文件 Parser，完整展示 Lexer → BNF → AST → Render 流程。',
+    meta: '基于 BMPI.dev · 2026-04',
+  },
+  {
+    slug: 'p2p-nat',
+    tag: '🌐 网络协议',
+    title: 'NAT 穿透与 P2P 通信',
+    description:
+      'NAT 穿透原理与实战：STUN/TURN 协议、4种 NAT 类型、PyPunchP2P 工作流程、TCP vs UDP 穿透区别。从零实现 P2P 聊天。',
+    meta: '基于 laike9m 博客 · 2026-04',
+  },
+  {
+    slug: 'domain-split',
+    tag: '🏗️ 微服务',
+    title: '微服务资源隔离之域名拆分',
+    description:
+      '微服务架构中的资源隔离实践：核心/非核心业务域名拆分、网关隔离、带宽管理策略、高可用保障。',
+    meta: '基于技术转型之路 · 2026-04',
+  },
+  {
+    slug: 'python-subprocess',
+    tag: '🐍 Python',
+    title: 'Python subprocess PIPE 使用指南',
+    description:
+      'Python subprocess 模块 PIPE 使用指南：管道通信、命令链式调用、输出捕获、常见陷阱与最佳实践。',
+    meta: '基于技术博客 · 2026-04',
+  },
+  {
+    slug: 'java-learning-path',
+    tag: '☕ Java',
+    title: 'Java 学习路线详解',
+    description:
+      'Java 完整学习路线图：从 HelloWorld 到 Spring 生态，OOP、集合、并发、JVM、框架，附学习资源推荐。',
+    meta: '基于多篇技术文章综合 · 2026-04',
   },
 ];

@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java 学习路线详解 — 从零基础到高级开发</title>
+    <meta name="description" content="Java 能做什么？如何系统学习 Java？本文提供完整学习路线：从编辑器、JDK、HelloWorld 到 OOP、集合、并发、JVM、Spring 生态。">
+    <meta property="og:title" content="Java 学习路线详解 — 从零基础到高级开发">
+    <meta property="og:description" content="Java 能做什么？如何系统学习 Java？本文提供完整学习路线：从编辑器、JDK、HelloWorld 到 OOP、集合、并发、JVM、Spring 生态。">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/java-learning-path/">
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"Article","headline":"Java 学习路线详解 — 从零基础到高级开发","description":"Java 能做什么？如何系统学习 Java？本文提供完整学习路线：从编辑器、JDK、HelloWorld 到 OOP、集合、并发、JVM、Spring 生态。","author":{"@type":"Person","name":"EathVader"},"datePublished":"2026-04-02","publisher":{"@type":"Organization","name":"EathVader"}}
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header><nav class="breadcrumb"><a href="/">首页</a> / <a href="/">Java</a> / 学习路线</nav></header>
+    <main><article>
+        <h1>Java 学习路线详解</h1>
+        <p class="meta">原创 · 2026-04-02 · 阅读约 18 分钟</p>
+
+        <section class="intro">
+            <h2>Java 能做什么？</h2>
+            <p>Java 是一门通用编程语言，自 1995 年发布以来一直是企业级开发的主力语言。它的应用领域非常广泛：</p>
+
+            <div class="diagram-container">
+                <svg viewBox="0 0 700 380" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:16px auto;display:block;">
+                    <!-- Center -->
+                    <circle cx="350" cy="190" r="50" fill="#4d96ff"/>
+                    <text x="350" y="185" text-anchor="middle" fill="white" font-size="18" font-weight="bold">Java</text>
+                    <text x="350" y="205" text-anchor="middle" fill="white" font-size="12">应用领域</text>
+
+                    <!-- Web Backend -->
+                    <line x1="350" y1="140" x2="350" y2="60" stroke="#666" stroke-width="2"/>
+                    <rect x="270" y="10" width="160" height="50" rx="8" fill="#6bcb77"/>
+                    <text x="350" y="32" text-anchor="middle" fill="white" font-size="13" font-weight="bold">Web 后端开发</text>
+                    <text x="350" y="50" text-anchor="middle" fill="white" font-size="10">Spring Boot, Micronaut</text>
+
+                    <!-- Android -->
+                    <line x1="400" y1="160" x2="550" y2="80" stroke="#666" stroke-width="2"/>
+                    <rect x="490" y="30" width="160" height="50" rx="8" fill="#ff6b6b"/>
+                    <text x="570" y="52" text-anchor="middle" fill="white" font-size="13" font-weight="bold">Android 开发</text>
+                    <text x="570" y="70" text-anchor="middle" fill="white" font-size="10">App, SDK</text>
+
+                    <!-- Big Data -->
+                    <line x1="400" y1="220" x2="550" y2="300" stroke="#666" stroke-width="2"/>
+                    <rect x="490" y="300" width="160" height="50" rx="8" fill="#ffd93d"/>
+                    <text x="570" y="322" text-anchor="middle" fill="#333" font-size="13" font-weight="bold">大数据</text>
+                    <text x="570" y="340" text-anchor="middle" fill="#333" font-size="10">Hadoop, Spark, Flink</text>
+
+                    <!-- Enterprise -->
+                    <line x1="350" y1="240" x2="350" y2="320" stroke="#666" stroke-width="2"/>
+                    <rect x="270" y="320" width="160" height="50" rx="8" fill="#9b59b6"/>
+                    <text x="350" y="342" text-anchor="middle" fill="white" font-size="13" font-weight="bold">企业级应用</text>
+                    <text x="350" y="360" text-anchor="middle" fill="white" font-size="10">ERP, CRM, 金融系统</text>
+
+                    <!-- Middleware -->
+                    <line x1="300" y1="220" x2="150" y2="300" stroke="#666" stroke-width="2"/>
+                    <rect x="50" y="300" width="160" height="50" rx="8" fill="#e67e22"/>
+                    <text x="130" y="322" text-anchor="middle" fill="white" font-size="13" font-weight="bold">中间件</text>
+                    <text x="130" y="340" text-anchor="middle" fill="white" font-size="10">消息队列, RPC 框架</text>
+
+                    <!-- DevOps -->
+                    <line x1="300" y1="160" x2="150" y2="80" stroke="#666" stroke-width="2"/>
+                    <rect x="50" y="30" width="160" height="50" rx="8" fill="#1abc9c"/>
+                    <text x="130" y="52" text-anchor="middle" fill="white" font-size="13" font-weight="bold">DevOps 工具</text>
+                    <text x="130" y="70" text-anchor="middle" fill="white" font-size="10">Jenkins, Gradle</text>
+                </svg>
+            </div>
+
+            <table>
+                <thead>
+                    <tr><th>领域</th><th>主流框架/工具</th><th>市场需求</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Web 后端</td><td>Spring Boot, Spring Cloud, MyBatis</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>Android</td><td>Android SDK, Kotlin（兼容 Java）</td><td>⭐⭐⭐⭐</td></tr>
+                    <tr><td>大数据</td><td>Hadoop, Spark, Flink, Kafka</td><td>⭐⭐⭐⭐</td></tr>
+                    <tr><td>企业应用</td><td>Spring, Hibernate, JPA</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>中间件</td><td>Dubbo, RocketMQ, Netty</td><td>⭐⭐⭐⭐</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>学习步骤：从零开始</h2>
+
+            <h3>第一步：选择编辑器</h3>
+            <table>
+                <thead>
+                    <tr><th>编辑器</th><th>特点</th><th>适合人群</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>IntelliJ IDEA</strong></td><td>功能最强，智能补全，社区版免费</td><td>推荐首选</td></tr>
+                    <tr><td><strong>Eclipse</strong></td><td>老牌 IDE，插件丰富，免费</td><td>传统企业开发</td></tr>
+                    <tr><td><strong>VS Code</strong></td><td>轻量，需安装 Java 扩展包</td><td>已习惯 VS Code 的开发者</td></tr>
+                </tbody>
+            </table>
+
+            <div class="highlight-box">
+                <strong>💡 推荐</strong>：IntelliJ IDEA Community Edition（免费），功能足够学习使用。企业开发建议用 Ultimate 版。
+            </div>
+
+            <h3>第二步：安装 JDK</h3>
+            <div class="code-block">
+                <div class="code-label">安装 JDK（推荐 JDK 17 或 21 LTS）</div>
+                <pre><code># macOS (使用 Homebrew)
+brew install openjdk@17
+
+# Ubuntu/Debian
+sudo apt install openjdk-17-jdk
+
+# Windows
+# 下载 Eclipse Temurin: https://adoptium.net/
+
+# 验证安装
+java -version
+javac -version</code></pre>
+            </div>
+
+            <h3>第三步：HelloWorld</h3>
+            <div class="code-block">
+                <div class="code-label">HelloWorld.java</div>
+                <pre><code>public class HelloWorld {
+    public static void main(String[] args) {
+        System.out.println("Hello, Java!");
+    }
+}</code></pre>
+            </div>
+
+            <div class="code-block">
+                <div class="code-label">编译和运行</div>
+                <pre><code># 编译：.java → .class
+javac HelloWorld.java
+
+# 运行
+java HelloWorld
+# 输出: Hello, Java!
+
+# JDK 11+ 可以直接运行（无需编译）
+java HelloWorld.java</code></pre>
+            </div>
+
+            <h3>第四步：理解编译/运行流程</h3>
+            <div class="diagram-container">
+                <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:16px auto;display:block;">
+                    <!-- Source -->
+                    <rect x="10" y="60" width="140" height="80" rx="8" fill="#4d96ff"/>
+                    <text x="80" y="90" text-anchor="middle" fill="white" font-size="14" font-weight="bold">.java 文件</text>
+                    <text x="80" y="115" text-anchor="middle" fill="white" font-size="12">Java 源代码</text>
+
+                    <!-- Arrow -->
+                    <line x1="150" y1="100" x2="230" y2="100" stroke="#666" stroke-width="2"/>
+                    <text x="190" y="90" text-anchor="middle" fill="#666" font-size="12">javac</text>
+
+                    <!-- Bytecode -->
+                    <rect x="230" y="60" width="140" height="80" rx="8" fill="#ffd93d"/>
+                    <text x="300" y="90" text-anchor="middle" fill="#333" font-size="14" font-weight="bold">.class 文件</text>
+                    <text x="300" y="115" text-anchor="middle" fill="#333" font-size="12">字节码 (Bytecode)</text>
+
+                    <!-- Arrow -->
+                    <line x1="370" y1="100" x2="450" y2="100" stroke="#666" stroke-width="2"/>
+                    <text x="410" y="90" text-anchor="middle" fill="#666" font-size="12">java (JVM)</text>
+
+                    <!-- JVM -->
+                    <rect x="450" y="60" width="140" height="80" rx="8" fill="#ff6b6b"/>
+                    <text x="520" y="90" text-anchor="middle" fill="white" font-size="14" font-weight="bold">JVM</text>
+                    <text x="520" y="115" text-anchor="middle" fill="white" font-size="12">Java 虚拟机</text>
+
+                    <!-- Arrow -->
+                    <line x1="590" y1="100" x2="640" y2="100" stroke="#666" stroke-width="2"/>
+
+                    <!-- Output -->
+                    <rect x="640" y="60" width="60" height="80" rx="8" fill="#6bcb77"/>
+                    <text x="670" y="90" text-anchor="middle" fill="white" font-size="12" font-weight="bold">输出</text>
+                    <text x="670" y="110" text-anchor="middle" fill="white" font-size="10">结果</text>
+
+                    <!-- Write once, run anywhere -->
+                    <rect x="180" y="160" width="340" height="30" rx="15" fill="#e8f5e9" stroke="#6bcb77" stroke-width="2"/>
+                    <text x="350" y="180" text-anchor="middle" fill="#6bcb77" font-size="13" font-weight="bold">Write Once, Run Anywhere (跨平台)</text>
+                </svg>
+            </div>
+        </section>
+
+        <section>
+            <h2>核心知识体系</h2>
+
+            <h3>阶段一：Java 基础（1-2 个月）</h3>
+            <table>
+                <thead>
+                    <tr><th>知识点</th><th>核心内容</th><th>重要程度</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>基本语法</td><td>变量、数据类型、运算符、流程控制</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>数组与字符串</td><td>数组操作、String/StringBuilder/StringBuffer</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>OOP 基础</td><td>类与对象、封装、继承、多态</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>接口与抽象类</td><td>interface、abstract class、默认方法</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>异常处理</td><td>try-catch-finally、自定义异常</td><td>⭐⭐⭐⭐</td></tr>
+                    <tr><td>泛型</td><td>泛型类、泛型方法、通配符</td><td>⭐⭐⭐⭐</td></tr>
+                    <tr><td>注解</td><td>@Override、@Deprecated、自定义注解</td><td>⭐⭐⭐</td></tr>
+                </tbody>
+            </table>
+
+            <h3>阶段二：核心 API（1-2 个月）</h3>
+            <table>
+                <thead>
+                    <tr><th>知识点</th><th>核心内容</th><th>重要程度</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>集合框架</td><td>List、Set、Map、Queue、Collections 工具类</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>IO/NIO</td><td>File、InputStream/OutputStream、NIO.2</td><td>⭐⭐⭐⭐</td></tr>
+                    <tr><td>反射</td><td>Class、Method、Field、动态代理</td><td>⭐⭐⭐⭐</td></tr>
+                    <tr><td>Lambda 与 Stream</td><td>函数式接口、Stream API、方法引用</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>日期时间 API</td><td>LocalDate、LocalDateTime、DateTimeFormatter</td><td>⭐⭐⭐⭐</td></tr>
+                    <tr><td>正则表达式</td><td>Pattern、Matcher</td><td>⭐⭐⭐</td></tr>
+                </tbody>
+            </table>
+
+            <h3>阶段三：并发编程（1-2 个月）</h3>
+            <table>
+                <thead>
+                    <tr><th>知识点</th><th>核心内容</th><th>重要程度</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>线程基础</td><td>Thread、Runnable、线程状态</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>线程安全</td><td>synchronized、volatile、CAS</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>并发工具类</td><td>CountDownLatch、CyclicBarrier、Semaphore</td><td>⭐⭐⭐⭐</td></tr>
+                    <tr><td>线程池</td><td>ExecutorService、ThreadPoolExecutor</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>并发集合</td><td>ConcurrentHashMap、CopyOnWriteArrayList</td><td>⭐⭐⭐⭐</td></tr>
+                    <tr><td>CompletableFuture</td><td>异步编程、链式调用</td><td>⭐⭐⭐⭐</td></tr>
+                    <tr><td>虚拟线程</td><td>Java 21+ Virtual Threads（Project Loom）</td><td>⭐⭐⭐</td></tr>
+                </tbody>
+            </table>
+
+            <h3>阶段四：JVM（1-2 个月）</h3>
+            <table>
+                <thead>
+                    <tr><th>知识点</th><th>核心内容</th><th>重要程度</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>内存模型</td><td>堆、栈、方法区、程序计数器</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>垃圾回收</td><td>GC 算法、G1/ZGC 收集器、调优</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>类加载机制</td><td>双亲委派、自定义 ClassLoader</td><td>⭐⭐⭐⭐</td></tr>
+                    <tr><td>性能调优</td><td>jstat、jmap、jstack、JFR</td><td>⭐⭐⭐⭐</td></tr>
+                    <tr><td>字节码</td><td>.class 文件结构、javap 反汇编</td><td>⭐⭐⭐</td></tr>
+                </tbody>
+            </table>
+
+            <h3>阶段五：Spring 生态（2-3 个月）</h3>
+            <table>
+                <thead>
+                    <tr><th>知识点</th><th>核心内容</th><th>重要程度</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Spring Core</td><td>IoC、DI、AOP、Bean 生命周期</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>Spring Boot</td><td>自动配置、Starter、Actuator</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>Spring MVC</td><td>RESTful API、拦截器、异常处理</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>Spring Data</td><td>JPA、MyBatis、事务管理</td><td>⭐⭐⭐⭐⭐</td></tr>
+                    <tr><td>Spring Security</td><td>认证、授权、OAuth2、JWT</td><td>⭐⭐⭐⭐</td></tr>
+                    <tr><td>Spring Cloud</td><td>服务注册、配置中心、网关、熔断</td><td>⭐⭐⭐⭐</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>学习路线图</h2>
+            <div class="diagram-container">
+                <svg viewBox="0 0 700 500" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:16px auto;display:block;">
+                    <!-- Phase 1 -->
+                    <rect x="10" y="10" width="680" height="80" rx="12" fill="#e3f2fd" stroke="#4d96ff" stroke-width="2"/>
+                    <text x="350" y="35" text-anchor="middle" fill="#4d96ff" font-size="16" font-weight="bold">阶段一：Java 基础（1-2 个月）</text>
+                    <text x="100" y="60" text-anchor="middle" fill="#333" font-size="12">基本语法</text>
+                    <text x="220" y="60" text-anchor="middle" fill="#333" font-size="12">OOP</text>
+                    <text x="340" y="60" text-anchor="middle" fill="#333" font-size="12">接口/抽象类</text>
+                    <text x="480" y="60" text-anchor="middle" fill="#333" font-size="12">异常处理</text>
+                    <text x="600" y="60" text-anchor="middle" fill="#333" font-size="12">泛型/注解</text>
+
+                    <!-- Arrow -->
+                    <line x1="350" y1="90" x2="350" y2="110" stroke="#666" stroke-width="2"/>
+
+                    <!-- Phase 2 -->
+                    <rect x="10" y="110" width="680" height="80" rx="12" fill="#e8f5e9" stroke="#6bcb77" stroke-width="2"/>
+                    <text x="350" y="135" text-anchor="middle" fill="#6bcb77" font-size="16" font-weight="bold">阶段二：核心 API（1-2 个月）</text>
+                    <text x="100" y="160" text-anchor="middle" fill="#333" font-size="12">集合框架</text>
+                    <text x="220" y="160" text-anchor="middle" fill="#333" font-size="12">IO/NIO</text>
+                    <text x="340" y="160" text-anchor="middle" fill="#333" font-size="12">反射</text>
+                    <text x="480" y="160" text-anchor="middle" fill="#333" font-size="12">Lambda/Stream</text>
+                    <text x="600" y="160" text-anchor="middle" fill="#333" font-size="12">日期 API</text>
+
+                    <!-- Arrow -->
+                    <line x1="350" y1="190" x2="350" y2="210" stroke="#666" stroke-width="2"/>
+
+                    <!-- Phase 3 -->
+                    <rect x="10" y="210" width="680" height="80" rx="12" fill="#fff3cd" stroke="#ffd93d" stroke-width="2"/>
+                    <text x="350" y="235" text-anchor="middle" fill="#e6a800" font-size="16" font-weight="bold">阶段三：并发编程（1-2 个月）</text>
+                    <text x="100" y="260" text-anchor="middle" fill="#333" font-size="12">线程基础</text>
+                    <text x="220" y="260" text-anchor="middle" fill="#333" font-size="12">线程安全</text>
+                    <text x="340" y="260" text-anchor="middle" fill="#333" font-size="12">线程池</text>
+                    <text x="480" y="260" text-anchor="middle" fill="#333" font-size="12">并发集合</text>
+                    <text x="600" y="260" text-anchor="middle" fill="#333" font-size="12">虚拟线程</text>
+
+                    <!-- Arrow -->
+                    <line x1="350" y1="290" x2="350" y2="310" stroke="#666" stroke-width="2"/>
+
+                    <!-- Phase 4 -->
+                    <rect x="10" y="310" width="680" height="80" rx="12" fill="#ffe5e5" stroke="#ff6b6b" stroke-width="2"/>
+                    <text x="350" y="335" text-anchor="middle" fill="#ff6b6b" font-size="16" font-weight="bold">阶段四：JVM（1-2 个月）</text>
+                    <text x="100" y="360" text-anchor="middle" fill="#333" font-size="12">内存模型</text>
+                    <text x="220" y="360" text-anchor="middle" fill="#333" font-size="12">垃圾回收</text>
+                    <text x="340" y="360" text-anchor="middle" fill="#333" font-size="12">类加载</text>
+                    <text x="480" y="360" text-anchor="middle" fill="#333" font-size="12">性能调优</text>
+                    <text x="600" y="360" text-anchor="middle" fill="#333" font-size="12">字节码</text>
+
+                    <!-- Arrow -->
+                    <line x1="350" y1="390" x2="350" y2="410" stroke="#666" stroke-width="2"/>
+
+                    <!-- Phase 5 -->
+                    <rect x="10" y="410" width="680" height="80" rx="12" fill="#f3e5f5" stroke="#9b59b6" stroke-width="2"/>
+                    <text x="350" y="435" text-anchor="middle" fill="#9b59b6" font-size="16" font-weight="bold">阶段五：Spring 生态（2-3 个月）</text>
+                    <text x="100" y="460" text-anchor="middle" fill="#333" font-size="12">Spring Core</text>
+                    <text x="220" y="460" text-anchor="middle" fill="#333" font-size="12">Spring Boot</text>
+                    <text x="340" y="460" text-anchor="middle" fill="#333" font-size="12">Spring MVC</text>
+                    <text x="480" y="460" text-anchor="middle" fill="#333" font-size="12">Spring Data</text>
+                    <text x="600" y="460" text-anchor="middle" fill="#333" font-size="12">Spring Cloud</text>
+                </svg>
+            </div>
+        </section>
+
+        <section>
+            <h2>学习资源推荐</h2>
+
+            <h3>书籍</h3>
+            <table>
+                <thead>
+                    <tr><th>书名</th><th>适合阶段</th><th>说明</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>《Head First Java》</td><td>入门</td><td>图文并茂，适合零基础</td></tr>
+                    <tr><td>《Java 核心技术 卷 I》</td><td>基础</td><td>经典教材，全面系统</td></tr>
+                    <tr><td>《Effective Java》</td><td>进阶</td><td>最佳实践，必读</td></tr>
+                    <tr><td>《Java 并发编程实战》</td><td>并发</td><td>并发编程权威</td></tr>
+                    <tr><td>《深入理解 Java 虚拟机》</td><td>JVM</td><td>JVM 最佳中文书</td></tr>
+                    <tr><td>《Spring 实战》</td><td>框架</td><td>Spring 入门到进阶</td></tr>
+                </tbody>
+            </table>
+
+            <h3>在线资源</h3>
+            <table>
+                <thead>
+                    <tr><th>资源</th><th>类型</th><th>说明</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><a href="https://docs.oracle.com/en/java/" target="_blank">Oracle 官方文档</a></td><td>文档</td><td>权威参考</td></tr>
+                    <tr><td><a href="https://www.baeldung.com/" target="_blank">Baeldung</a></td><td>教程</td><td>Spring/Java 教程质量极高</td></tr>
+                    <tr><td><a href="https://github.com/doocs/advanced-java" target="_blank">advanced-java</a></td><td>GitHub</td><td>Java 面试知识体系</td></tr>
+                    <tr><td><a href="https://javaguide.cn/" target="_blank">JavaGuide</a></td><td>网站</td><td>Java 学习 + 面试指南</td></tr>
+                    <tr><td><a href="https://start.spring.io/" target="_blank">Spring Initializr</a></td><td>工具</td><td>快速生成 Spring Boot 项目</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>学习建议</h2>
+
+            <div class="highlight-box">
+                <strong>💡 核心原则</strong>：<strong>动手写代码 > 看视频教程 > 读书</strong>。每个知识点都要写代码验证，不要只看不动手。
+            </div>
+
+            <ul>
+                <li><strong>每天写代码</strong>：哪怕只有 30 分钟，保持手感比突击学习更有效</li>
+                <li><strong>做项目驱动学习</strong>：学完基础后做一个完整的项目（如博客系统、电商后台）</li>
+                <li><strong>读源码</strong>：从 JDK 集合源码开始，逐步阅读 Spring 核心源码</li>
+                <li><strong>写技术博客</strong>：输出是最好的学习方式，也能建立个人品牌</li>
+                <li><strong>参与开源</strong>：从提 Issue 开始，逐步参与代码贡献</li>
+            </ul>
+
+            <div class="warning-box">
+                <strong>⚠️ 常见误区</strong>：不要一上来就学 Spring！先打好 Java 基础（集合、并发、JVM），否则学框架只会停留在「会用」层面，遇到复杂问题无法排查。
+            </div>
+        </section>
+
+        <section class="summary">
+            <h2>总结</h2>
+            <ul>
+                <li><strong>Java 应用广泛</strong>：Web 后端、Android、大数据、企业应用、中间件</li>
+                <li><strong>学习路径</strong>：基础语法 → 核心 API → 并发编程 → JVM → Spring 生态</li>
+                <li><strong>预计时间</strong>：从零到能独立开发约 6-9 个月（每天 2-3 小时）</li>
+                <li><strong>核心建议</strong>：动手写代码、做项目驱动学习、读源码、写博客</li>
+                <li><strong>避坑指南</strong>：先学基础再学框架，不要跳过并发和 JVM</li>
+            </ul>
+        </section>
+
+        <section class="references">
+            <h2>参考来源</h2>
+            <ul>
+                <li><a href="https://docs.oracle.com/en/java/" target="_blank">Oracle Java Documentation</a></li>
+                <li><a href="https://www.baeldung.com/" target="_blank">Baeldung - Java and Spring Tutorials</a></li>
+                <li><a href="https://github.com/doocs/advanced-java" target="_blank">advanced-java - Java 面试知识体系</a></li>
+                <li><a href="https://javaguide.cn/" target="_blank">JavaGuide</a></li>
+                <li><a href="https://start.spring.io/" target="_blank">Spring Initializr</a></li>
+            </ul>
+        </section>
+    </article></main>
+    <footer><div class="giscus"></div></footer>
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDOHZL5Rg" data-category="Comments" data-category-id="DIC_kwDOHZL5Rs4CR-F6" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="preferred_color_scheme" data-lang="zh-CN" crossorigin="anonymous" async></script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>

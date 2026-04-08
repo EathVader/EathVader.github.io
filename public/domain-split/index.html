@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微服务资源隔离之域名拆分 — 核心链路保护实践</title>
+    <meta name="description" content="核心业务和非核心业务共用同一域名导致流量突发波及核心链路？本文详解域名拆分原则、命名规则、网关拆分架构和带宽管理策略。">
+    <meta property="og:title" content="微服务资源隔离之域名拆分 — 核心链路保护实践">
+    <meta property="og:description" content="核心业务和非核心业务共用同一域名导致流量突发波及核心链路？本文详解域名拆分原则、命名规则、网关拆分架构和带宽管理策略。">
+    <meta property="og:type" content="article">
+    <link rel="canonical" href="https://eathvader.github.io/domain-split/">
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"Article","headline":"微服务资源隔离之域名拆分 — 核心链路保护实践","description":"核心业务和非核心业务共用同一域名导致流量突发波及核心链路？本文详解域名拆分原则、命名规则、网关拆分架构和带宽管理策略。","author":{"@type":"Person","name":"EathVader"},"datePublished":"2026-04-02","publisher":{"@type":"Organization","name":"EathVader"}}
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header><nav class="breadcrumb"><a href="/">首页</a> / <a href="/">架构</a> / 微服务</nav></header>
+    <main><article>
+        <h1>微服务资源隔离之域名拆分</h1>
+        <p class="meta">原创 · 2026-04-02 · 阅读约 15 分钟</p>
+
+        <section class="intro">
+            <h2>问题背景</h2>
+            <p>在微服务架构中，一个常见的反模式是：<strong>所有服务共用同一个域名和 API 网关</strong>。这在初期开发方便，但随着业务增长会暴露严重问题。</p>
+
+            <h3>典型案例：非核心流量突发波及核心链路</h3>
+            <div class="code-block">
+                <div class="code-label">问题场景</div>
+                <pre><code>api.company.com
+├── /order/*      ← 核心业务（下单、支付）
+├── /user/*       ← 核心业务（登录、鉴权）
+├── /report/*     ← 非核心（数据报表）
+├── /export/*     ← 非核心（数据导出）
+└── /webhook/*    ← 非核心（第三方回调）
+
+某天，报表服务被大量并发查询，导出服务被批量触发...
+结果：网关连接池耗尽 → 下单接口超时 → 核心业务受损！</code></pre>
+            </div>
+
+            <div class="warning-box">
+                <strong>⚠️ 核心问题</strong>：当核心业务和非核心业务共享同一域名时，它们共享同一套网络资源（DNS、CDN、网关、负载均衡、连接池）。非核心业务的流量突峰会直接挤占核心业务的资源。
+            </div>
+        </section>
+
+        <section>
+            <h2>域名拆分原则</h2>
+
+            <h3>原则一：相同功能的 API 划分到同一域名</h3>
+            <p>按<strong>业务领域</strong>而非技术层级拆分。例如：</p>
+            <ul>
+                <li>所有订单相关 API → <code>order.company.com</code></li>
+                <li>所有用户相关 API → <code>user.company.com</code></li>
+                <li>所有报表相关 API → <code>report.company.com</code></li>
+            </ul>
+
+            <h3>原则二：区分核心/非核心业务</h3>
+            <table>
+                <thead>
+                    <tr><th>分类</th><th>特征</th><th>示例</th><th>SLA 要求</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>核心业务</strong></td><td>直接影响收入/用户体验</td><td>下单、支付、登录</td><td>99.99%</td></tr>
+                    <tr><td><strong>重要业务</strong></td><td>影响用户体验但不直接损失</td><td>搜索、推荐、消息</td><td>99.9%</td></tr>
+                    <tr><td><strong>非核心业务</strong></td><td>可延迟、可降级</td><td>报表、导出、通知</td><td>99%</td></tr>
+                </tbody>
+            </table>
+
+            <h3>原则三：独立资源隔离</h3>
+            <p>不同域名对应独立的：</p>
+            <ul>
+                <li><strong>网关实例</strong>：不同的 Nginx/APISIX/Kong 实例</li>
+                <li><strong>负载均衡</strong>：独立的 LB 配置和健康检查</li>
+                <li><strong>连接池</strong>：数据库连接池、上游服务连接池隔离</li>
+                <li><strong>限流策略</strong>：各自独立的限流阈值</li>
+                <li><strong>监控告警</strong>：独立的 SLO 和告警规则</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>命名规则：NAME.TAG.host.com</h2>
+            <p>统一的命名规范有助于管理和自动化：</p>
+
+            <div class="code-block">
+                <div class="code-label">命名格式</div>
+                <pre><code>格式: {NAME}.{TAG}.{BASE_DOMAIN}
+
+NAME  - 业务名称（order, user, report, gateway）
+TAG   - 环境/用途标签（api, admin, internal, public）
+BASE  - 基础域名
+
+示例:
+order.api.company.com      # 订单 API（对外）
+order.admin.company.com    # 订单管理后台
+user.api.company.com       # 用户 API（对外）
+report.internal.company.com # 报表服务（内部）
+gateway.public.company.com  # 公共网关</code></pre>
+            </div>
+
+            <table>
+                <thead>
+                    <tr><th>标签</th><th>用途</th><th>访问范围</th><th>示例</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>api</code></td><td>对外 REST API</td><td>公网</td><td><code>order.api.company.com</code></td></tr>
+                    <tr><td><code>admin</code></td><td>管理后台</td><td>内网/VPN</td><td><code>order.admin.company.com</code></td></tr>
+                    <tr><td><code>internal</code></td><td>内部服务调用</td><td>内网</td><td><code>report.internal.company.com</code></td></tr>
+                    <tr><td><code>public</code></td><td>公共资源</td><td>公网</td><td><code>static.public.company.com</code></td></tr>
+                    <tr><td><code>grpc</code></td><td>gRPC 服务</td><td>内网</td><td><code>order.grpc.company.com</code></td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>网关拆分架构</h2>
+
+            <h3>拆分前：单网关架构</h3>
+            <div class="diagram-container">
+                <svg viewBox="0 0 600 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:600px;margin:16px auto;display:block;">
+                    <rect x="200" y="10" width="200" height="40" rx="8" fill="#4d96ff"/>
+                    <text x="300" y="35" text-anchor="middle" fill="white" font-size="14" font-weight="bold">用户请求</text>
+
+                    <rect x="150" y="80" width="300" height="80" rx="12" fill="#ff6b6b"/>
+                    <text x="300" y="110" text-anchor="middle" fill="white" font-size="16" font-weight="bold">单一 API 网关</text>
+                    <text x="300" y="135" text-anchor="middle" fill="white" font-size="12">api.company.com</text>
+                    <text x="300" y="152" text-anchor="middle" fill="white" font-size="11">共享连接池 / 限流 / 资源</text>
+
+                    <line x1="200" y1="160" x2="100" y2="220" stroke="#666" stroke-width="2"/>
+                    <line x1="250" y1="160" x2="220" y2="220" stroke="#666" stroke-width="2"/>
+                    <line x1="300" y1="160" x2="300" y2="220" stroke="#666" stroke-width="2"/>
+                    <line x1="350" y1="160" x2="380" y2="220" stroke="#666" stroke-width="2"/>
+                    <line x1="400" y1="160" x2="500" y2="220" stroke="#666" stroke-width="2"/>
+
+                    <rect x="30" y="220" width="130" height="50" rx="8" fill="#6bcb77"/>
+                    <text x="95" y="240" text-anchor="middle" fill="white" font-size="12" font-weight="bold">订单服务</text>
+                    <text x="95" y="258" text-anchor="middle" fill="white" font-size="10">核心业务</text>
+
+                    <rect x="165" y="220" width="110" height="50" rx="8" fill="#6bcb77"/>
+                    <text x="220" y="240" text-anchor="middle" fill="white" font-size="12" font-weight="bold">用户服务</text>
+                    <text x="220" y="258" text-anchor="middle" fill="white" font-size="10">核心业务</text>
+
+                    <rect x="280" y="220" width="110" height="50" rx="8" fill="#ffd93d"/>
+                    <text x="335" y="240" text-anchor="middle" fill="#333" font-size="12" font-weight="bold">报表服务</text>
+                    <text x="335" y="258" text-anchor="middle" fill="#333" font-size="10">非核心</text>
+
+                    <rect x="395" y="220" width="110" height="50" rx="8" fill="#ffd93d"/>
+                    <text x="450" y="240" text-anchor="middle" fill="#333" font-size="12" font-weight="bold">导出服务</text>
+                    <text x="450" y="258" text-anchor="middle" fill="#333" font-size="10">非核心</text>
+
+                    <rect x="510" y="220" width="80" height="50" rx="8" fill="#e1e5eb"/>
+                    <text x="550" y="240" text-anchor="middle" fill="#666" font-size="12" font-weight="bold">Webhook</text>
+                    <text x="550" y="258" text-anchor="middle" fill="#666" font-size="10">非核心</text>
+
+                    <rect x="100" y="290" width="400" height="28" rx="14" fill="#ff6b6b"/>
+                    <text x="300" y="309" text-anchor="middle" fill="white" font-size="12" font-weight="bold">❌ 非核心流量突增 → 网关资源耗尽 → 核心业务受损</text>
+                </svg>
+            </div>
+
+            <h3>拆分后：多网关架构</h3>
+            <div class="diagram-container">
+                <svg viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;margin:16px auto;display:block;">
+                    <rect x="250" y="10" width="200" height="40" rx="8" fill="#9b59b6"/>
+                    <text x="350" y="35" text-anchor="middle" fill="white" font-size="14" font-weight="bold">DNS 路由分发</text>
+
+                    <line x1="300" y1="50" x2="150" y2="90" stroke="#666" stroke-width="2"/>
+                    <line x1="350" y1="50" x2="350" y2="90" stroke="#666" stroke-width="2"/>
+                    <line x1="400" y1="50" x2="550" y2="90" stroke="#666" stroke-width="2"/>
+
+                    <rect x="20" y="90" width="260" height="70" rx="12" fill="#6bcb77"/>
+                    <text x="150" y="115" text-anchor="middle" fill="white" font-size="15" font-weight="bold">核心业务网关</text>
+                    <text x="150" y="138" text-anchor="middle" fill="white" font-size="12">core-api.company.com</text>
+                    <text x="150" y="155" text-anchor="middle" fill="white" font-size="11">独立资源 · 高优先级 · 严格限流</text>
+
+                    <rect x="290" y="90" width="260" height="70" rx="12" fill="#4d96ff"/>
+                    <text x="420" y="115" text-anchor="middle" fill="white" font-size="15" font-weight="bold">重要业务网关</text>
+                    <text x="420" y="138" text-anchor="middle" fill="white" font-size="12">api.company.com</text>
+                    <text x="420" y="155" text-anchor="middle" fill="white" font-size="11">独立资源 · 中优先级</text>
+
+                    <rect x="560" y="90" width="130" height="70" rx="12" fill="#ffd93d"/>
+                    <text x="625" y="115" text-anchor="middle" fill="#333" font-size="15" font-weight="bold">非核心网关</text>
+                    <text x="625" y="138" text-anchor="middle" fill="#333" font-size="12">batch.company.com</text>
+                    <text x="625" y="155" text-anchor="middle" fill="#333" font-size="11">低优先级 · 可降级</text>
+
+                    <line x1="80" y1="160" x2="80" y2="210" stroke="#6bcb77" stroke-width="2"/>
+                    <line x1="150" y1="160" x2="150" y2="210" stroke="#6bcb77" stroke-width="2"/>
+                    <line x1="220" y1="160" x2="220" y2="210" stroke="#6bcb77" stroke-width="2"/>
+
+                    <rect x="20" y="210" width="120" height="45" rx="8" fill="#6bcb77"/>
+                    <text x="80" y="230" text-anchor="middle" fill="white" font-size="12">订单服务</text>
+                    <text x="80" y="247" text-anchor="middle" fill="white" font-size="10">/order/*</text>
+
+                    <rect x="150" y="210" width="120" height="45" rx="8" fill="#6bcb77"/>
+                    <text x="210" y="230" text-anchor="middle" fill="white" font-size="12">用户服务</text>
+                    <text x="210" y="247" text-anchor="middle" fill="white" font-size="10">/user/*</text>
+
+                    <rect x="10" y="270" width="280" height="30" rx="6" fill="#d4edda"/>
+                    <text x="150" y="290" text-anchor="middle" fill="#333" font-size="12">✅ SLA 99.99% · 独立连接池 · 高基础带宽</text>
+
+                    <line x1="350" y1="160" x2="350" y2="210" stroke="#4d96ff" stroke-width="2"/>
+                    <line x1="420" y1="160" x2="420" y2="210" stroke="#4d96ff" stroke-width="2"/>
+                    <line x1="490" y1="160" x2="490" y2="210" stroke="#4d96ff" stroke-width="2"/>
+
+                    <rect x="290" y="210" width="120" height="45" rx="8" fill="#4d96ff"/>
+                    <text x="350" y="230" text-anchor="middle" fill="white" font-size="12">搜索服务</text>
+                    <text x="350" y="247" text-anchor="middle" fill="white" font-size="10">/search/*</text>
+
+                    <rect x="420" y="210" width="120" height="45" rx="8" fill="#4d96ff"/>
+                    <text x="480" y="230" text-anchor="middle" fill="white" font-size="12">推荐服务</text>
+                    <text x="480" y="247" text-anchor="middle" fill="white" font-size="10">/recommend/*</text>
+
+                    <rect x="290" y="270" width="260" height="30" rx="6" fill="#e3f2fd"/>
+                    <text x="420" y="290" text-anchor="middle" fill="#333" font-size="12">SLA 99.9% · 独立连接池 · 中等带宽</text>
+
+                    <line x1="590" y1="160" x2="590" y2="210" stroke="#ffd93d" stroke-width="2"/>
+                    <line x1="660" y1="160" x2="660" y2="210" stroke="#ffd93d" stroke-width="2"/>
+
+                    <rect x="560" y="210" width="130" height="45" rx="8" fill="#ffd93d"/>
+                    <text x="625" y="230" text-anchor="middle" fill="#333" font-size="12">报表/导出</text>
+                    <text x="625" y="247" text-anchor="middle" fill="#333" font-size="10">/report/* /export/*</text>
+
+                    <rect x="560" y="270" width="130" height="30" rx="6" fill="#fff3cd"/>
+                    <text x="625" y="290" text-anchor="middle" fill="#333" font-size="12">SLA 99% · 可降级</text>
+
+                    <rect x="10" y="330" width="680" height="55" rx="8" fill="#d4edda" stroke="#6bcb77" stroke-width="2"/>
+                    <text x="350" y="355" text-anchor="middle" fill="#333" font-size="14" font-weight="bold">✅ 资源完全隔离：非核心流量突增不影响核心业务</text>
+                    <text x="350" y="375" text-anchor="middle" fill="#666" font-size="12">独立网关 · 独立连接池 · 独立限流 · 独立监控告警</text>
+                </svg>
+            </div>
+        </section>
+
+        <section>
+            <h2>带宽管理策略</h2>
+
+            <h3>核心业务：高基础带宽保障</h3>
+            <ul>
+                <li><strong>基础带宽</strong>：按峰值流量的 120% 配置，确保高峰期不瓶颈</li>
+                <li><strong>弹性扩容</strong>：自动根据 QPS 扩容网关实例</li>
+                <li><strong>优先级队列</strong>：核心接口在网关层设置更高优先级</li>
+            </ul>
+
+            <h3>非核心业务：动态调整</h3>
+            <ul>
+                <li><strong>基础带宽</strong>：按平均流量配置，不预留过多</li>
+                <li><strong>动态限流</strong>：当核心业务带宽使用率高时，自动收紧非核心限流</li>
+                <li><strong>降级策略</strong>：极端情况下可完全关闭非核心服务</li>
+            </ul>
+
+            <div class="code-block">
+                <div class="code-label">Nginx 限流配置示例</div>
+                <pre><code># 核心业务网关 - 宽松限流
+limit_req_zone $binary_remote_addr zone=core:10m rate=1000r/s;
+server {
+    listen 80;
+    server_name core-api.company.com;
+
+    location /order/ {
+        limit_req zone=core burst=200 nodelay;
+        proxy_pass http://order-service;
+    }
+}
+
+# 非核心业务网关 - 严格限流
+limit_req_zone $binary_remote_addr zone=batch:10m rate=100r/s;
+server {
+    listen 80;
+    server_name batch.company.com;
+
+    location /export/ {
+        limit_req zone=batch burst=20 nodelay;
+        proxy_pass http://export-service;
+    }
+
+    location /report/ {
+        limit_req zone=batch burst=50 nodelay;
+        proxy_pass http://report-service;
+    }
+}</code></pre>
+            </div>
+        </section>
+
+        <section>
+            <h2>实践注意事项</h2>
+
+            <div class="highlight-box">
+                <strong>💡 拆分不是越多越好</strong>：域名拆分会增加 DNS 解析次数、SSL 证书管理成本、运维复杂度。建议按业务重要程度分为 2-3 层即可。
+            </div>
+
+            <table>
+                <thead>
+                    <tr><th>注意事项</th><th>说明</th><th>建议</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>DNS 解析延迟</strong></td><td>每个新域名增加一次 DNS 查询</td><td>使用 DNS 预解析</td></tr>
+                    <tr><td><strong>SSL 证书管理</strong></td><td>每个域名需要独立证书</td><td>使用通配符证书或 ACME 自动续期</td></tr>
+                    <tr><td><strong>CORS 跨域</strong></td><td>不同域名间请求触发 CORS</td><td>配置正确的 CORS 头，或使用同域不同路径</td></tr>
+                    <tr><td><strong>Cookie 共享</strong></td><td>不同域名间 Cookie 不共享</td><td>使用 Token 鉴权，或设置 .company.com 域</td></tr>
+                    <tr><td><strong>监控告警</strong></td><td>需要为每个域名配置独立监控</td><td>统一监控平台 + 分级告警策略</td></tr>
+                    <tr><td><strong>灰度发布</strong></td><td>拆分后灰度策略更复杂</td><td>使用网关层流量染色 + 路由规则</td></tr>
+                </tbody>
+            </table>
+
+            <div class="warning-box">
+                <strong>⚠️ 常见误区</strong>：域名拆分只是资源隔离的第一步。完整的隔离还需要：独立的数据库连接池、独立的消息队列消费组、独立的缓存实例。否则即使网关隔离了，下游资源仍可能被挤占。
+            </div>
+        </section>
+
+        <section class="summary">
+            <h2>总结</h2>
+            <ul>
+                <li><strong>核心问题</strong>：核心/非核心业务共用域名 → 共享资源 → 非核心流量突增波及核心链路</li>
+                <li><strong>拆分原则</strong>：按业务领域分组，按重要程度分级，相同功能 API 归到同一域名</li>
+                <li><strong>命名规范</strong>：NAME.TAG.host.com，标签区分用途（api/admin/internal/public）</li>
+                <li><strong>架构设计</strong>：核心/重要/非核心各自独立网关，资源完全隔离</li>
+                <li><strong>带宽策略</strong>：核心业务高基础保障，非核心业务动态调整 + 可降级</li>
+                <li><strong>注意事项</strong>：DNS 延迟、SSL 管理、CORS、Cookie 共享、监控告警</li>
+            </ul>
+        </section>
+
+        <section class="references">
+            <h2>参考来源</h2>
+            <ul>
+                <li><a href="https://martinfowler.com/articles/microservices.html" target="_blank">Martin Fowler - Microservices</a></li>
+                <li><a href="https://docs.nginx.com/nginx/admin-guide/security-controls/controlling-access-proxied-http/" target="_blank">Nginx Rate Limiting Documentation</a></li>
+                <li><a href="https://apisix.apache.org/docs/apisix/getting-started/README/" target="_blank">Apache APISIX API Gateway</a></li>
+                <li><a href="https://konghq.com/blog/engineering/api-gateway-patterns" target="_blank">Kong - API Gateway Patterns</a></li>
+            </ul>
+        </section>
+    </article></main>
+    <footer><div class="giscus"></div></footer>
+    <script src="https://eathvader.github.io/common.js"></script>
+    <script src="https://eathvader.github.io/syntax-highlight.js" defer></script>
+    <script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDOHZL5Rg" data-category="Comments" data-category-id="DIC_kwDOHZL5Rs4CR-F6" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="preferred_color_scheme" data-lang="zh-CN" crossorigin="anonymous" async></script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "98f150b2d4504972b013d68f408b3b77"}'></script>
+</body>
+</html>
