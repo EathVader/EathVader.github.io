@@ -8,6 +8,14 @@ export interface Tutorial {
 
 export const tutorials: Tutorial[] = [
   {
+    slug: 'distributed-consensus',
+    tag: '🏗️ 分布式',
+    title: '分布式一致性协议全面总结',
+    description:
+      'CAP 定理、Paxos、Raft、ZAB、2PC/3PC 一网打尽。覆盖共识算法原理、节点状态、日志复制、时钟同步，含交互式测验。',
+    meta: '基于多篇技术文章 · 2026-04',
+  },
+  {
     slug: 'backend-fundamentals',
     tag: '🏗️ 后端基础',
     title: '后端基础知识全景总结',
