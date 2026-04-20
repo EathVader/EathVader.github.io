@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="高并发架构：缓存、限流、熔断、负载均衡、压测">
+<title>高并发架构全面总结</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>⚡ <span>高并发架构</span>全面总结</h1>
+  <p class="subtitle">缓存 · 限流 · 熔断 · 负载均衡 · 压测<br>支撑千万级流量的架构设计</p>
+  <span class="badge">⚡ 高并发</span>
+  <span class="badge">🏗️ 架构</span>
+  <span class="badge">📈 性能</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-metric">高并发性能指标</a></li>
+    <li><a href="#sec-design">架构设计原则</a></li>
+    <li><a href="#sec-cache">缓存策略</a></li>
+    <li><a href="#sec-lb">负载均衡</a></li>
+    <li><a href="#sec-limit">限流与熔断</a></li>
+    <li><a href="#sec-test">压测与容量规划</a></li>
+    <li><a href="#sec-quiz">知识测验</a></li>
+  </ol>
+</nav>
+
+<section id="sec-metric">
+<h2 class="section-title"><span class="num">1</span> 高并发性能指标</h2>
+
+<h3>核心指标</h3>
+<table>
+  <tr><th>指标</th><th>说明</th></tr>
+  <tr><td><strong>QPS/TPS</strong></td><td>每秒请求数/事务数</td></tr>
+  <tr><td><strong>TP99/TP999</strong></td><td>99%/99.9% 请求的响应时间</td></tr>
+  <tr><td><strong>吞吐量</strong></td><td>吞吐量 = 单位时间 / 平均延迟</td></tr>
+  <tr><td><strong>SLA</strong></td><td>在特定 QPS 下提供 TP99 为 n 毫秒的服务能力</td></tr>
+</table>
+
+<h3>延迟时间参考</h3>
+<table>
+  <tr><th>操作</th><th>延迟</th></tr>
+  <tr><td>L1/L2 Cache 访问</td><td>几纳秒</td></tr>
+  <tr><td>内存访问</td><td>约 100 纳秒</td></tr>
+  <tr><td>1Gbps 网络发送 1KB</td><td>10 微秒</td></tr>
+  <tr><td>SSD 随机读</td><td>约 1 毫秒</td></tr>
+  <tr><td>磁盘随机读</td><td>约 10 毫秒</td></tr>
+</table>
+</section>
+
+<section id="sec-design">
+<h2 class="section-title"><span class="num">2</span> 架构设计原则</h2>
+
+<h3>实现高并发</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">服务拆分</div>
+  <div class="step" style="border-color:#22c55e">服务化</div>
+  <div class="step" style="border-color:#f59e0b">消息队列</div>
+  <div class="step" style="border-color:#a78bfa">缓存</div>
+</div>
+
+<h3>实现高可用</h3>
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">集群</div>
+  <div class="step" style="border-color:#f59e0b">限流</div>
+  <div class="step" style="border-color:#22c55e">降级</div>
+  <div class="step" style="border-color:#3b82f6">熔断</div>
+</div>
+
+<h3>业务设计</h3>
+<ul>
+  <li><strong>幂等</strong>：同一操作多次执行结果一致</li>
+  <li><strong>防重</strong>：通过 Token 防止重复提交</li>
+  <li><strong>状态机</strong>：有限状态机管理业务流程</li>
+</ul>
+</section>
+
+<section id="sec-cache">
+<h2 class="section-title"><span class="num">3</span> 缓存策略</h2>
+
+<h3>多级缓存</h3>
+<div class="flow">
+  <div class="step" style="border-color:#22c55e">本地缓存<br><small>Guava/Caffeine</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#3b82f6">分布式缓存<br><small>Redis</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#a78bfa">CDN<br><small>静态资源</small></div>
+</div>
+
+<h3>缓存问题</h3>
+<table>
+  <tr><th>问题</th><th>解决方案</th></tr>
+  <tr><td>缓存穿透</td><td>布隆过滤器、缓存空值</td></tr>
+  <tr><td>缓存击穿</td><td>互斥锁、逻辑过期</td></tr>
+  <tr><td>缓存雪崩</td><td>随机过期时间、多级缓存</td></tr>
+</table>
+</section>
+
+<section id="sec-lb">
+<h2 class="section-title"><span class="num">4</span> 负载均衡</h2>
+
+<h3>架构层面</h3>
+<table>
+  <tr><th>技术</th><th>说明</th></tr>
+  <tr><td>CDN</td><td>内容分发网络，就近访问</td></tr>
+  <tr><td>DNS 负载均衡</td><td>域名解析层面分流</td></tr>
+  <tr><td>L4/L7 负载均衡</td><td>四层/七层负载均衡（F5、LVS、Nginx）</td></tr>
+  <tr><td>服务网格</td><td>Sidecar 代理（Istio）</td></tr>
+</table>
+
+<h3>负载均衡算法</h3>
+<ul>
+  <li>轮询、加权轮询</li>
+  <li>最少连接</li>
+  <li>IP 哈希</li>
+  <li>一致性哈希</li>
+</ul>
+</section>
+
+<section id="sec-limit">
+<h2 class="section-title"><span class="num">5</span> 限流与熔断</h2>
+
+<h3>限流算法</h3>
+<table>
+  <tr><th>算法</th><th>说明</th></tr>
+  <tr><td>计数器</td><td>固定时间窗口内限制请求数</td></tr>
+  <tr><td>滑动窗口</td><td>动态调整时间窗口</td></tr>
+  <tr><td>漏桶</td><td>以固定速率处理请求</td></tr>
+  <tr><td>令牌桶</td><td>支持突发流量</td></tr>
+</table>
+
+<h3>熔断策略</h3>
+<ul>
+  <li><strong>失败阈值</strong>：连续失败 N 次后熔断</li>
+  <li><strong>恢复时间</strong>：熔断后尝试恢复</li>
+  <li><strong>半开状态</strong>：部分请求探测服务是否恢复</li>
+</ul>
+</section>
+
+<section id="sec-test">
+<h2 class="section-title"><span class="num">6</span> 压测与容量规划</h2>
+
+<h3>压测方法</h3>
+<table>
+  <tr><th>方法</th><th>说明</th></tr>
+  <tr><td>日志回放</td><td>录制线上日志，回放压测</td></tr>
+  <tr><td>流量复制</td><td>将流量复制到目标系统</td></tr>
+  <tr><td>场景化压测</td><td>模拟真实业务场景</td></tr>
+  <tr><td>全链路压测</td><td>模拟全链路流量</td></tr>
+</table>
+
+<h3>容量规划流程</h3>
+<ol>
+  <li><strong>基准测试</strong>：确定单系统容量</li>
+  <li><strong>短板分析</strong>：找到系统瓶颈</li>
+  <li><strong>容量计算</strong>：根据流量比例计算所需资源</li>
+  <li><strong>线性扩展</strong>：水平扩展应对增长</li>
+</ol>
+
+<div class="box box-amber">
+  <div class="title">💡 阿里双 11 经验</div>
+  <p>提前几个月准备 → 场景化压测 → 分层压测 → 限流降级预案</p>
+</div>
+</section>
+
+<section id="sec-quiz">
+<h2 class="section-title"><span class="num">7</span> 知识测验</h2>
+
+<div class="demo">
+  <h4>🎮 交互式测验</h4>
+  <button onclick="loadQuiz()">📋 开始测验</button>
+  <div id="quiz-area"></div>
+  <div id="quiz-score" style="margin-top:1rem;font-size:.95rem;color:#94a3b8"></div>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>基于多篇技术文章整理为交互式教程</p>
+  <p><a href="../">← 返回主页</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+const quizData = [
+  { q: 'TP99 表示什么？', opts: ['99% 请求的响应时间', '每秒 99 次请求', '99% 可用性', '99 个请求'], ans: 0 },
+  { q: '以下哪个不是实现高并��的手段？', opts: ['服务拆分', '消息队列', '单体部署', '缓存'], ans: 2 },
+  { q: '缓存击穿的解决方案不包括？', opts: ['互斥锁', '逻辑过期', '布隆过滤器', '永不过期'], ans: 2 },
+  { q: '令牌桶算法支持什么？', opts: ['固定速率', '突发流量', '平滑限流', '以上全部'], ans: 3 },
+  { q: '以下哪个不是负载均衡算法？', opts: ['轮询', '最短路径', '最少连接', '一致性哈希'], ans: 1 },
+  { q: '熔断的触发条件是？', opts: ['超时', '连续失败', '限流', '重试'], ans: 1 },
+];
+
+let quizAnswers = {};
+function loadQuiz() {
+  const area = document.getElementById('quiz-area');
+  quizAnswers = {};
+  area.innerHTML = quizData.map((q, i) => `<div style="margin-bottom:1.5rem"><p style="font-weight:600;color:#f8fafc">${i + 1}. ${q.q}</p><div class="quiz-options">${q.opts.map((opt, j) => `<label><input type="radio" name="q${i}" value="${j}" onchange="checkAnswer(${i}, ${j})">${opt}</label>`).join('')}</div><div class="quiz-result" id="result-${i}"></div></div>`).join('') + '<button onclick="showScore()" style="margin-top:.5rem">📊 查看得分</button>';
+}
+function checkAnswer(qi, selected) {
+  const el = document.getElementById('result-' + qi);
+  const correct = quizData[qi].ans;
+  quizAnswers[qi] = selected;
+  if (selected === correct) { el.className = 'quiz-result correct'; el.textContent = '✅ 正确！'; }
+  else { el.className = 'quiz-result wrong'; el.textContent = '❌ 错误，正确答案是：' + quizData[qi].opts[correct]; }
+}
+function showScore() {
+  let correct = 0;
+  for (let i = 0; i < quizData.length; i++) { if (quizAnswers[i] === quizData[i].ans) correct++; }
+  const pct = Math.round(correct / quizData.length * 100);
+  document.getElementById('quiz-score').innerHTML = `得分：<strong style="color:#60a5fa">${correct}/${quizData.length}</strong>（${pct}%）`;
+}
+window.addEventListener('scroll', () => { document.getElementById('backTop').classList.toggle('show', window.scrollY > 400); });
+</script>
+
+<script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDORuTVww" data-category="General" data-category-id="DIC_kwDORuTVw84C5OW8" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="dark_dimmed" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous" async></script>
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

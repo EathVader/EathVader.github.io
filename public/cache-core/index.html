@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="缓存核心知识：存储层次、MESI协议、缓存策略、穿透/击穿/雪崩">
+<title>缓存核心知识全面总结</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>🗄️ <span>缓存核心知识</span>全面总结</h1>
+  <p class="subtitle">存储层次 · MESI 协议 · 缓存策略 · 穿透/击穿/雪崩</p>
+  <span class="badge">🗄️ 缓存</span>
+  <span class="badge">⚡ 并发</span>
+  <span class="badge">🏗️ 分布式</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-hierarchy">存储层次与缓存基础</a></li>
+    <li><a href="#sec-coherency">CPU 缓存一致性</a></li>
+    <li><a href="#sec-strategy">缓存策略</a></li>
+    <li><a href="#sec-problems">缓存问题与解决方案</a></li>
+    <li><a href="#sec-distributed">分布式缓存</a></li>
+    <li><a href="#sec-quiz">知识测验</a></li>
+  </ol>
+</nav>
+
+<section id="sec-hierarchy">
+<h2 class="section-title"><span class="num">1</span> 存储层次与缓存基础</h2>
+
+<h3>计算机存储层次</h3>
+<table>
+  <tr><th>存储层级</th><th>访问延迟</th><th>典型容量</th></tr>
+  <tr><td>寄存器</td><td>1 周期</td><td>极少</td></tr>
+  <tr><td>L1/L2 Cache</td><td>几周期</td><td>KB-MB</td></tr>
+  <tr><td>L3 Cache</td><td>十几周期</td><td>MB</td></tr>
+  <tr><td>内存</td><td>几十-几百周期</td><td>GB</td></tr>
+  <tr><td>磁盘/SSD</td><td>毫秒级</td><td>TB</td></tr>
+</table>
+
+<h3>局部性原理</h3>
+<div class="flow">
+  <div class="step">⏰ 时间局部性<br><small>访问过的数据很可能再次被访问</small></div>
+  <div class="step">📍 空间局部性<br><small>附近地址很可能也被访问</small></div>
+</div>
+
+<h3>Cache Line 映射方式</h3>
+<table>
+  <tr><th>方式</th><th>说明</th></tr>
+  <tr><td>直接映射</td><td>每个地址只能映射到唯一位置</td></tr>
+  <tr><td>组相联</td><td>每组有多个 Cache Line（如 8-way）</td></tr>
+  <tr><td>全相联</td><td>任意地址可映射到任意位置</td></tr>
+</table>
+
+<div class="box box-blue">
+  <div class="title">📏 Cache Line 大小</div>
+  <p>典型大小 <strong>64 字节</strong>，是 Cache 与内存同步的最小单位。</p>
+</div>
+</section>
+
+<section id="sec-coherency">
+<h2 class="section-title"><span class="num">2</span> CPU 缓存一致性</h2>
+
+<h3>多核缓存架构</h3>
+<div class="flow">
+  <div class="step">L1/L2<br><small>每核独有</small></div>
+  <div class="step">L3<br><small>所有核心共享</small></div>
+</div>
+
+<h3>MESI 协议</h3>
+<table>
+  <tr><th>状态</th><th>含义</th></tr>
+  <tr><td><strong>M</strong>odified</td><td>数据已修改，未同步到内存</td></tr>
+  <tr><td><strong>E</strong>xclusive</td><td>独占，无副本</td></tr>
+  <tr><td><strong>S</strong>hared</td><td>共享，多核持有相同数据</td></tr>
+  <tr><td><strong>I</strong>nvalid</td><td>无效，需从内存加载</td></tr>
+</table>
+
+<h3>内存屏障（Memory Fence）</h3>
+<table>
+  <tr><th>屏障类型</th><th>作用</th></tr>
+  <tr><td>Store Barrier</td><td>强制刷新写缓冲到内存</td></tr>
+  <tr><td>Load Barrier</td><td>强制使缓存失效，重新读取</td></tr>
+  <tr><td>Full Barrier</td><td>兼具两者</td></tr>
+</table>
+
+<div class="box box-amber">
+  <div class="title">⚠️ False Sharing（伪共享）</div>
+  <p>不同线程访问同一 Cache Line 上的不同数据，导致缓存失效。解决方案：字节填充（Padding）。</p>
+</div>
+</section>
+
+<section id="sec-strategy">
+<h2 class="section-title"><span class="num">3</span> 缓存策略</h2>
+
+<h3>写策略</h3>
+<table>
+  <tr><th>策略</th><th>说明</th><th>优点</th><th>缺点</th></tr>
+  <tr><td>Write-through</td><td>同步写 Cache 和后端</td><td>一致性好</td><td>写延迟高</td></tr>
+  <tr><td>Write-back</td><td>只写 Cache，延迟写回</td><td>写延迟低</td><td>数据风险</td></tr>
+</table>
+
+<h3>读策略</h3>
+<table>
+  <tr><th>策略</th><th>说明</th></tr>
+  <tr><td>Read-through</td><td>Cache 未命中时自动从后端加载</td></tr>
+  <tr><td>Cache-aside</td><td>应用自行决定何时加载/写回</td></tr>
+</table>
+
+<h3>缓存过期模式</h3>
+<div class="flow">
+  <div class="step">Cache-aside<br><small>应用自行管理</small></div>
+  <div class="step">Read-through<br><small>Cache 自动加载</small></div>
+  <div class="step">Write-through<br><small>同步写</small></div>
+  <div class="step">Write-behind<br><small>异步写回</small></div>
+</div>
+</section>
+
+<section id="sec-problems">
+<h2 class="section-title"><span class="num">4</span> 缓存问题与解决方案</h2>
+
+<h3>缓存穿透</h3>
+<div class="box box-amber">
+  <div class="title">❌ 问题</div>
+  <p>查询不存在的数据，每次都打到后端数据库。</p>
+</div>
+<p><strong>解决方案：</strong>布隆过滤器 · 缓存空值 · 请求合法性校验</p>
+
+<h3>缓存击穿</h3>
+<div class="box box-amber">
+  <div class="title">❌ 问题</div>
+  <p>热点 key 过期瞬间，大量请求同时打到后端。</p>
+</div>
+<p><strong>解决方案：</strong>互斥锁 · 永不过期（逻辑过期） · 提前更新</p>
+
+<h3>缓存雪崩</h3>
+<div class="box box-amber">
+  <div class="title">❌ 问题</div>
+  <p>大量 key 同时过期，或 Cache 服务故障。</p>
+</div>
+<p><strong>解决方案：</strong>随机过期时间 · 多级缓存 · 熔断/限流 · 预热</p>
+
+<h3>服务过载预防</h3>
+<div class="flow">
+  <div class="step">Client 端<br><small>限制并发、请求排队</small></div>
+  <div class="step">Server 端<br><small>熔断、降级、限流</small></div>
+  <div class="step">Cache 端<br><small>预热、渐进恢复</small></div>
+</div>
+</section>
+
+<section id="sec-distributed">
+<h2 class="section-title"><span class="num">5</span> 分布式缓存</h2>
+
+<h3>缓存集群模式</h3>
+<table>
+  <tr><th>模式</th><th>说明</th></tr>
+  <tr><td>主从</td><td>主节点写，从节点读</td></tr>
+  <tr><td>分片</td><td>哈希/一致性哈希分配到不同节点</td></tr>
+  <tr><td>Redis Cluster</td><td>自动分片 + 哨兵</td></tr>
+</table>
+
+<div class="box box-green">
+  <div class="title">✅ 性能优化建议</div>
+  <ul style="margin:0;padding-left:1.2rem">
+    <li>优先使用本地缓存（Guava Cache、Caffeine）</li>
+    <li>热点数据用分布式缓存（Redis）</li>
+    <li>合理设置过期时间，避免同时过期</li>
+    <li>监控命中率，低于 80% 需优化</li>
+    <li>避免大对象，超过 Cache Line 会降低效率</li>
+    <li>批量操作，减少网络往返</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-quiz">
+<h2 class="section-title"><span class="num">6</span> 知识测验</h2>
+<div class="demo">
+  <h4>🎮 交互式测验</h4>
+  <button onclick="loadQuiz()">📋 开始测验</button>
+  <div id="quiz-area"></div>
+  <div id="quiz-score" style="margin-top:1rem;color:#94a3b8"></div>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>基于多篇技术文章整理</p>
+  <p><a href="../">← 返回主页</a></p>
+</footer>
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+const quizData = [
+  { q: 'Cache Line 典型大小是？', opts: ['16字节', '32字节', '64字节', '128字节'], ans: 2 },
+  { q: 'MESI 中 M 状态表示？', opts: ['共享', '独占', '已修改', '无效'], ans: 2 },
+  { q: '缓存穿透的解决方案不包括？', opts: ['布隆过滤器', '缓存空值', '增加内存', '请求校验'], ans: 2 },
+  { q: '哪种写策略延迟最低？', opts: ['Write-through', 'Write-back', 'Write-around', 'Write-once'], ans: 1 },
+  { q: '缓存命中率低于多少需要优化？', opts: ['50%', '60%', '70%', '80%'], ans: 3 },
+];
+let quizAnswers = {};
+function loadQuiz() {
+  const area = document.getElementById('quiz-area');
+  quizAnswers = {};
+  area.innerHTML = quizData.map((q,i)=>`<div style="margin-bottom:1.5rem"><p style="font-weight:600;color:#f8fafc">${i+1}. ${q.q}</p><div class="quiz-options">${q.opts.map((opt,j)=>`<label><input type="radio" name="q${i}" value="${j}" onchange="checkAnswer(${i},${j})">${opt}</label>`).join('')}</div><div class="quiz-result" id="result-${i}"></div></div>`).join('')+'<button onclick="showScore()">📊 查看得分</button>';
+}
+function checkAnswer(qi,sel){const el=document.getElementById('result-'+qi);quizAnswers[qi]=sel;if(sel===quizData[qi].ans){el.className='quiz-result correct';el.textContent='✅ 正确！';}else{el.className='quiz-result wrong';el.textContent='❌ 错误';}}
+function showScore(){let c=0;for(let i=0;i<quizData.length;i++)if(quizAnswers[i]===quizData[i].ans)c++;document.getElementById('quiz-score').innerHTML=`得分：<strong style="color:#60a5fa">${c}/${quizData.length}</strong>`;}
+window.addEventListener('scroll',()=>{document.getElementById('backTop').classList.toggle('show',window.scrollY>400);});
+</script>
+<script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDORuTVww" data-category="General" data-category-id="DIC_kwDORuTVw84C5OW8" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="dark_dimmed" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous" async></script>
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Feed系统设计：推模式、拉模式、推拉结合、IM消息系统">
+<title>Feed系统设计全面总结</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>📰 <span>Feed 系统设计</span>全面总结</h1>
+  <p class="subtitle">推模式 · 拉模式 · 推拉结合 · IM 消息系统</p>
+  <span class="badge">🏗️ 架构</span>
+  <span class="badge">📰 Feed</span>
+  <span class="badge">💬 IM</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-overview">Feed 业务概述</a></li>
+    <li><a href="#sec-push">推模式（写扩散）</a></li>
+    <li><a href="#sec-pull">拉模式（读扩散）</a></li>
+    <li><a href="#sec-hybrid">推拉结合</a></li>
+    <li><a href="#sec-im">IM 消息系统</a></li>
+    <li><a href="#sec-arch">架构要点</a></li>
+    <li><a href="#sec-quiz">知识测验</a></li>
+  </ol>
+</nav>
+
+<section id="sec-overview">
+<h2 class="section-title"><span class="num">1</span> Feed 业务概述</h2>
+
+<h3>典型业务</h3>
+<div class="flow">
+  <div class="step">微博<br><small>弱关系</small></div>
+  <div class="step">朋友圈<br><small>强关系</small></div>
+  <div class="step">Pinterest<br><small>图片社交</small></div>
+</div>
+
+<h3>核心操作</h3>
+<div class="flow">
+  <div class="step">关注/取关</div>
+  <div class="step">发布 Feed</div>
+  <div class="step">拉取主页 Feed 流</div>
+</div>
+</section>
+
+<section id="sec-push">
+<h2 class="section-title"><span class="num">2</span> 推模式（写扩散）</h2>
+
+<h3>原理</h3>
+<p>用户发布消息时，<strong>主动推送到所有粉丝的收件箱</strong>。</p>
+
+<div class="flow">
+  <div class="step">A 发布消息</div>
+  <div class="arrow">→</div>
+  <div class="step">找到所有粉丝</div>
+  <div class="arrow">→</div>
+  <div class="step">推送到每个粉丝 Feed</div>
+</div>
+
+<table>
+  <tr><th>优点</th><th>缺点</th></tr>
+  <tr><td>✅ 读取快（直接读收件箱）</td><td>❌ 写压力大（大V推送量巨大）</td></tr>
+  <tr><td>✅ 实时性好</td><td>❌ 存储冗余</td></tr>
+</table>
+
+<div class="box box-blue">
+  <div class="title">📌 适用场景</div>
+  <p>粉丝数均衡、读多写少、实时性要求高。</p>
+</div>
+</section>
+
+<section id="sec-pull">
+<h2 class="section-title"><span class="num">3</span> 拉模式（读扩散）</h2>
+
+<h3>原理</h3>
+<p>用户读取 Feed 时，<strong>主动拉取所有关注者的消息并聚合</strong>。</p>
+
+<div class="flow">
+  <div class="step">用户请求 Feed</div>
+  <div class="arrow">→</div>
+  <div class="step">获取关注列表</div>
+  <div class="arrow">→</div>
+  <div class="step">拉取+聚合+排序</div>
+</div>
+
+<table>
+  <tr><th>优点</th><th>缺点</th></tr>
+  <tr><td>✅ 写压力小</td><td>❌ 读取慢（需聚合）</td></tr>
+  <tr><td>✅ 存储简单</td><td>❌ 缓存困难</td></tr>
+</table>
+
+<div class="box box-blue">
+  <div class="title">📌 适用场景</div>
+  <p>强关系社交（朋友圈）、关注数少、读延迟容忍度高。</p>
+</div>
+</section>
+
+<section id="sec-hybrid">
+<h2 class="section-title"><span class="num">4</span> 推拉结合</h2>
+
+<h3>混合策略</h3>
+<div class="flow">
+  <div class="step">大 V 走拉取<br><small>粉丝数超阈值</small></div>
+  <div class="step">普通用户走推送<br><small>粉丝数少</small></div>
+</div>
+
+<h3>智能 Feed</h3>
+<div class="flow">
+  <div class="step">🤖 算法排序<br><small>按兴趣排序</small></div>
+  <div class="step">👥 社交关系<br><small>基于社交网络分发</small></div>
+  <div class="step">📊 实时反馈<br><small>根据行为调整</small></div>
+</div>
+</section>
+
+<section id="sec-im">
+<h2 class="section-title"><span class="num">5</span> IM 消息系统</h2>
+
+<h3>单聊</h3>
+<div class="flow">
+  <div class="step">实时推送<br><small>WebSocket/长轮询</small></div>
+  <div class="step">离线存储<br><small>未读消息持久化</small></div>
+</div>
+
+<h3>群聊消息存储</h3>
+<table>
+  <tr><th>策略</th><th>说明</th></tr>
+  <tr><td>多份存储</td><td>每个群成员一个队列</td></tr>
+  <tr><td>单份存储（推荐）</td><td>只存一份，按需读取</td></tr>
+</table>
+
+<h3>状态同步</h3>
+<table>
+  <tr><th>场景</th><th>推荐方式</th></tr>
+  <tr><td>在线状态</td><td>推（WebSocket）</td></tr>
+  <tr><td>历史消息</td><td>拉（分页）</td></tr>
+  <tr><td>未读数</td><td>推（增量更新）</td></tr>
+</table>
+</section>
+
+<section id="sec-arch">
+<h2 class="section-title"><span class="num">6</span> 架构要点</h2>
+
+<h3>技术方案</h3>
+<table>
+  <tr><th>方案</th><th>说明</th></tr>
+  <tr><td>分库分表</td><td>按用户 ID 哈希分片</td></tr>
+  <tr><td>多级缓存</td><td>本地缓存 + Redis</td></tr>
+  <tr><td>异步处理</td><td>消息队列解耦</td></tr>
+  <tr><td>CDN</td><td>静态资源加速</td></tr>
+</table>
+
+<div class="box box-green">
+  <div class="title">✅ 性能优化</div>
+  <p>预加载下一页 · 瀑布流无限滚动 · 骨架屏 Loading 优化</p>
+</div>
+</section>
+
+<section id="sec-quiz">
+<h2 class="section-title"><span class="num">7</span> 知识测验</h2>
+<div class="demo">
+  <h4>🎮 交互式测验</h4>
+  <button onclick="loadQuiz()">📋 开始测验</button>
+  <div id="quiz-area"></div>
+  <div id="quiz-score" style="margin-top:1rem;color:#94a3b8"></div>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>基于多篇技术文章整理</p>
+  <p><a href="../">← 返回主页</a></p>
+</footer>
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+const quizData = [
+  { q: '推模式也叫什么？', opts: ['读扩散', '写扩散', '混合扩散', '无扩散'], ans: 1 },
+  { q: '微博属于什么关系类型？', opts: ['强关系', '弱关系', '无关系', '双向关系'], ans: 1 },
+  { q: '大V用户推荐用什么模式？', opts: ['推模式', '拉模式', '推拉结合', '不处理'], ans: 1 },
+  { q: '群聊消息推荐什么存储策略？', opts: ['多份存储', '单份存储', '不存储', '全量复制'], ans: 1 },
+  { q: '在线状态推荐用什么方式同步？', opts: ['拉', '推', '轮询', '邮件'], ans: 1 },
+];
+let quizAnswers={};
+function loadQuiz(){const area=document.getElementById('quiz-area');quizAnswers={};area.innerHTML=quizData.map((q,i)=>`<div style="margin-bottom:1.5rem"><p style="font-weight:600;color:#f8fafc">${i+1}. ${q.q}</p><div class="quiz-options">${q.opts.map((opt,j)=>`<label><input type="radio" name="q${i}" value="${j}" onchange="checkAnswer(${i},${j})">${opt}</label>`).join('')}</div><div class="quiz-result" id="result-${i}"></div></div>`).join('')+'<button onclick="showScore()">📊 查看得分</button>';}
+function checkAnswer(qi,sel){const el=document.getElementById('result-'+qi);quizAnswers[qi]=sel;if(sel===quizData[qi].ans){el.className='quiz-result correct';el.textContent='✅ 正确！';}else{el.className='quiz-result wrong';el.textContent='❌ 错误';}}
+function showScore(){let c=0;for(let i=0;i<quizData.length;i++)if(quizAnswers[i]===quizData[i].ans)c++;document.getElementById('quiz-score').innerHTML=`得分：<strong style="color:#60a5fa">${c}/${quizData.length}</strong>`;}
+window.addEventListener('scroll',()=>{document.getElementById('backTop').classList.toggle('show',window.scrollY>400);});
+</script>
+<script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDORuTVww" data-category="General" data-category-id="DIC_kwDORuTVw84C5OW8" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="dark_dimmed" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous" async></script>
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

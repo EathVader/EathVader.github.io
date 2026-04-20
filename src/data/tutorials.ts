@@ -8,11 +8,115 @@ export interface Tutorial {
 
 export const tutorials: Tutorial[] = [
   {
+    slug: 'performance-latency',
+    tag: '⏱️ 性能',
+    title: '性能与延迟全面总结',
+    description:
+      '首屏秒开、服务端优化、全链路优化。覆盖延迟时间参考、移动端优化、监控指标，含交互式测验。',
+    meta: '基于多篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'high-concurrency',
+    tag: '⚡ 高并发',
+    title: '高并发架构全面总结',
+    description:
+      '缓存、限流、熔断、负载均衡、压测。覆盖 QPS/TP99、多级缓存、限流算法、容量规划，含交互式测验。',
+    meta: '基于多篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'programming-concurrency',
+    tag: '🧵 并发',
+    title: '编程语言与并发模型全面总结',
+    description:
+      'Scala 特性、Actor、CSP、七周七并发模型、LSM Tree。覆盖 OOP+FP、消息传递、存储结构，含交互式测验。',
+    meta: '基于多篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'architecture-design',
+    tag: '🏗️ 架构',
+    title: '架构设计方法论全面总结',
+    description:
+      '分层架构、SOA、微服务、DDD、SNAKE 分析法。覆盖架构目标、评判标准、演进路径、容错设计，含交互式测验。',
+    meta: '基于多篇技术文章 · 2026-04',
+  },
+  {
     slug: 'distributed-consensus',
     tag: '🏗️ 分布式',
     title: '分布式一致性协议全面总结',
     description:
       'CAP 定理、Paxos、Raft、ZAB、2PC/3PC 一网打尽。覆盖共识算法原理、节点状态、日志复制、时钟同步，含交互式测验。',
+    meta: '基于多篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'storage-database',
+    tag: '💾 存储',
+    title: '存储与数据库全面总结',
+    description:
+      '磁盘原理、RAID、Ceph 分布式存储、云存储安全。覆盖磁盘调度算法、RAID 级别选型、CRUSH 算法、数据去重与加密，含交互式测验。',
+    meta: '基于多篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'cache-core',
+    tag: '🗄️ 缓存',
+    title: '缓存核心知识全面总结',
+    description:
+      '存储层次、MESI 协议、缓存策略、穿透/击穿/雪崩。覆盖 Cache Line、内存屏障、Write-through/Write-back、分布式缓存集群，含交互式测验。',
+    meta: '基于多篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'api-design',
+    tag: '🔌 API',
+    title: 'API 设计最佳实践全面总结',
+    description:
+      'RESTful、HTTP 方法、状态码、URL 设计。覆盖资源命名、幂等性、响应格式、安全性、版本管理，含交互式测验。',
+    meta: '基于多篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'big-company-arch',
+    tag: '🏢 案例',
+    title: '大厂架构案例汇总',
+    description:
+      '美团外卖、映客直播、Riot Games、小红书、有赞日志平台。覆盖订单中心演进、服务化迁移、聊天集群、数据驱动，含交互式测验。',
+    meta: '基于多篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'distributed-id',
+    tag: '🆔 分布式',
+    title: '分布式 ID 生成方法全面总结',
+    description:
+      'UUID、雪花算法、号段模式、Redis INCR。覆盖 64 位结构、时钟回拨、方案对比、业务选型，含交互式测验。',
+    meta: '基于多篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'feed-system',
+    tag: '📰 社交',
+    title: 'Feed 系统设计全面总结',
+    description:
+      '推模式、拉模式、推拉结合、IM 消息系统。覆盖写扩散/读扩散、智能 Feed、群聊存储、状态同步，含交互式测验。',
+    meta: '基于多篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'blockchain-intro',
+    tag: '⛓️ 区块链',
+    title: '区块链入门全面总结',
+    description:
+      '核心概念、工作原理、共识机制、Python 实现。覆盖 PoW/PoS/DPoS、区块结构、链式哈希，含交互式测验。',
+    meta: '基于多篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'career-growth',
+    tag: '🚀 成长',
+    title: '职业成长与技术管理全面总结',
+    description:
+      '成长路径、技术分享、从程序员到 CTO、团队建设。覆盖成长阶段、技术写作、管理转型、12306 业务分析，含交互式测验。',
+    meta: '基于多篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'arch-practice',
+    tag: '🔧 实践',
+    title: '架构实践与数据分析全面总结',
+    description:
+      '分布式缓存、系统拆分、康威定律、数据分析思维。覆盖流式计算、渐进式演进、漏斗分析、IT 技能图谱，含交互式测验。',
     meta: '基于多篇技术文章 · 2026-04',
   },
   {

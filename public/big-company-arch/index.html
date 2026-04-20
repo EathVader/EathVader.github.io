@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="大厂架构案例：美团外卖、映客直播、Riot Games、小红书、有赞日志平台">
+<title>大厂架构案例汇总</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>🏢 <span>大厂架构案例</span>汇总</h1>
+  <p class="subtitle">美团 · 映客 · Riot Games · 小红书 · 有赞 · 多点</p>
+  <span class="badge">🏗️ 架构</span>
+  <span class="badge">🏢 案例</span>
+  <span class="badge">📈 演进</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-meituan">美团外卖订单中心</a></li>
+    <li><a href="#sec-yingke">映客直播架构优化</a></li>
+    <li><a href="#sec-riot">Riot Games 聊天服务</a></li>
+    <li><a href="#sec-xiaohongshu">小红书数据驱动</a></li>
+    <li><a href="#sec-youzan">有赞统一日志平台</a></li>
+    <li><a href="#sec-summary">架构共性总结</a></li>
+    <li><a href="#sec-quiz">知识测验</a></li>
+  </ol>
+</nav>
+
+<section id="sec-meituan">
+<h2 class="section-title"><span class="num">1</span> 美团外卖订单中心</h2>
+
+<h3>业务背景</h3>
+<p>日均订单量从几单增长到 <strong>600 万单</strong>，1 小时内完成配送。</p>
+
+<h3>订单业务特征</h3>
+<div class="flow">
+  <div class="step">⏰ 实时性高<br><small>1小时内送达</small></div>
+  <div class="step">📈 峰值明显<br><small>中午/晚上饭点</small></div>
+  <div class="step">🔄 多阶段流程<br><small>支付→接单→配送→送达</small></div>
+</div>
+
+<h3>系统演进</h3>
+<div class="flow">
+  <div class="step">早期<br><small>单体应用</small></div>
+  <div class="arrow">→</div>
+  <div class="step">中期<br><small>分布式可扩展</small></div>
+  <div class="arrow">→</div>
+  <div class="step">当前<br><small>多服务协同</small></div>
+</div>
+
+<div class="box box-blue">
+  <div class="title">💡 经验</div>
+  <p>业务驱动架构演进，峰值流量需提前容量规划，订单状态机设计至关重要。</p>
+</div>
+</section>
+
+<section id="sec-yingke">
+<h2 class="section-title"><span class="num">2</span> 映客直播架构优化</h2>
+
+<h3>挑战</h3>
+<div class="flow">
+  <div class="step">流量一天一个台阶</div>
+  <div class="step">性能和稳定性要求高</div>
+  <div class="step">系统平滑升级</div>
+</div>
+
+<h3>优化方向</h3>
+<ul>
+  <li>服务化架构迁移</li>
+  <li>系统和存储拆分</li>
+  <li>微服务与效率平衡</li>
+</ul>
+
+<div class="box box-amber">
+  <div class="title">💡 经验</div>
+  <p>架构重构要平滑过渡，基础设施先行，监控和告警体系完善。</p>
+</div>
+</section>
+
+<section id="sec-riot">
+<h2 class="section-title"><span class="num">3</span> Riot Games 聊天服务</h2>
+
+<h3>业务规模</h3>
+<p>英雄联盟：每天<strong>数百万条消息</strong>，每天新增 <strong>170 万好友关系</strong>。</p>
+
+<h3>架构设计</h3>
+<table>
+  <tr><th>特性</th><th>说明</th></tr>
+  <tr><td>区域隔离</td><td>每个区服独立聊天集群</td></tr>
+  <tr><td>集群规模</td><td>6-12 台机器/集群</td></tr>
+  <tr><td>节点独立</td><td>节点完全独立可替换</td></tr>
+  <tr><td>容错设计</td><td>可关闭一半节点不中断服务</td></tr>
+</table>
+
+<div class="box box-green">
+  <div class="title">💡 经验</div>
+  <p>物理服务器保证持续可用，容错设计是核心，聊天会话管理需要限流和日志记录。</p>
+</div>
+</section>
+
+<section id="sec-xiaohongshu">
+<h2 class="section-title"><span class="num">4</span> 小红书数据驱动</h2>
+
+<h3>软件公司 vs 互联网公司</h3>
+<table>
+  <tr><th>维度</th><th>软件公司</th><th>互联网公司</th></tr>
+  <tr><td>产品周期</td><td>几年一个版本</td><td>快速迭代</td></tr>
+  <tr><td>流程</td><td>需求文档→实现→QA</td><td>数据驱动→快速实验</td></tr>
+  <tr><td>决策</td><td>层层传达</td><td>数据分析→共同决策</td></tr>
+</table>
+
+<h3>数据驱动实践</h3>
+<div class="flow">
+  <div class="step">📊 数据分析</div>
+  <div class="arrow">→</div>
+  <div class="step">🧪 A/B 测试</div>
+  <div class="arrow">→</div>
+  <div class="step">📝 收集反馈</div>
+  <div class="arrow">→</div>
+  <div class="step">🔄 迭代优化</div>
+</div>
+</section>
+
+<section id="sec-youzan">
+<h2 class="section-title"><span class="num">5</span> 有赞统一日志平台</h2>
+
+<h3>业务规模</h3>
+<p>每秒 <strong>1.1 万条</strong>日志（峰值 1.5 万），每天约 <strong>9 亿条</strong>，占用 2.4TB。</p>
+
+<h3>总体架构</h3>
+<div class="flow">
+  <div class="step">日志接入层</div>
+  <div class="arrow">→</div>
+  <div class="step">Kafka 日志中心</div>
+  <div class="arrow">→</div>
+  <div class="step">日志处理层</div>
+  <div class="arrow">→</div>
+  <div class="step">日志存储层</div>
+</div>
+
+<h3>存储与处理</h3>
+<table>
+  <tr><th>用途</th><th>存储</th></tr>
+  <tr><td>实时分析</td><td>Storm / Spark</td></tr>
+  <tr><td>离线分析</td><td>HDFS</td></tr>
+  <tr><td>查询</td><td>Elasticsearch</td></tr>
+  <tr><td>监控报警</td><td>Hawk</td></tr>
+</table>
+</section>
+
+<section id="sec-summary">
+<h2 class="section-title"><span class="num">6</span> 架构共性总结</h2>
+
+<h3>架构演进模式</h3>
+<div class="flow">
+  <div class="step">单体→服务化<br><small>复杂度驱动</small></div>
+  <div class="step">垂直拆分<br><small>按业务域</small></div>
+  <div class="step">水平扩展<br><small>应对流量</small></div>
+</div>
+
+<h3>高可用设计</h3>
+<div class="flow">
+  <div class="step">多副本部署</div>
+  <div class="step">故障自动转移</div>
+  <div class="step">限流降级</div>
+  <div class="step">监控告警</div>
+</div>
+
+<div class="box box-green">
+  <div class="title">✅ 核心经验</div>
+  <ul style="margin:0;padding-left:1.2rem">
+    <li>业务驱动架构演进</li>
+    <li>数据驱动决策</li>
+    <li>快速迭代、小步快跑</li>
+    <li>组织与技术对齐</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-quiz">
+<h2 class="section-title"><span class="num">7</span> 知识测验</h2>
+<div class="demo">
+  <h4>🎮 交互式测验</h4>
+  <button onclick="loadQuiz()">📋 开始测验</button>
+  <div id="quiz-area"></div>
+  <div id="quiz-score" style="margin-top:1rem;color:#94a3b8"></div>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>基于多篇技术文章整理</p>
+  <p><a href="../">← 返回主页</a></p>
+</footer>
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+const quizData = [
+  { q: '美团外卖日均订单量峰值约？', opts: ['60万', '600万', '6000万', '6亿'], ans: 1 },
+  { q: 'Riot Games 聊天集群每个区服多少台机器？', opts: ['1-2台', '6-12台', '50-100台', '200+台'], ans: 1 },
+  { q: '有赞日志平台每天产生多少条日志？', opts: ['100万', '1亿', '9亿', '90亿'], ans: 2 },
+  { q: '架构演进的驱动力是？', opts: ['技术趋势', '业务需求', '团队规模', '成本压力'], ans: 1 },
+  { q: '互联网公司决策方式是？', opts: ['层层传达', '数据驱动', '领导拍板', '投票决定'], ans: 1 },
+];
+let quizAnswers={};
+function loadQuiz(){const area=document.getElementById('quiz-area');quizAnswers={};area.innerHTML=quizData.map((q,i)=>`<div style="margin-bottom:1.5rem"><p style="font-weight:600;color:#f8fafc">${i+1}. ${q.q}</p><div class="quiz-options">${q.opts.map((opt,j)=>`<label><input type="radio" name="q${i}" value="${j}" onchange="checkAnswer(${i},${j})">${opt}</label>`).join('')}</div><div class="quiz-result" id="result-${i}"></div></div>`).join('')+'<button onclick="showScore()">📊 查看得分</button>';}
+function checkAnswer(qi,sel){const el=document.getElementById('result-'+qi);quizAnswers[qi]=sel;if(sel===quizData[qi].ans){el.className='quiz-result correct';el.textContent='✅ 正确！';}else{el.className='quiz-result wrong';el.textContent='❌ 错误';}}
+function showScore(){let c=0;for(let i=0;i<quizData.length;i++)if(quizAnswers[i]===quizData[i].ans)c++;document.getElementById('quiz-score').innerHTML=`得分：<strong style="color:#60a5fa">${c}/${quizData.length}</strong>`;}
+window.addEventListener('scroll',()=>{document.getElementById('backTop').classList.toggle('show',window.scrollY>400);});
+</script>
+<script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDORuTVww" data-category="General" data-category-id="DIC_kwDORuTVw84C5OW8" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="dark_dimmed" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous" async></script>
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="编程语言与并发模型：Scala、Actor、CSP、LSM Tree">
+<title>编程语言与并发模型全面总结</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>🧵 <span>编程语言与并发模型</span>全面总结</h1>
+  <p class="subtitle">Scala 特性 · Actor · CSP · LSM Tree · 七周七并发模型</p>
+  <span class="badge">🧵 并发</span>
+  <span class="badge">🧩 Scala</span>
+  <span class="badge">💾 存储</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-scala">Scala 语言特性</a></li>
+    <li><a href="#sec-model">并发模型</a></li>
+    <li><a href="#sec-lsm">LSM Tree</a></li>
+    <li><a href="#sec-doris">Doris Colocate Join</a></li>
+    <li><a href="#sec-quiz">知识测验</a></li>
+  </ol>
+</nav>
+
+<section id="sec-scala">
+<h2 class="section-title"><span class="num">1</span> Scala 语言特性</h2>
+
+<h3>1.1 OOP + FP</h3>
+<ul>
+  <li><strong>面向对象</strong>：一切皆对象，`1 + 1` 实际是 `1.+(1)`</li>
+  <li><strong>函数式</strong>：函数为头等公民，方法无副作用</li>
+  <li><strong>特质（trait）</strong>：比接口更强大</li>
+</ul>
+
+<h3>1.2 并发特性</h3>
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">Actor 模型</div>
+  <div class="step" style="border-color:#f59e0b">Future/Promise</div>
+  <div class="step" style="border-color:#22c55e">协程支持</div>
+</div>
+
+<h3>1.3 类型系统</h3>
+<ul>
+  <li>强大的类型推断</li>
+  <li>模式匹配</li>
+  <li>协变/逆变</li>
+</ul>
+</section>
+
+<section id="sec-model">
+<h2 class="section-title"><span class="num">2</span> 并发模型</h2>
+
+<h3>七周七并发模型</h3>
+<table>
+  <tr><th>模型</th><th>语言</th><th>特点</th></tr>
+  <tr><td>线程与锁</td><td>Java</td><td>共享内存</td></tr>
+  <tr><td>函数式</td><td>Haskell</td><td>无副作用</td></tr>
+  <tr><td>Actor</td><td>Erlang/Akka</td><td>消息传递</td></tr>
+  <tr><td>CSP</td><td>Go</td><td>通道通信</td></tr>
+  <tr><td>数据流</td><td>Oz</td><td>数据驱动</td></tr>
+  <tr><td>Lambda</td><td>函数式并行</td><td>计算即数据</td></tr>
+</table>
+
+<div class="analogy">
+  <div class="emoji">📬</div>
+  <h4>Actor vs CSP</h4>
+  <p><strong>Actor</strong>：邮箱是私有的，通过消息队列通信<br><strong>CSP</strong>：通道是共享的，通过 channel 通信</p>
+</div>
+</section>
+
+<section id="sec-lsm">
+<h2 class="section-title"><span class="num">3</span> LSM Tree</h2>
+
+<h3>3.1 概念</h3>
+<p>Log-Structured Merge Tree，结合 Immutable 思想实现的高效存储结构。</p>
+
+<h3>3.2 优势</h3>
+<ul>
+  <li>写性能高（顺序写）</li>
+  <li>支持高并发写入</li>
+  <li>适用于写多读少场景</li>
+</ul>
+
+<h3>3.3 应用</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">RocksDB</div>
+  <div class="step" style="border-color:#a78bfa">Cassandra</div>
+  <div class="step" style="border-color:#22c55e">LevelDB</div>
+</div>
+</section>
+
+<section id="sec-doris">
+<h2 class="section-title"><span class="num">4</span> Doris Colocate Join</h2>
+
+<h3>4.1 概念</h3>
+<p>将关联数据存储在同一批次节点，避免跨节点网络开销。</p>
+
+<h3>4.2 核心思路</h3>
+<ul>
+  <li>导入时保证数据本地性</li>
+  <li>查询时利用本地性优化</li>
+</ul>
+</section>
+
+<section id="sec-quiz">
+<h2 class="section-title"><span class="num">5</span> 知识测验</h2>
+
+<div class="demo">
+  <h4>🎮 交互式测验</h4>
+  <button onclick="loadQuiz()">📋 开始测验</button>
+  <div id="quiz-area"></div>
+  <div id="quiz-score" style="margin-top:1rem;font-size:.95rem;color:#94a3b8"></div>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>基于多篇技术文章整理为交互式教程</p>
+  <p><a href="../">← 返回主页</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+const quizData = [
+  { q: 'Scala 中，1 + 1 实际调用的是什么？', opts: ['add(1)', '1.+(1)', 'sum(1)', 'plus(1)'], ans: 1 },
+  { q: 'Actor 模型的核心通信方式是什么？', opts: ['共享内存', '消息传递', '通道通信', '锁机制'], ans: 1 },
+  { q: 'CSP 模型通过什么通信？', opts: ['邮箱', '通道', '信号量', '共享变量'], ans: 1 },
+  { q: 'LSM Tree 适合什么场景？', opts: ['读多写少', '写多读少', '随机读写', '事务处理'], ans: 1 },
+  { q: 'RocksDB 底层基于什么实现？', opts: ['B+ Tree', 'LSM Tree', 'Hash', 'Skip List'], ans: 1 },
+  { q: 'Doris Colocate Join 的核心优化是？', opts: ['增加缓存', '数据本地性', '并行查询', '压缩存储'], ans: 1 },
+];
+
+let quizAnswers = {};
+function loadQuiz() {
+  const area = document.getElementById('quiz-area');
+  quizAnswers = {};
+  area.innerHTML = quizData.map((q, i) => `<div style="margin-bottom:1.5rem"><p style="font-weight:600;color:#f8fafc">${i + 1}. ${q.q}</p><div class="quiz-options">${q.opts.map((opt, j) => `<label><input type="radio" name="q${i}" value="${j}" onchange="checkAnswer(${i}, ${j})">${opt}</label>`).join('')}</div><div class="quiz-result" id="result-${i}"></div></div>`).join('') + '<button onclick="showScore()" style="margin-top:.5rem">📊 查看得分</button>';
+}
+function checkAnswer(qi, selected) {
+  const el = document.getElementById('result-' + qi);
+  const correct = quizData[qi].ans;
+  quizAnswers[qi] = selected;
+  if (selected === correct) { el.className = 'quiz-result correct'; el.textContent = '✅ 正确！'; }
+  else { el.className = 'quiz-result wrong'; el.textContent = '❌ 错误，正确答案是：' + quizData[qi].opts[correct]; }
+}
+function showScore() {
+  let correct = 0;
+  for (let i = 0; i < quizData.length; i++) { if (quizAnswers[i] === quizData[i].ans) correct++; }
+  const pct = Math.round(correct / quizData.length * 100);
+  document.getElementById('quiz-score').innerHTML = `得分：<strong style="color:#60a5fa">${correct}/${quizData.length}</strong>（${pct}%）`;
+}
+window.addEventListener('scroll', () => { document.getElementById('backTop').classList.toggle('show', window.scrollY > 400); });
+</script>
+
+<script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDORuTVww" data-category="General" data-category-id="DIC_kwDORuTVw84C5OW8" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="dark_dimmed" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous" async></script>
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

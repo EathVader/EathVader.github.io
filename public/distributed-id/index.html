@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="分布式ID生成：UUID、雪花算法、号段模式、Redis INCR">
+<title>分布式ID生成方法全面总结</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>🆔 <span>分布式 ID 生成</span>全面总结</h1>
+  <p class="subtitle">UUID · 雪花算法 · 号段模式 · Redis INCR</p>
+  <span class="badge">🏗️ 分布式</span>
+  <span class="badge">🆔 ID生成</span>
+  <span class="badge">❄️ Snowflake</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-need">核心需求</a></li>
+    <li><a href="#sec-schemes">常见方案</a></li>
+    <li><a href="#sec-snowflake">雪花算法详解</a></li>
+    <li><a href="#sec-compare">方案对比</a></li>
+    <li><a href="#sec-select">业务选型</a></li>
+    <li><a href="#sec-quiz">知识测验</a></li>
+  </ol>
+</nav>
+
+<section id="sec-need">
+<h2 class="section-title"><span class="num">1</span> 核心需求</h2>
+<table>
+  <tr><th>需求</th><th>说明</th></tr>
+  <tr><td><strong>全局唯一</strong></td><td>不同节点、不同时间生成的 ID 不能重复</td></tr>
+  <tr><td><strong>趋势有序</strong></td><td>ID 基本按时间递增，有利于数据库索引</td></tr>
+</table>
+</section>
+
+<section id="sec-schemes">
+<h2 class="section-title"><span class="num">2</span> 常见方案</h2>
+
+<h3>UUID</h3>
+<div class="flow">
+  <div class="step">✅ 本地生成，无中心化</div>
+  <div class="step">❌ 无序，36字符</div>
+  <div class="step">📌 适合不依赖有序的业务</div>
+</div>
+
+<h3>数据库自增</h3>
+<div class="flow">
+  <div class="step">✅ 有序递增，简单</div>
+  <div class="step">❌ 单点瓶颈，扩展难</div>
+  <div class="step">📌 适合单机单库</div>
+</div>
+
+<h3>雪花算法（Snowflake）</h3>
+<div class="box box-blue">
+  <div class="title">❄️ Twitter 开源</div>
+  <p>64 位 long 型 ID，单机每秒可生成约 <strong>400 万个</strong> ID。</p>
+</div>
+
+<h3>号段模式</h3>
+<div class="flow">
+  <div class="step">批量获取 ID（如 1000 个）</div>
+  <div class="arrow">→</div>
+  <div class="step">内存中分配</div>
+  <div class="arrow">→</div>
+  <div class="step">用完再获取下一段</div>
+</div>
+
+<h3>Redis INCR</h3>
+<div class="flow">
+  <div class="step">✅ 性能高、有序</div>
+  <div class="step">❌ 依赖外部 Redis</div>
+  <div class="step">📌 适合已有 Redis 基础设施</div>
+</div>
+</section>
+
+<section id="sec-snowflake">
+<h2 class="section-title"><span class="num">3</span> 雪花算法详解</h2>
+
+<h3>64 位结构</h3>
+<table>
+  <tr><th>位段</th><th>长度</th><th>说明</th></tr>
+  <tr><td>符号位</td><td>1 bit</td><td>永远是 0</td></tr>
+  <tr><td>时间戳</td><td>41 bit</td><td>毫秒时间戳，支持 69 年</td></tr>
+  <tr><td>数据中心 ID</td><td>5 bit</td><td>0-31</td></tr>
+  <tr><td>机器 ID</td><td>5 bit</td><td>0-31</td></tr>
+  <tr><td>序列号</td><td>12 bit</td><td>每毫秒 4096 个 ID</td></tr>
+</table>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 时钟回拨问题</div>
+  <p>机器时钟回拨会导致 ID 重复。解决方案：检测回拨后等待追上，或使用更大的序列号。</p>
+</div>
+
+<h3>优缺点</h3>
+<div class="flow">
+  <div class="step">✅ 高性能</div>
+  <div class="step">✅ 有序</div>
+  <div class="step">✅ 分布式</div>
+  <div class="step">❌ 依赖时钟</div>
+</div>
+</section>
+
+<section id="sec-compare">
+<h2 class="section-title"><span class="num">4</span> 方案对比</h2>
+<table>
+  <tr><th>方案</th><th>唯一性</th><th>有序性</th><th>性能</th><th>复杂度</th><th>依赖</th></tr>
+  <tr><td>UUID</td><td>✅</td><td>❌</td><td>高</td><td>低</td><td>无</td></tr>
+  <tr><td>数据库自增</td><td>✅</td><td>✅</td><td>低</td><td>低</td><td>数据库</td></tr>
+  <tr><td>雪花算法</td><td>✅</td><td>✅</td><td>高</td><td>中</td><td>时钟</td></tr>
+  <tr><td>号段模式</td><td>✅</td><td>✅</td><td>高</td><td>中</td><td>数据库</td></tr>
+  <tr><td>Redis</td><td>✅</td><td>✅</td><td>高</td><td>低</td><td>Redis</td></tr>
+</table>
+</section>
+
+<section id="sec-select">
+<h2 class="section-title"><span class="num">5</span> 业务选型</h2>
+<table>
+  <tr><th>场景</th><th>推荐方案</th></tr>
+  <tr><td>消息队列幂等</td><td>雪花算法</td></tr>
+  <tr><td>订单 ID</td><td>雪花算法 / 号段模式</td></tr>
+  <tr><td>临时文件命名</td><td>UUID</td></tr>
+  <tr><td>分库分表主键</td><td>雪花算法</td></tr>
+</table>
+
+<div class="box box-green">
+  <div class="title">✅ 总结</div>
+  <ul style="margin:0;padding-left:1.2rem">
+    <li><strong>无序可接受</strong>：UUID</li>
+    <li><strong>高性能+有序</strong>：雪花算法（推荐）</li>
+    <li><strong>简单实现</strong>：数据库自增</li>
+    <li><strong>批量生成</strong>：号段模式</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-quiz">
+<h2 class="section-title"><span class="num">6</span> 知识测验</h2>
+<div class="demo">
+  <h4>🎮 交互式测验</h4>
+  <button onclick="loadQuiz()">📋 开始测验</button>
+  <div id="quiz-area"></div>
+  <div id="quiz-score" style="margin-top:1rem;color:#94a3b8"></div>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>基于多篇技术文章整理</p>
+  <p><a href="../">← 返回主页</a></p>
+</footer>
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+const quizData = [
+  { q: '雪花算法 ID 总共多少位？', opts: ['32位', '48位', '64位', '128位'], ans: 2 },
+  { q: '雪花算法每毫秒最多生成多少个 ID？', opts: ['1024', '2048', '4096', '8192'], ans: 2 },
+  { q: '雪花算法的主要缺点是？', opts: ['性能低', '依赖时钟', '无序', '存储大'], ans: 1 },
+  { q: 'UUID 的主要缺点是？', opts: ['不唯一', '无序', '性能低', '依赖网络'], ans: 1 },
+  { q: '分库分表主键推荐用什么方案？', opts: ['UUID', '数据库自增', '雪花算法', '随机数'], ans: 2 },
+];
+let quizAnswers={};
+function loadQuiz(){const area=document.getElementById('quiz-area');quizAnswers={};area.innerHTML=quizData.map((q,i)=>`<div style="margin-bottom:1.5rem"><p style="font-weight:600;color:#f8fafc">${i+1}. ${q.q}</p><div class="quiz-options">${q.opts.map((opt,j)=>`<label><input type="radio" name="q${i}" value="${j}" onchange="checkAnswer(${i},${j})">${opt}</label>`).join('')}</div><div class="quiz-result" id="result-${i}"></div></div>`).join('')+'<button onclick="showScore()">📊 查看得分</button>';}
+function checkAnswer(qi,sel){const el=document.getElementById('result-'+qi);quizAnswers[qi]=sel;if(sel===quizData[qi].ans){el.className='quiz-result correct';el.textContent='✅ 正确！';}else{el.className='quiz-result wrong';el.textContent='❌ 错误';}}
+function showScore(){let c=0;for(let i=0;i<quizData.length;i++)if(quizAnswers[i]===quizData[i].ans)c++;document.getElementById('quiz-score').innerHTML=`得分：<strong style="color:#60a5fa">${c}/${quizData.length}</strong>`;}
+window.addEventListener('scroll',()=>{document.getElementById('backTop').classList.toggle('show',window.scrollY>400);});
+</script>
+<script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDORuTVww" data-category="General" data-category-id="DIC_kwDORuTVw84C5OW8" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="dark_dimmed" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous" async></script>
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>
