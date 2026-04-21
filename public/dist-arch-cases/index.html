@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="分布式架构案例与实战：架构演进、去哪儿网、负载均衡、MapReduce、混沌工程">
+<title>分布式架构案例与实战全面总结</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>🏛️ <span>分布式架构案例</span>与实战总结</h1>
+  <p class="subtitle">架构演进 · 去哪儿网实战 · 负载均衡 · MapReduce · 混沌工程<br>从单体到微服务的真实架构变迁之路</p>
+  <span class="badge">🏛️ 架构</span>
+  <span class="badge">📊 案例</span>
+  <span class="badge">🔧 实战</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-evolution">架构演进模式</a></li>
+    <li><a href="#sec-qunar">去哪儿网案例</a></li>
+    <li><a href="#sec-startup">创业公司架构变迁</a></li>
+    <li><a href="#sec-lb">负载均衡原理</a></li>
+    <li><a href="#sec-mr">大数据分布式计算</a></li>
+    <li><a href="#sec-chaos">混沌工程</a></li>
+    <li><a href="#sec-components">系统设计核心组件</a></li>
+    <li><a href="#sec-quiz">知识测验</a></li>
+  </ol>
+</nav>
+
+<section id="sec-evolution">
+<h2 class="section-title"><span class="num">1</span> 架构演进模式</h2>
+
+<h3>演进的普遍规律</h3>
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">单体应用</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">垂直拆分</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">分布式服务化</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#3b82f6">微服务架构</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#a78bfa">云原生/容器化</div>
+</div>
+
+<h3>架构演进的驱动力</h3>
+<table>
+  <tr><th>驱动因素</th><th>具体表现</th></tr>
+  <tr><td><strong>业务复杂度增长</strong></td><td>业务线增多，代码臃肿，迭代速度下降</td></tr>
+  <tr><td><strong>用户规模爆发</strong></td><td>高并发压力，单机性能瓶颈</td></tr>
+  <tr><td><strong>团队规模扩大</strong></td><td>多人协作困难，缺少并行研发能力</td></tr>
+  <tr><td><strong>数据量膨胀</strong></td><td>单库单表瓶颈，需要分库分表</td></tr>
+  <tr><td><strong>可用性要求提升</strong></td><td>单点故障风险，需要高可用架构</td></tr>
+</table>
+
+<h3>架构选型原则</h3>
+<div class="box box-blue">
+  <div class="title">📌 四大原则</div>
+  <ul>
+    <li><strong>选择合适的技术而非最好的技术</strong>：权衡研发效率和产品目标</li>
+    <li><strong>架构围绕业务</strong>：不同业务时期需要不同架构</li>
+    <li><strong>提前规划扩展性</strong>：单体阶段就规划好未来解耦路径</li>
+    <li><strong>渐进式演进</strong>：在维护现有系统的基础上同时进行架构重构</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-qunar">
+<h2 class="section-title"><span class="num">2</span> 去哪儿网案例</h2>
+
+<h3>机票搜索系统</h3>
+<p>高峰期承载<strong>日均十亿级 PV、月均上亿 UV</strong>。</p>
+<table>
+  <tr><th>核心指标</th><th>数值</th></tr>
+  <tr><td>搜索缓存命中率</td><td>> 99.7%</td></tr>
+  <tr><td>每台实例 QPS</td><td>> 1000（50~60 台虚拟机）</td></tr>
+  <tr><td>搜索结果 Average-Time</td><td>< 3 秒</td></tr>
+</table>
+
+<h3>整体架构（水平分层 + 垂直按引擎划分）</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">终端渠道层<br><small>APP/WWW/低价</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">报价聚合层<br><small>全局缓存 + Cache Manager</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">MQ + Redis<br><small>数据交换区，解耦</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#a78bfa">报价计算引擎层<br><small>多渠道并行计算</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#ef4444">基础数据层<br><small>运价/调价/航班</small></div>
+</div>
+
+<div class="box box-green">
+  <div class="title">✅ 关键设计点</div>
+  <ul>
+    <li><strong>MQ + Redis 交互</strong>：解耦聚合层与引擎层，新增/减少引擎不影响聚合层</li>
+    <li><strong>缓存管理</strong>：所有影响报价的变更收拢到 Cache Manager</li>
+    <li><strong>多引擎并行</strong>：各渠道报价引擎并行计算，形成互补优势</li>
+    <li><strong>自定义 txt 格式</strong>：压缩到原来 30%~40%，极大节约带宽</li>
+  </ul>
+</div>
+
+<h3>支付系统架构演进</h3>
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">1.0 单体<br><small>所有功能耦合</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">2.0 服务化拆分<br><small>按交易时序拆分</small></div>
+</div>
+
+<p><strong>2.0 拆分后的核心系统</strong>：</p>
+<table>
+  <tr><th>系统</th><th>职责</th></tr>
+  <tr><td><strong>交易核心（Apollo）</strong></td><td>直接交易、担保交易、分账交易、预授权等</td></tr>
+  <tr><td><strong>支付核心（Minos）</strong></td><td>银行卡、支付宝、微信、余额、积分、红包等组合支付</td></tr>
+  <tr><td><strong>网关</strong></td><td>高度抽象为标准服务（支付、退款、查询），多通道智能选择</td></tr>
+  <tr><td><strong>收银台</strong></td><td>多端支持（APP/Touch/PC），直接影响订单转化率</td></tr>
+  <tr><td><strong>API 读写分离</strong></td><td>读服务（Ares）查询 + 写服务（Odin）核心业务</td></tr>
+</table>
+</section>
+
+<section id="sec-startup">
+<h2 class="section-title"><span class="num">3</span> 创业公司架构变迁：贝聊 5 年实战</h2>
+
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">V1.0 LNMP 单体<br><small>1 名 PHP 开发，3 台 ECS</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">V2.0 Java 分布式<br><small>Hessian RPC + MQ</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">V3.0 微服务（Dubbo）<br><small>用户增长数百万</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#3b82f6">V4.0 云原生<br><small>Docker + API 网关</small></div>
+</div>
+
+<h3>V3.0 微服务治理体系</h3>
+<table>
+  <tr><th>治理能力</th><th>实现方案</th></tr>
+  <tr><td><strong>版本发布</strong></td><td>自研发布系统：一键部署、灰度发布、快速回滚</td></tr>
+  <tr><td><strong>环境管理</strong></td><td>四套环境：开发 → 测试 → 预发布 → 生产</td></tr>
+  <tr><td><strong>配置中心</strong></td><td>Disconf：配置云端管理、加密、无需重启</td></tr>
+  <tr><td><strong>任务调度</strong></td><td>Elastic-Job：分片、弹性扩缩容、失效转移</td></tr>
+  <tr><td><strong>全链路跟踪</strong></td><td>美团 Cat + Dubbo 整合，全局链路 ID</td></tr>
+  <tr><td><strong>服务监控</strong></td><td>Dubbo 监控中心 + 定制化统计</td></tr>
+</table>
+
+<div class="box box-amber">
+  <div class="title">💡 核心经验</div>
+  <p>单体架构适合创业初期，但设计时要提前规划扩展性。架构来源于业务，演进生命周期必须匹配业务生命周期。</p>
+</div>
+</section>
+
+<section id="sec-lb">
+<h2 class="section-title"><span class="num">4</span> 负载均衡原理</h2>
+
+<h3>为什么需要负载均衡</h3>
+<p>水平扩展的核心问题：<strong>从客户角度看，最好只有一个服务器</strong>。</p>
+
+<h3>NAT 模式（四层负载均衡）</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">客户端</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">LB<br><small>修改目的 IP/端口</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">RS<br><small>真实服务器</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">LB<br><small>改回源地址</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#3b82f6">客户端</div>
+</div>
+<p><strong>瓶颈</strong>：所有流量（请求 + 响应）都经过 LB，响应报文通常远大于请求报文。</p>
+
+<h3>DR 模式（直接路由，高效方案）</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">客户端</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">LB<br><small>只修改 MAC 地址</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">RS<br><small>直接响应客户端</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#3b82f6">客户端</div>
+</div>
+
+<div class="box box-green">
+  <div class="title">✅ DR 模式优势</div>
+  <p>LB 只负责转发请求，响应由 RS 直接返回，消除了 LB 的带宽瓶颈。这就是著名开源软件 <strong>LVS</strong>（Linux Virtual Server）的核心原理。</p>
+</div>
+
+<h3>负载均衡策略</h3>
+<table>
+  <tr><th>策略</th><th>说明</th></tr>
+  <tr><td><strong>轮询</strong></td><td>依次分配，最简单</td></tr>
+  <tr><td><strong>加权轮询</strong></td><td>性能好的服务器权重高</td></tr>
+  <tr><td><strong>最少连接</strong></td><td>当前连接数最少的服务器优先</td></tr>
+  <tr><td><strong>一致性哈希</strong></td><td>相同请求始终路由到同一服务器</td></tr>
+</table>
+
+<h3>四层 vs 七层</h3>
+<ul>
+  <li><strong>四层（传输层）</strong>：基于 TCP 连接，维护连接映射表</li>
+  <li><strong>七层（应用层）</strong>：解析 HTTP 报文，根据 URL、浏览器等信息智能分发</li>
+</ul>
+</section>
+
+<section id="sec-mr">
+<h2 class="section-title"><span class="num">5</span> 大数据分布式计算</h2>
+
+<h3>MapReduce 四字诀：分、变、洗、合</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">① 切分（Split）<br><small>输入数据切分多份</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">② 变换（Map）<br><small>每条数据按相同规则映射</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">③ 洗牌（Shuffle）<br><small>相同 Key 汇聚到同一节点</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#a78bfa">④ 合并（Reduce）<br><small>同一 Key 数据合并输出</small></div>
+</div>
+
+<h3>角色分工</h3>
+<table>
+  <tr><th>角色</th><th>职责</th></tr>
+  <tr><td><strong>指挥官（Master）</strong></td><td>负责数据切分和任务调度</td></tr>
+  <tr><td><strong>Map 计算兵</strong></td><td>负责变换操作</td></tr>
+  <tr><td><strong>Reduce 计算兵</strong></td><td>负责合并操作</td></tr>
+</table>
+
+<div class="box box-blue">
+  <div class="title">💡 核心要点</div>
+  <p>程序员只需定义两种规则：<strong>Map 变换规则</strong>和 <strong>Reduce 合并规则</strong>。分布式框架自动处理任务调度、节点间通信、容错恢复等复杂过程。</p>
+</div>
+</section>
+
+<section id="sec-chaos">
+<h2 class="section-title"><span class="num">6</span> 混沌工程</h2>
+
+<p>混沌工程旨在<strong>将故障扼杀在襁褓之中</strong>——在故障造成中断之前将它们识别出来。</p>
+
+<h3>发展历史</h3>
+<table>
+  <tr><th>时间</th><th>里程碑</th></tr>
+  <tr><td>2010</td><td>Netflix 开发 Chaos Monkey，测试 AWS 实例故障影响</td></tr>
+  <tr><td>2011</td><td>Simian Army 诞生，增加更多故障注入模式</td></tr>
+  <tr><td>2012</td><td>Netflix 在 GitHub 开源 Chaos Monkey</td></tr>
+  <tr><td>2014</td><td>"混沌工程师"角色诞生；FIT 概念提出</td></tr>
+</table>
+
+<h3>三步法</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">① 假设<br><small>假设系统故障时的行为</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">② 试验<br><small>设计针对性试验</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">③ 评估<br><small>评估故障影响</small></div>
+</div>
+
+<h3>分布式系统八大谬论（Peter Deutsch）</h3>
+<ol>
+  <li>网络是可靠的</li>
+  <li>延迟是零</li>
+  <li>带宽是无限的</li>
+  <li>网络是安全的</li>
+  <li>拓扑结构不会变</li>
+  <li>存在管理员这样的角色</li>
+  <li>传输成本是零</li>
+  <li>网络是同质的</li>
+</ol>
+
+<div class="box box-amber">
+  <div class="title">💡 混沌工程的价值</div>
+  <p><strong>客户</strong>：增强服务可用性 | <strong>业务</strong>：避免利润损失，降低维护成本 | <strong>技术</strong>：减少事故和轮班待命负担</p>
+</div>
+</section>
+
+<section id="sec-components">
+<h2 class="section-title"><span class="num">7</span> 系统设计核心组件</h2>
+
+<h3>Web 应用架构全景</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">客户端</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">DNS/CDN</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">负载均衡/反向代理</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#a78bfa">Web 服务</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#ef4444">数据存储/缓存/搜索</div>
+</div>
+
+<h3>CAP 定理</h3>
+<p>分布式系统不可能同时满足一致性、可用性和分区容错性，最多满足其中两个。</p>
+<table>
+  <tr><th>数据库</th><th>CAP 选择</th><th>说明</th></tr>
+  <tr><td><strong>MongoDB</strong></td><td>CP</td><td>一致性 + 分区容错，牺牲可用性</td></tr>
+  <tr><td><strong>Cassandra</strong></td><td>AP</td><td>可用性 + 分区容错，不保证强一致性</td></tr>
+</table>
+
+<h3>消息队列选择</h3>
+<table>
+  <tr><th>平台</th><th>特点</th></tr>
+  <tr><td><strong>Amazon SQS</strong></td><td>简单实用，创业早期首选</td></tr>
+  <tr><td><strong>RabbitMQ</strong></td><td>特性丰富，复杂路由，简单灵活</td></tr>
+  <tr><td><strong>ActiveMQ</strong></td><td>基于 Java，低延迟</td></tr>
+</table>
+
+<h3>三种扩展方式</h3>
+<div class="flow">
+  <div class="step" style="border-color:#22c55e">增加克隆副本<br><small>最简单、最廉价</small></div>
+  <div class="step" style="border-color:#3b82f6">按功能划分<br><small>服务器专项化，SOA</small></div>
+  <div class="step" style="border-color:#a78bfa">按数据划分<br><small>分库分表、分片</small></div>
+</div>
+
+<div class="box box-green">
+  <div class="title">✅ 全球分布式系统设计原则（NSONE）</div>
+  <ul>
+    <li><strong>架构优先，而非代码优化</strong>：优先考虑水平扩展</li>
+    <li><strong>以角色（Role）思考系统</strong>：将应用拆分为解耦的、互相通信的角色</li>
+    <li><strong>跨数据中心通信是核心难题</strong>：不同通信模式使用不同工具</li>
+    <li><strong>一致性哈希是同步与分片的利器</strong>：无需实际通信即可达成一致</li>
+    <li><strong>测量和监控一切</strong>：深入应用层，建立对"正常行为"的直觉理解</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-quiz">
+<h2 class="section-title"><span class="num">8</span> 知识测验</h2>
+
+<div class="demo">
+  <h4>🎮 交互式测验</h4>
+  <button onclick="loadQuiz()">📋 开始测验</button>
+  <div id="quiz-area"></div>
+  <div id="quiz-score" style="margin-top:1rem;font-size:.95rem;color:#94a3b8"></div>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>基于多篇技术文章整理为交互式教程</p>
+  <p><a href="../">← 返回主页</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+const quizData = [
+  { q: '互联网公司架构演进的普遍规律，第一阶段是？', opts: ['微服务架构', '垂直拆分', '单体应用', '云原生'], ans: 2 },
+  { q: 'DR 模式负载均衡的核心优势是？', opts: ['所有流量经过 LB', '响应由 RS 直接返回客户端', '修改 IP 数据报', '使用 DNS 轮询'], ans: 1 },
+  { q: 'MapReduce 的四个步骤正确顺序是？', opts: ['变、分、洗、合', '分、变、洗、合', '分、洗、变、合', '洗、分、变、合'], ans: 1 },
+  { q: '混沌工程的核心目标是？', opts: ['提高代码质量', '在故障造成中断之前识别它们', '优化数据库性能', '减少代码量'], ans: 1 },
+  { q: 'CAP 定理中，MongoDB 选择了哪两个？', opts: ['CA', 'CP', 'AP', 'CAP 全部'], ans: 1 },
+  { q: 'Netflix 开发的混沌工程工具叫什么？', opts: ['Chaos Gorilla', 'Chaos Monkey', 'Chaos Kong', 'Chaos Dog'], ans: 1 },
+];
+
+let quizAnswers = {};
+function loadQuiz() {
+  const area = document.getElementById('quiz-area');
+  quizAnswers = {};
+  area.innerHTML = quizData.map((q, i) => `<div style="margin-bottom:1.5rem"><p style="font-weight:600;color:#f8fafc">${i + 1}. ${q.q}</p><div class="quiz-options">${q.opts.map((opt, j) => `<label><input type="radio" name="q${i}" value="${j}" onchange="checkAnswer(${i}, ${j})">${opt}</label>`).join('')}</div><div class="quiz-result" id="result-${i}"></div></div>`).join('') + '<button onclick="showScore()" style="margin-top:.5rem">📊 查看得分</button>';
+}
+function checkAnswer(qi, selected) {
+  const el = document.getElementById('result-' + qi);
+  const correct = quizData[qi].ans;
+  quizAnswers[qi] = selected;
+  if (selected === correct) { el.className = 'quiz-result correct'; el.textContent = '✅ 正确！'; }
+  else { el.className = 'quiz-result wrong'; el.textContent = '❌ 错误，正确答案是：' + quizData[qi].opts[correct]; }
+}
+function showScore() {
+  let correct = 0;
+  for (let i = 0; i < quizData.length; i++) { if (quizAnswers[i] === quizData[i].ans) correct++; }
+  const pct = Math.round(correct / quizData.length * 100);
+  document.getElementById('quiz-score').innerHTML = `得分：<strong style="color:#60a5fa">${correct}/${quizData.length}</strong>（${pct}%）`;
+}
+window.addEventListener('scroll', () => { document.getElementById('backTop').classList.toggle('show', window.scrollY > 400); });
+</script>
+
+<script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDORuTVww" data-category="General" data-category-id="DIC_kwDORuTVw84C5OW8" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="dark_dimmed" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous" async></script>
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

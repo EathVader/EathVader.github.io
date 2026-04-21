@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="RPC 与通信协议：核心原理、序列化、框架对比与选型">
+<title>RPC 与通信协议全面总结</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>🔗 <span>RPC 与通信协议</span>全面总结</h1>
+  <p class="subtitle">核心原理 · 序列化协议 · 框架对比 · 选型指南<br>构建高性能分布式通信的完整知识体系</p>
+  <span class="badge">🔗 RPC</span>
+  <span class="badge">📡 通信协议</span>
+  <span class="badge">⚡ 高性能</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-core">RPC 核心原理</a></li>
+    <li><a href="#sec-io">I/O 模型与线程模型</a></li>
+    <li><a href="#sec-serial">序列化协议</a></li>
+    <li><a href="#sec-framework">RPC 框架对比</a></li>
+    <li><a href="#sec-select">选型建议</a></li>
+    <li><a href="#sec-quiz">知识测验</a></li>
+  </ol>
+</nav>
+
+<section id="sec-core">
+<h2 class="section-title"><span class="num">1</span> RPC 核心原理</h2>
+
+<h3>什么是 RPC</h3>
+<p>RPC（Remote Procedure Call）即远程过程调用，核心目标：<strong>让调用方感觉就像调用本地函数一样调用远端函数</strong>。在 OSI 模型中，RPC 跨越了传输层和应用层，基于请求-应答模式，是跨语言的通信标准。</p>
+
+<h3>RPC 的分层架构</h3>
+<table>
+  <tr><th>层次</th><th>职责</th><th>示例</th></tr>
+  <tr><td><strong>服务层（Service）</strong></td><td>RPC 接口定义与实现</td><td>IDL 定义、业务逻辑</td></tr>
+  <tr><td><strong>协议层（Protocol）</strong></td><td>RPC 报文格式和数据编码</td><td>PB、Thrift Binary/Compact</td></tr>
+  <tr><td><strong>传输层（Transport）</strong></td><td>实现底层通信</td><td>TCP、HTTP/2</td></tr>
+</table>
+
+<h3>通信性能排序</h3>
+<div class="flow">
+  <div class="step" style="border-color:#22c55e">IPC<br><small>最快</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#3b82f6">TCP</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">HTTP</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#ef4444">SOAP<br><small>最慢</small></div>
+</div>
+
+<h3>TCP 粘包与半包解决方案</h3>
+<table>
+  <tr><th>方式</th><th>说明</th><th>代表</th></tr>
+  <tr><td><strong>分隔符/换行符</strong></td><td>用特殊字符标记消息边界</td><td>Memcache（<code>\r\n</code>）</td></tr>
+  <tr><td><strong>固定长度 Header + Payload</strong></td><td>Header 中包含 body length</td><td>RPC 最常用</td></tr>
+  <tr><td><strong>特殊标记</strong></td><td>协议自带长度字段</td><td>HTTP Content-Length</td></tr>
+</table>
+
+<h3>可靠性保障</h3>
+<ul>
+  <li><strong>长连接心跳保活</strong>：检测连接存活状态</li>
+  <li><strong>网络闪断重连、重传</strong>：自动恢复通信</li>
+  <li><strong>连接超时控制</strong>：避免无限等待</li>
+  <li><strong>Netty 等框架</strong>封装了这些复杂性</li>
+</ul>
+</section>
+
+<section id="sec-io">
+<h2 class="section-title"><span class="num">2</span> I/O 模型与线程模型</h2>
+
+<h3>四种 I/O 模型</h3>
+<table>
+  <tr><th>模型</th><th>特点</th><th>适用场景</th></tr>
+  <tr><td><strong>阻塞 I/O（BIO）</strong></td><td>线程被 I/O 阻塞，CPU 空闲</td><td>低并发</td></tr>
+  <tr><td><strong>非阻塞 I/O（NIO）</strong></td><td>轮询检查 I/O 状态</td><td>中等并发</td></tr>
+  <tr><td><strong>I/O 多路复用</strong></td><td>一个线程监听多个 Socket（epoll/kqueue）</td><td>高并发，工业界主流</td></tr>
+  <tr><td><strong>异步 I/O（AIO）</strong></td><td>内核完成 I/O 后回调通知</td><td>Windows IOCP</td></tr>
+</table>
+
+<div class="box box-blue">
+  <div class="title">💡 Reactor vs Proactor</div>
+  <p><strong>I/O 多路复用 → Reactor 模式</strong>：epoll + 事件驱动，Redis、Nginx、Node.js、Netty 均采用此模式。<br>
+  <strong>异步 I/O → Proactor 模式</strong>：在 Windows 上大放异彩（IOCP）。</p>
+</div>
+
+<h3>Thrift Server 线程模型</h3>
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">TSimpleServer<br><small>单线程阻塞</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">TThreadPoolServer<br><small>线程池阻塞</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">TNonblockingServer<br><small>单线程非阻塞</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#3b82f6">THsHaServer<br><small>非阻塞+工作线程池</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#a78bfa">TThreadedSelectorServer<br><small>多线程非阻塞+线程池</small></div>
+</div>
+
+<h3>RPC 性能三要素</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">I/O 模型<br><small>非阻塞 I/O（Netty）</small></div>
+  <div class="step" style="border-color:#22c55e">序列化方式<br><small>二进制（PB/Thrift）</small></div>
+  <div class="step" style="border-color:#a78bfa">线程调度<br><small>Reactor 模式</small></div>
+</div>
+
+<div class="box box-green">
+  <div class="title">✅ 高性能推荐组合</div>
+  <p>异步非阻塞 I/O（Netty）+ 二进制序列化（Thrift/PB）+ Reactor 线程模型</p>
+</div>
+</section>
+
+<section id="sec-serial">
+<h2 class="section-title"><span class="num">3</span> 序列化协议</h2>
+
+<h3>评估维度</h3>
+<table>
+  <tr><th>维度</th><th>说明</th></tr>
+  <tr><td><strong>编码格式</strong></td><td>文本（human readable）vs 二进制（binary）</td></tr>
+  <tr><td><strong>Schema 声明</strong></td><td>基于 IDL（PB/Thrift）vs 自描述（JSON/XML）</td></tr>
+  <tr><td><strong>语言中立性</strong></td><td>跨语言支持程度</td></tr>
+  <tr><td><strong>兼容性</strong></td><td>新老契约的前向/后向兼容</td></tr>
+  <tr><td><strong>性能</strong></td><td>序列化/反序列化时间 + 数据大小</td></tr>
+</table>
+
+<h3>主流序列化方案对比</h3>
+<table>
+  <tr><th>方案</th><th>编码</th><th>Schema</th><th>跨语言</th><th>性能</th></tr>
+  <tr><td><strong>Protocol Buffers</strong></td><td>二进制</td><td>IDL（.proto）</td><td>✅ 优秀</td><td>⭐⭐⭐⭐⭐</td></tr>
+  <tr><td><strong>Thrift</strong></td><td>二进制</td><td>IDL（.thrift）</td><td>✅ 优秀</td><td>⭐⭐⭐⭐⭐</td></tr>
+  <tr><td><strong>Avro</strong></td><td>二进制</td><td>JSON Schema</td><td>✅</td><td>⭐⭐⭐⭐</td></tr>
+  <tr><td><strong>Hessian</strong></td><td>二进制</td><td>自描述</td><td>✅</td><td>⭐⭐⭐</td></tr>
+  <tr><td><strong>Kryo</strong></td><td>二进制</td><td>无</td><td>❌ Java only</td><td>⭐⭐⭐⭐</td></tr>
+  <tr><td><strong>JSON</strong></td><td>文本</td><td>自描述</td><td>✅</td><td>⭐⭐</td></tr>
+  <tr><td><strong>XML</strong></td><td>文本</td><td>XSD</td><td>✅</td><td>⭐</td></tr>
+</table>
+
+<div class="box box-amber">
+  <div class="title">🔍 Protocol Buffers 为何高效</div>
+  <p>使用字段序号作为标识（而非包名类名），极其紧凑；使用 varint 和 zigzag 对整型做特殊编码。同一个 Person 对象：PB 序列化仅 <strong>33 字节</strong>，远小于 JSON/XML。</p>
+</div>
+
+<h3>通信协议演进历史</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">HTTP<br><small>Internet 与电商</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">Java RMI<br><small>跨平台但限 Java</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">XML/SOAP<br><small>标准数据封装</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#a78bfa">高性能二进制 RPC<br><small>Thrift/PB/gRPC</small></div>
+</div>
+</section>
+
+<section id="sec-framework">
+<h2 class="section-title"><span class="num">4</span> RPC 框架对比</h2>
+
+<h3>框架分类</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">服务治理型<br><small>Dubbo / Dubbox / Motan</small></div>
+  <div class="step" style="border-color:#22c55e">多语言型<br><small>gRPC / Thrift / Avro</small></div>
+</div>
+
+<h3>详细对比</h3>
+<table>
+  <tr><th>特性</th><th>Dubbo/Dubbox</th><th>Motan</th><th>gRPC</th><th>Thrift</th></tr>
+  <tr><td><strong>开发方</strong></td><td>阿里/当当</td><td>新浪微博</td><td>Google</td><td>Facebook/Apache</td></tr>
+  <tr><td><strong>语言支持</strong></td><td>Java 为主</td><td>Java 为主</td><td>多语言</td><td>多语言</td></tr>
+  <tr><td><strong>序列化</strong></td><td>Hessian2/Kryo/FST</td><td>Hessian2</td><td>Protocol Buffers</td><td>Thrift Binary/Compact</td></tr>
+  <tr><td><strong>传输协议</strong></td><td>TCP（Netty）</td><td>TCP（Netty）</td><td>HTTP/2</td><td>TCP</td></tr>
+  <tr><td><strong>服务治理</strong></td><td>✅ 完善</td><td>✅ 完善</td><td>❌ 需自建</td><td>❌ 需自建</td></tr>
+  <tr><td><strong>服务发现</strong></td><td>ZooKeeper</td><td>ZK/Consul</td><td>需自建</td><td>需自建</td></tr>
+  <tr><td><strong>IDL</strong></td><td>可选</td><td>无</td><td>.proto 必须</td><td>.thrift 必须</td></tr>
+</table>
+
+<h3>性能测试数据（10 万次调用）</h3>
+<table>
+  <tr><th>框架/协议</th><th>平均 TPS</th><th>备注</th></tr>
+  <tr><td><strong>Dubbox + Thrift</strong></td><td>~7,500</td><td>性能最优</td></tr>
+  <tr><td><strong>Motan</strong></td><td>~2,500</td><td></td></tr>
+  <tr><td><strong>Dubbox + FST</strong></td><td>~2,200</td><td></td></tr>
+  <tr><td><strong>gRPC</strong></td><td>~1,900</td><td>HTTP/2 开销</td></tr>
+  <tr><td><strong>Dubbox + Kryo</strong></td><td>~1,900</td><td></td></tr>
+</table>
+</section>
+
+<section id="sec-select">
+<h2 class="section-title"><span class="num">5</span> 选型建议</h2>
+
+<h3>选型决策树</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">需要跨语言？</div>
+</div>
+<div class="flow">
+  <div class="step" style="border-color:#22c55e">是 → HTTP/2 + 流式？<br><small>是 → gRPC</small><br><small>否 → 极致性能？ → Thrift</small></div>
+  <div class="step" style="border-color:#f59e0b">否 → Java 生态<br><small>服务治理 → Dubbox</small><br><small>轻量级 → Motan</small></div>
+</div>
+
+<h3>场景化建议</h3>
+<table>
+  <tr><th>场景</th><th>推荐方案</th><th>理由</th></tr>
+  <tr><td><strong>企业内部 Java 微服务</strong></td><td>Dubbox</td><td>服务治理完善，可集成多种序列化协议</td></tr>
+  <tr><td><strong>跨语言微服务</strong></td><td>gRPC</td><td>HTTP/2 友好，PB 高效，生态活跃</td></tr>
+  <tr><td><strong>极致性能（大规模内部通信）</strong></td><td>Thrift</td><td>序列化性能最优，TNonblockingServer 高效</td></tr>
+  <tr><td><strong>新项目、云原生</strong></td><td>gRPC</td><td>与 K8s/Istio 等云原生生态契合</td></tr>
+</table>
+
+<h3>关键原则</h3>
+<div class="box box-blue">
+  <div class="title">📌 五大选型原则</div>
+  <ul>
+    <li><strong>接口先行，语言中立</strong>：服务提供者和消费者解耦，并行开发</li>
+    <li><strong>契约驱动开发</strong>：基于 IDL 定义接口，Mock 测试桩并行验证</li>
+    <li><strong>API 版本兼容性优先</strong>：使用字段编号机制保证前向兼容</li>
+    <li><strong>循序渐进</strong>：微服务拆分粒度随业务演进逐步细化</li>
+    <li><strong>综合考量</strong>：不仅看性能，还要看团队熟悉度、社区活跃度、运维成本</li>
+  </ul>
+</div>
+</section>
+
+<section id="sec-quiz">
+<h2 class="section-title"><span class="num">6</span> 知识测验</h2>
+
+<div class="demo">
+  <h4>🎮 交互式测验</h4>
+  <button onclick="loadQuiz()">📋 开始测验</button>
+  <div id="quiz-area"></div>
+  <div id="quiz-score" style="margin-top:1rem;font-size:.95rem;color:#94a3b8"></div>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>基于多篇技术文章整理为交互式教程</p>
+  <p><a href="../">← 返回主页</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+const quizData = [
+  { q: 'RPC 在 OSI 模型中跨越了哪些层？', opts: ['物理层和数据链路层', '传输层和应用层', '网络层和传输层', '会话层和表示层'], ans: 1 },
+  { q: '以下哪种 I/O 模型是工业界高并发的主流选择？', opts: ['阻塞 I/O', '非阻塞 I/O', 'I/O 多路复用', '异步 I/O'], ans: 2 },
+  { q: 'Protocol Buffers 为何序列化体积小？', opts: ['使用 XML 压缩', '使用字段序号而非包名类名', '使用 Base64 编码', '使用 gzip 压缩'], ans: 1 },
+  { q: '以下哪个 RPC 框架内置了完善的服务治理能力？', opts: ['gRPC', 'Thrift', 'Dubbo', 'Avro'], ans: 2 },
+  { q: 'gRPC 使用的传输协议是？', opts: ['TCP', 'HTTP/1.1', 'HTTP/2', 'WebSocket'], ans: 2 },
+  { q: '解决 TCP 粘包问题最常用的 RPC 方式是？', opts: ['分隔符', '固定长度 Header + Payload', '特殊标记', '超时断开'], ans: 1 },
+];
+
+let quizAnswers = {};
+function loadQuiz() {
+  const area = document.getElementById('quiz-area');
+  quizAnswers = {};
+  area.innerHTML = quizData.map((q, i) => `<div style="margin-bottom:1.5rem"><p style="font-weight:600;color:#f8fafc">${i + 1}. ${q.q}</p><div class="quiz-options">${q.opts.map((opt, j) => `<label><input type="radio" name="q${i}" value="${j}" onchange="checkAnswer(${i}, ${j})">${opt}</label>`).join('')}</div><div class="quiz-result" id="result-${i}"></div></div>`).join('') + '<button onclick="showScore()" style="margin-top:.5rem">📊 查看得分</button>';
+}
+function checkAnswer(qi, selected) {
+  const el = document.getElementById('result-' + qi);
+  const correct = quizData[qi].ans;
+  quizAnswers[qi] = selected;
+  if (selected === correct) { el.className = 'quiz-result correct'; el.textContent = '✅ 正确！'; }
+  else { el.className = 'quiz-result wrong'; el.textContent = '❌ 错误，正确答案是：' + quizData[qi].opts[correct]; }
+}
+function showScore() {
+  let correct = 0;
+  for (let i = 0; i < quizData.length; i++) { if (quizAnswers[i] === quizData[i].ans) correct++; }
+  const pct = Math.round(correct / quizData.length * 100);
+  document.getElementById('quiz-score').innerHTML = `得分：<strong style="color:#60a5fa">${correct}/${quizData.length}</strong>（${pct}%）`;
+}
+window.addEventListener('scroll', () => { document.getElementById('backTop').classList.toggle('show', window.scrollY > 400); });
+</script>
+
+<script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDORuTVww" data-category="General" data-category-id="DIC_kwDORuTVw84C5OW8" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="dark_dimmed" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous" async></script>
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

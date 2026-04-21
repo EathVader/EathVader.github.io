@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="ZooKeeper 全面总结：核心概念、ZAB 协议、数据模型、典型应用、跨数据中心部署、运维实践">
+<title>ZooKeeper 全面总结</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>🦁 <span>ZooKeeper</span> 全面总结</h1>
+  <p class="subtitle">核心概念 · ZAB 协议 · 数据模型 · 分布式锁 · 跨数据中心部署<br>分布式协调服务的深度解析</p>
+  <span class="badge">🦁 ZooKeeper</span>
+  <span class="badge">🔗 分布式协调</span>
+  <span class="badge">📦 一致性</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-core">核心概念</a></li>
+    <li><a href="#sec-zab">ZAB 协议</a></li>
+    <li><a href="#sec-data">数据模型</a></li>
+    <li><a href="#sec-app">典型应用</a></li>
+    <li><a href="#sec-cross">跨数据中心部署</a></li>
+    <li><a href="#sec-ops">运维部署</a></li>
+    <li><a href="#sec-why">阿里为何不用 ZK 做服务发现</a></li>
+    <li><a href="#sec-quiz">知识测验</a></li>
+  </ol>
+</nav>
+
+<section id="sec-core">
+<h2 class="section-title"><span class="num">1</span> 核心概念</h2>
+
+<h3>ZooKeeper 是什么</h3>
+<p>ZooKeeper 是一个<strong>高可用、高可靠的分布式协调服务</strong>，最初由 Yahoo 开发，后成为 Apache 顶级项目。本质上是一个<strong>顺序一致性的分布式 key/value 数据库</strong>，数据以树状层次结构组织，全部保存在内存中。</p>
+
+<h3>提供的能力</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">命名服务</div>
+  <div class="step" style="border-color:#22c55e">配置管理</div>
+  <div class="step" style="border-color:#f59e0b">分布式锁</div>
+  <div class="step" style="border-color:#a78bfa">Leader 选举</div>
+  <div class="step" style="border-color:#ef4444">组成员管理</div>
+</div>
+
+<h3>核心设计原则</h3>
+<table>
+  <tr><th>原则</th><th>说明</th></tr>
+  <tr><td><strong>数据全量复制</strong></td><td>所有节点保存完整数据副本（内存），znode 数据上限 1MB</td></tr>
+  <tr><td><strong>写操作串行化</strong></td><td>所有写请求由 Leader 统一排序并广播，保证全局写顺序</td></tr>
+  <tr><td><strong>读操作本地化</strong></td><td>读请求可由任意节点直接响应，读性能随节点数线性提升</td></tr>
+  <tr><td><strong>节点数量奇数</strong></td><td>3 节点容忍 1 个故障，5 节点容忍 2 个故障</td></tr>
+</table>
+
+<h3>一致性保证</h3>
+<table>
+  <tr><th>保证</th><th>说明</th></tr>
+  <tr><td><strong>顺序一致性</strong></td><td>来自同一客户端的更新按发送顺序执行</td></tr>
+  <tr><td><strong>原子性</strong></td><td>更新操作要么成功要么失败，不存在部分成功</td></tr>
+  <tr><td><strong>单一系统视图</strong></td><td>客户端无论连接哪个服务器，看到的数据视图一致</td></tr>
+  <tr><td><strong>持久性</strong></td><td>更新一旦成功，数据持久化，服务器重启不丢失</td></tr>
+  <tr><td><strong>时效性</strong></td><td>客户端视图在一定时间范围内保证更新</td></tr>
+</table>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 重要注意</div>
+  <p>ZooKeeper <strong>不保证</strong>跨客户端的实时一致性。客户端 A 写入后通知客户端 B 读取，B 可能读到旧值。如需强一致读，B 应先调用 <code>sync()</code> 强制同步到 Leader 最新状态。</p>
+</div>
+
+<h3>CAP 定位</h3>
+<ul>
+  <li><strong>写操作</strong>：通过 ZAB 协议实现线性一致性（Linearizability）</li>
+  <li><strong>读操作</strong>：实现顺序一致性，可通过 <code>sync</code> + <code>read</code> 升级为线性一致性读</li>
+  <li>整体偏向 <strong>CP</strong>：在网络分区时优先保证一致性，牺牲可用性</li>
+</ul>
+</section>
+
+<section id="sec-zab">
+<h2 class="section-title"><span class="num">2</span> ZAB 协议</h2>
+
+<p>ZAB（ZooKeeper Atomic Broadcast）是 ZooKeeper 的核心一致性协议，参考了 Paxos 算法思想，分为两个阶段循环运行。</p>
+
+<h3>阶段一：Leader 选举</h3>
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">集群启动/Leader 故障</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">所有节点参与投票</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">多数派确认</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#3b82f6">选举完成（≈200ms）</div>
+</div>
+
+<h3>阶段二：原子广播</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">写请求发给 Leader</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">分配全局 zxid</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">广播给 Follower</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#a78bfa">多数派确认提交</div>
+</div>
+
+<h3>角色分工</h3>
+<table>
+  <tr><th>角色</th><th>职责</th></tr>
+  <tr><td><strong>Leader</strong></td><td>处理所有写请求，分配 zxid，广播事务，确认多数派提交</td></tr>
+  <tr><td><strong>Follower</strong></td><td>接收并执行 Leader 广播的事务，参与投票，可直接处理读请求</td></tr>
+  <tr><td><strong>Observer</strong></td><td>仅接收数据复制，不参与投票，用于扩展读性能</td></tr>
+</table>
+
+<div class="box box-blue">
+  <div class="title">💡 写操作流程</div>
+  <p>Client → Follower → 转发给 Leader → Leader 广播 Proposal → Follower ACK → 多数派确认 → Leader Commit → Follower 应用 → 返回客户端成功</p>
+</div>
+</section>
+
+<section id="sec-data">
+<h2 class="section-title"><span class="num">3</span> 数据模型</h2>
+
+<h3>ZNode 树结构</h3>
+<pre><code>/
+├── /app1
+│   ├── /app1/config    (data: "v1.2")
+│   └── /app1/members
+│       ├── /app1/members/node1
+│       └── /app1/members/node2
+└── /zookeeper          (系统保留节点)</code></pre>
+
+<h3>ZNode 类型</h3>
+<table>
+  <tr><th>类型</th><th>特点</th></tr>
+  <tr><td><strong>Persistent（持久节点）</strong></td><td>创建后一直存在，除非主动删除</td></tr>
+  <tr><td><strong>Ephemeral（临时节点）</strong></td><td>与 Session 绑定，Session 结束自动删除；不能有子节点</td></tr>
+  <tr><td><strong>Sequential（顺序节点）</strong></td><td>名称后追加 10 位递增序号（如 <code>lock-0000000001</code>）</td></tr>
+  <tr><td><strong>Protected（保护节点）</strong></td><td>名称前加 GUID 前缀，断线重连后可识别</td></tr>
+</table>
+
+<h3>核心操作</h3>
+<table>
+  <tr><th>操作</th><th>说明</th></tr>
+  <tr><td><code>create</code></td><td>创建 ZNode</td></tr>
+  <tr><td><code>delete</code></td><td>删除 ZNode（需指定版本号，-1 忽略版本检查）</td></tr>
+  <tr><td><code>exists</code></td><td>判断 ZNode 是否存在，可设置 Watch</td></tr>
+  <tr><td><code>getData</code></td><td>获取 ZNode 数据，可设置 Watch</td></tr>
+  <tr><td><code>setData</code></td><td>更新 ZNode 数据（需指定版本号）</td></tr>
+  <tr><td><code>getChildren</code></td><td>获取子节点列表，可设置 Watch</td></tr>
+  <tr><td><code>sync</code></td><td>强制同步到 Leader 最新状态</td></tr>
+  <tr><td><code>multi</code></td><td>批量原子操作（要么全成功，要么全失败）</td></tr>
+</table>
+
+<h3>Watch 机制</h3>
+<div class="box box-green">
+  <div class="title">🔔 Watch 特性</div>
+  <p>Watch 是<strong>一次性触发</strong>的：触发后自动移除，需重新设置。事件类型包括 NodeCreated、NodeDeleted、NodeDataChanged、NodeChildrenChanged。Watch 事件保证有序性——先于对应的新数据被客户端看到。</p>
+</div>
+
+<h3>Session 机制</h3>
+<ul>
+  <li>客户端与服务器建立 TCP 长连接，创建 Session</li>
+  <li>Session 有超时时间（通常 4~40 秒）</li>
+  <li>客户端通过心跳（ping）维持 Session 活性</li>
+  <li>连接断开后自动尝试重连，携带已知最新 zxid</li>
+  <li>Session 过期后，所有关联的临时节点被删除</li>
+</ul>
+</section>
+
+<section id="sec-app">
+<h2 class="section-title"><span class="num">4</span> 典型应用</h2>
+
+<h3>服务发现</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">创建服务根节点<br><small>/api（持久）</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">创建服务名节点<br><small>/api/user（持久）</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">实例注册临时节点<br><small>{host, port}</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#a78bfa">消费者 Watch<br><small>实时感知上下线</small></div>
+</div>
+
+<h3>分布式锁（排他锁）</h3>
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">创建临时顺序节点</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">getChildren</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">序号最小？获得锁</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#3b82f6">否则 Watch 前一个节点</div>
+</div>
+
+<div class="box box-blue">
+  <div class="title">🔑 关键设计：避免羊群效应</div>
+  <p>每个节点只 Watch 前一个节点，而非所有节点。这样锁释放时只通知下一个等待者，避免大量节点同时被唤醒。</p>
+</div>
+
+<h3>其他应用场景</h3>
+<table>
+  <tr><th>场景</th><th>实现方式</th></tr>
+  <tr><td><strong>配置管理</strong></td><td>配置写入 ZNode，消费方 getData + Watch 实时获取变更</td></tr>
+  <tr><td><strong>Leader 选举</strong></td><td>创建临时顺序节点，序号最小者为 Leader</td></tr>
+  <tr><td><strong>共享锁</strong></td><td>读锁 <code>read-</code> 前缀，写锁 <code>write-</code> 前缀</td></tr>
+  <tr><td><strong>FIFO 队列</strong></td><td>创建顺序节点，消费者取序号最小的节点</td></tr>
+  <tr><td><strong>屏障（Barrier）</strong></td><td>通过屏障节点的存在/删除控制阻塞/放行</td></tr>
+  <tr><td><strong>两阶段提交</strong></td><td>协调者创建事务节点，参与者投票，Watch 感知结果</td></tr>
+</table>
+</section>
+
+<section id="sec-cross">
+<h2 class="section-title"><span class="num">5</span> 跨数据中心部署</h2>
+
+<h3>方案对比</h3>
+<table>
+  <tr><th>方案</th><th>写性能</th><th>读性能</th><th>正确性</th><th>可用性</th></tr>
+  <tr><td><strong>单集群跨 DC</strong></td><td>慢（跨 DC 投票）</td><td>快（本地读）</td><td>✅</td><td>好（无单点）</td></tr>
+  <tr><td><strong>Learner 模式</strong></td><td>DC1 快，其他慢</td><td>快（本地读）</td><td>✅</td><td>DC1 单点</td></tr>
+  <tr><td><strong>多独立集群</strong></td><td>本分片快</td><td>快（本地读）</td><td>❌ 不满足顺序一致性</td><td>好</td></tr>
+  <tr><td><strong>Modular Composition</strong></td><td>本分片快</td><td>本分片快，跨分片有 sync 开销</td><td>✅</td><td>好</td></tr>
+</table>
+
+<h3>Modular Composition（推荐方案）</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">读非本分片数据</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">sync（拉取最新数据）</div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">read（线性一致性读）</div>
+</div>
+
+<div class="box box-green">
+  <div class="title">✅ 最佳实践</div>
+  <p>在多独立集群基础上，对非本分片的读操作前插入 sync 操作，保证跨分片读的线性一致性，同时本分片读写仍在本地完成。</p>
+</div>
+</section>
+
+<section id="sec-ops">
+<h2 class="section-title"><span class="num">6</span> 运维部署</h2>
+
+<h3>关键配置（zoo.cfg）</h3>
+<table>
+  <tr><th>参数</th><th>说明</th></tr>
+  <tr><td><code>tickTime=2000</code></td><td>基本时间单位（毫秒）</td></tr>
+  <tr><td><code>dataDir</code></td><td>数据目录</td></tr>
+  <tr><td><code>dataLogDir</code></td><td>事务日志目录（建议独立磁盘）</td></tr>
+  <tr><td><code>clientPort=2181</code></td><td>客户端连接端口</td></tr>
+  <tr><td><code>initLimit=10</code></td><td>Follower 连接 Leader 的超时（tick 数）</td></tr>
+  <tr><td><code>syncLimit=5</code></td><td>Follower 同步 Leader 的超时</td></tr>
+</table>
+
+<h3>四字命令</h3>
+<table>
+  <tr><th>命令</th><th>说明</th></tr>
+  <tr><td><code>ruok</code></td><td>检查服务是否运行（返回 imok）</td></tr>
+  <tr><td><code>stat</code></td><td>服务器状态和连接的客户端</td></tr>
+  <tr><td><code>mntr</code></td><td>监控指标（延迟、连接数等）</td></tr>
+  <tr><td><code>cons</code></td><td>列出所有客户端连接详情</td></tr>
+  <tr><td><code>dump</code></td><td>列出未完成的 Session 和临时节点</td></tr>
+  <tr><td><code>wchs</code></td><td>Watch 概要信息</td></tr>
+</table>
+
+<h3>运维最佳实践</h3>
+<ul>
+  <li><strong>事务日志与快照分离</strong>：dataLogDir 使用独立磁盘</li>
+  <li><strong>节点数量为奇数</strong>：3 或 5 个节点最常见</li>
+  <li><strong>专用服务器</strong>：ZK 服务器不应运行其他应用</li>
+  <li><strong>Session 超时设置</strong>：太短导致频繁过期，太长导致故障检测延迟</li>
+</ul>
+</section>
+
+<section id="sec-why">
+<h2 class="section-title"><span class="num">7</span> 阿里为何不用 ZK 做服务发现</h2>
+
+<div class="box box-amber">
+  <div class="title">🏢 背景</div>
+  <p>阿里内部维护着国内最大规模的 ZooKeeper 集群（近千台节点），但最终选择不用 ZK 做服务发现。</p>
+</div>
+
+<h3>核心原因</h3>
+<table>
+  <tr><th>问题</th><th>说明</th></tr>
+  <tr><td><strong>注册中心应是 AP 而非 CP</strong></td><td>数据不一致仅导致流量轻微不均衡；不可用则导致服务无法互相调用——不可接受</td></tr>
+  <tr><td><strong>写操作不可水平扩展</strong></td><td>所有写经过 Leader，服务规模增长后力不从心</td></tr>
+  <tr><td><strong>健康检测过于简单</strong></td><td>仅依赖 TCP 长连接活性，无法自定义健康检测逻辑</td></tr>
+  <tr><td><strong>持久化存储不必要</strong></td><td>服务实时地址列表不需要事务日志和快照机制</td></tr>
+  <tr><td><strong>客户端复杂度高</strong></td><td>80% 以上首次使用 ZK 的开发者会踩坑</td></tr>
+</table>
+
+<h3>ZK 的正确使用场景</h3>
+<div class="flow">
+  <div class="step" style="border-color:#22c55e">✅ 粗粒度分布式锁</div>
+  <div class="step" style="border-color:#22c55e">✅ 分布式选主</div>
+  <div class="step" style="border-color:#22c55e">✅ 主备高可用切换</div>
+  <div class="step" style="border-color:#22c55e">✅ 大数据任务协调</div>
+</div>
+<div class="flow">
+  <div class="step" style="border-color:#ef4444">❌ 大规模服务发现</div>
+  <div class="step" style="border-color:#ef4444">❌ 大规模健康监测</div>
+  <div class="step" style="border-color:#ef4444">❌ 高 TPS 写入场景</div>
+</div>
+
+<div class="box box-blue">
+  <div class="title">📌 一句话总结</div>
+  <p>大数据向左（用 ZooKeeper），交易向右（用专门的注册中心）；分布式协调向左，服务发现向右。</p>
+</div>
+
+<h3>异常处理速查</h3>
+<table>
+  <tr><th>异常</th><th>类型</th><th>处理方式</th></tr>
+  <tr><td><code>ConnectionLossException</code></td><td>可恢复</td><td>同一 Session 内重试，注意幂等性</td></tr>
+  <tr><td><code>SessionExpiredException</code></td><td>不可恢复</td><td>必须重建 ZooKeeper 实例和所有状态</td></tr>
+  <tr><td><code>NoNodeException</code></td><td>状态异常</td><td>节点不存在，检查路径或创建节点</td></tr>
+  <tr><td><code>NodeExistsException</code></td><td>状态异常</td><td>节点已存在，多进程并发创建的正常现象</td></tr>
+  <tr><td><code>BadVersionException</code></td><td>状态异常</td><td>版本号不匹配，数据已被其他客户端修改</td></tr>
+</table>
+</section>
+
+<section id="sec-quiz">
+<h2 class="section-title"><span class="num">8</span> 知识测验</h2>
+
+<div class="demo">
+  <h4>🎮 交互式测验</h4>
+  <button onclick="loadQuiz()">📋 开始测验</button>
+  <div id="quiz-area"></div>
+  <div id="quiz-score" style="margin-top:1rem;font-size:.95rem;color:#94a3b8"></div>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>基于多篇技术文章整理为交互式教程</p>
+  <p><a href="../">← 返回主页</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+const quizData = [
+  { q: 'ZooKeeper 整体偏向 CAP 中的哪种模型？', opts: ['AP', 'CP', 'CA', '三者兼顾'], ans: 1 },
+  { q: 'ZAB 协议中，写操作需要什么条件才能提交？', opts: ['所有节点确认', '多数派确认', 'Leader 单独确认', '任意一个 Follower 确认'], ans: 1 },
+  { q: 'ZooKeeper 的 Watch 机制是什么特性？', opts: ['持续监听', '一次性触发', '定时轮询', '双向通信'], ans: 1 },
+  { q: '分布式锁中避免羊群效应的关键设计是？', opts: ['Watch 所有节点', '只 Watch 前一个节点', '使用轮询', '设置超时时间'], ans: 1 },
+  { q: 'Observer 节点的作用是？', opts: ['参与投票', '处理写请求', '扩展读性能', '替代 Leader'], ans: 2 },
+  { q: '阿里不用 ZK 做服务发现的核心原因是？', opts: ['性能太差', '注册中心应是 AP 而非 CP', '不支持 Java', '没有 Watch 机制'], ans: 1 },
+];
+
+let quizAnswers = {};
+function loadQuiz() {
+  const area = document.getElementById('quiz-area');
+  quizAnswers = {};
+  area.innerHTML = quizData.map((q, i) => `<div style="margin-bottom:1.5rem"><p style="font-weight:600;color:#f8fafc">${i + 1}. ${q.q}</p><div class="quiz-options">${q.opts.map((opt, j) => `<label><input type="radio" name="q${i}" value="${j}" onchange="checkAnswer(${i}, ${j})">${opt}</label>`).join('')}</div><div class="quiz-result" id="result-${i}"></div></div>`).join('') + '<button onclick="showScore()" style="margin-top:.5rem">📊 查看得分</button>';
+}
+function checkAnswer(qi, selected) {
+  const el = document.getElementById('result-' + qi);
+  const correct = quizData[qi].ans;
+  quizAnswers[qi] = selected;
+  if (selected === correct) { el.className = 'quiz-result correct'; el.textContent = '✅ 正确！'; }
+  else { el.className = 'quiz-result wrong'; el.textContent = '❌ 错误，正确答案是：' + quizData[qi].opts[correct]; }
+}
+function showScore() {
+  let correct = 0;
+  for (let i = 0; i < quizData.length; i++) { if (quizAnswers[i] === quizData[i].ans) correct++; }
+  const pct = Math.round(correct / quizData.length * 100);
+  document.getElementById('quiz-score').innerHTML = `得分：<strong style="color:#60a5fa">${correct}/${quizData.length}</strong>（${pct}%）`;
+}
+window.addEventListener('scroll', () => { document.getElementById('backTop').classList.toggle('show', window.scrollY > 400); });
+</script>
+
+<script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDORuTVww" data-category="General" data-category-id="DIC_kwDORuTVw84C5OW8" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="dark_dimmed" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous" async></script>
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

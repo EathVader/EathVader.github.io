@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="分布式缓存实战：更新策略、穿透/击穿/雪崩、Promise 缓存、内存一致性模型">
+<title>分布式缓存实战全面总结</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <h1>🗄️ <span>分布式缓存</span>实战全面总结</h1>
+  <p class="subtitle">更新策略 · 穿透/击穿/雪崩 · Promise 缓存 · 内存一致性模型<br>从 Facebook 到 Instagram 的缓存工程实践</p>
+  <span class="badge">🗄️ 缓存</span>
+  <span class="badge">🔄 一致性</span>
+  <span class="badge">⚡ 高性能</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-update">缓存更新策略</a></li>
+    <li><a href="#sec-problem">缓存问题（穿透/击穿/雪崩/惊群）</a></li>
+    <li><a href="#sec-promise">Instagram Promise 缓存方案</a></li>
+    <li><a href="#sec-memory">内存一致性模型</a></li>
+    <li><a href="#sec-practice">缓存分类与工程实践</a></li>
+    <li><a href="#sec-quiz">知识测验</a></li>
+  </ol>
+</nav>
+
+<section id="sec-update">
+<h2 class="section-title"><span class="num">1</span> 缓存更新策略</h2>
+
+<h3>Cache Aside Pattern（旁路缓存，最常用）</h3>
+<p>Facebook 论文《Scaling Memcache at Facebook》采用的策略，业界最广泛使用。</p>
+
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">读（失效）<br><small>读 cache → 未命中 → 读 DB → 写 cache</small></div>
+  <div class="step" style="border-color:#22c55e">读（命中）<br><small>直接从 cache 返回</small></div>
+  <div class="step" style="border-color:#f59e0b">写（更新）<br><small>先更新 DB → 让缓存失效</small></div>
+</div>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 为什么是"失效"而非"更新"缓存？</div>
+  <p>两个并发写操作可能导致缓存中的数据是脏的。Facebook 选择删除缓存而非更新缓存，避免并发写导致的脏数据。</p>
+</div>
+
+<div class="box box-blue">
+  <div class="title">❌ 常见错误：先删缓存，再更新数据库</div>
+  <p>① 更新操作删除缓存 → ② 查询操作未命中，从 DB 读到<strong>旧数据</strong>放入缓存 → ③ 更新操作更新 DB。结果：缓存中永远是旧数据。</p>
+</div>
+
+<h3>Read/Write Through Pattern（读写穿透）</h3>
+<p>应用层认为后端就是一个单一存储，缓存层自己维护与数据库的同步。</p>
+<ul>
+  <li><strong>Read Through</strong>：缓存失效时，由缓存服务自己加载数据（对应用透明）</li>
+  <li><strong>Write Through</strong>：写数据时，命中缓存则更新缓存，由缓存同步更新数据库</li>
+</ul>
+
+<h3>Write Behind Caching Pattern（写回）</h3>
+<p>与 Linux 文件系统的 Page Cache 算法原理相同：更新数据时<strong>只更新缓存，不更新数据库</strong>，缓存异步批量更新数据库。</p>
+
+<h3>四种模式总结</h3>
+<table>
+  <tr><th>模式</th><th>一致性</th><th>性能</th><th>复杂度</th><th>适用场景</th></tr>
+  <tr><td><strong>Cache Aside</strong></td><td>最终一致</td><td>好</td><td>低</td><td>通用场景，最推荐</td></tr>
+  <tr><td><strong>Read/Write Through</strong></td><td>较强</td><td>好</td><td>中</td><td>缓存层有代理能力</td></tr>
+  <tr><td><strong>Write Behind</strong></td><td>弱</td><td>极高</td><td>高</td><td>写密集、可容忍丢失</td></tr>
+</table>
+
+<div class="box box-green">
+  <div class="title">💬 陈皓观点</div>
+  <p>这些 Design Pattern 都是计算机体系结构里的老古董设计（CPU 缓存、硬盘缓存、数据库缓存），历经长时间考验。<strong>如果你要做好架构，首先得把计算机体系结构以及很多老古董的基础技术吃透了。</strong></p>
+</div>
+</section>
+
+<section id="sec-problem">
+<h2 class="section-title"><span class="num">2</span> 缓存问题（穿透/击穿/雪崩/惊群）</h2>
+
+<table>
+  <tr><th>问题</th><th>定义</th><th>解决方案</th></tr>
+  <tr><td><strong>缓存穿透</strong></td><td>查询一定不存在的数据，每次请求都打到 DB</td><td>布隆过滤器、空值缓存</td></tr>
+  <tr><td><strong>缓存击穿</strong></td><td>热点 key 过期瞬间，大量并发请求打到 DB</td><td>互斥锁、热点永不过期、Promise 缓存</td></tr>
+  <tr><td><strong>缓存雪崩</strong></td><td>大量缓存同时过期或缓存服务宕机</td><td>随机过期时间、多级缓存、高可用</td></tr>
+  <tr><td><strong>缓存惊群</strong></td><td>缓存为空时大量并发请求同时 cache miss</td><td>Promise 缓存（见下文）</td></tr>
+</table>
+
+<h3>缓存雪崩解决方案</h3>
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">过期时间加随机值</div>
+  <div class="step" style="border-color:#22c55e">多级缓存架构</div>
+  <div class="step" style="border-color:#f59e0b">Redis Cluster / Sentinel</div>
+  <div class="step" style="border-color:#a78bfa">限流降级兜底</div>
+</div>
+</section>
+
+<section id="sec-promise">
+<h2 class="section-title"><span class="num">3</span> Instagram Promise 缓存方案</h2>
+
+<h3>问题场景</h3>
+<p>Instagram 的服务是无状态的，通过缓存减少 90% 的后端请求。但在服务重启、全新请求、新集群上线时，缓存为空意味着 <strong>100 个并发请求全部 cache miss，产生 100 个独立的后端请求</strong>。</p>
+
+<h3>传统方案及其不足</h3>
+<table>
+  <tr><th>方案</th><th>缺点</th></tr>
+  <tr><td>外部缓存（memcache）</td><td>增加复杂性和故障模式</td></tr>
+  <tr><td>本地磁盘持久化</td><td>增加复杂性</td></tr>
+  <tr><td>预热（fake requests）</td><td>不能覆盖所有场景</td></tr>
+  <tr><td>缓慢发布新客户端</td><td>限制业务敏捷性</td></tr>
+</table>
+
+<h3>Promise 缓存方案（核心创新）</h3>
+<div class="box box-blue">
+  <div class="title">💡 关键思想</div>
+  <p><strong>不缓存实际的值，而是缓存一个 Promise（将来会提供值的对象）。</strong></p>
+</div>
+
+<div class="flow">
+  <div class="step" style="border-color:#3b82f6">① 请求到来<br><small>原子检查缓存</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#22c55e">② Cache Miss<br><small>创建 Promise 插入缓存</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#f59e0b">③ 异步请求后端<br><small>Promise 开始加载</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#a78bfa">④ 后续请求命中 Promise<br><small>所有 worker 等待同一请求</small></div>
+  <div class="arrow">→</div>
+  <div class="step" style="border-color:#ef4444">⑤ Promise Fulfill<br><small>所有 worker 同时获得结果</small></div>
+</div>
+
+<div class="box box-green">
+  <div class="title">✅ 效果</div>
+  <p>即使缓存为空，也能维持 90% 的缓存命中率假设——因为相同请求只会产生一次后端调用。Instagram 使用 C++ 服务，基于 <code>folly::SharedPromise</code> 实现。</p>
+</div>
+
+<div class="box box-amber">
+  <div class="title">🔑 核心洞察</div>
+  <p>Promise 缓存将"缓存值"升级为"缓存计算过程"，从根本上解决了冷缓存下的惊群问题。</p>
+</div>
+</section>
+
+<section id="sec-memory">
+<h2 class="section-title"><span class="num">4</span> 内存一致性模型</h2>
+
+<h3>为什么需要内存一致性模型</h3>
+<p>在多核/多线程环境下，不同线程如何观察共享内存状态是一个根本性问题。内存一致性模型是硬件和软件之间的<strong>契约</strong>。</p>
+
+<h3>一致性模型层次</h3>
+<table>
+  <tr><th>模型</th><th>说明</th><th>代价</th></tr>
+  <tr><td><strong>顺序一致性（SC）</strong></td><td>所有操作有全局顺序，单线程按编写顺序</td><td>极慢，每次只能运行一条指令</td></tr>
+  <tr><td><strong>TSO</strong></td><td>引入 Store Buffer 隐藏写延迟</td><td>允许 SC 禁止的行为（x86 采用）</td></tr>
+  <tr><td><strong>弱排序（ARM）</strong></td><td>几乎允许任何重排</td><td>需要显式内存屏障</td></tr>
+</table>
+
+<h3>内存屏障（Memory Barrier / Fence）</h3>
+<ul>
+  <li><strong>Barrier/Fence</strong>：强制屏障前的所有内存操作完成后，才能开始屏障后的操作</li>
+  <li><strong>原子 CAS</strong>（Compare-and-Swap）：更实用的同步原语</li>
+  <li>代价高昂（数百 cycles），应谨慎使用</li>
+</ul>
+
+<h3>对缓存系统的启示</h3>
+<table>
+  <tr><th>硬件概念</th><th>缓存系统中的映射</th></tr>
+  <tr><td>SC（顺序一致性）</td><td>强一致性缓存（2PC/Paxos）</td></tr>
+  <tr><td>TSO</td><td>Cache Aside（最终一致，极端 case 可能读到旧值）</td></tr>
+  <tr><td>Weak Ordering</td><td>Write Behind（异步写回，弱一致）</td></tr>
+  <tr><td>Barrier</td><td>缓存失效操作（强制同步点）</td></tr>
+  <tr><td>Data Race</td><td>并发读写缓存和数据库</td></tr>
+</table>
+
+<div class="box box-amber">
+  <div class="title">💡 核心教训</div>
+  <p>使用同步库！它会处理丑陋的重排问题。正如陈皓所说：<strong>宏观系统架构中的很多设计都来源于微观的计算机体系结构。</strong></p>
+</div>
+</section>
+
+<section id="sec-practice">
+<h2 class="section-title"><span class="num">5</span> 缓存分类与工程实践</h2>
+
+<h3>缓存特征三要素</h3>
+<table>
+  <tr><th>特征</th><th>说明</th></tr>
+  <tr><td><strong>命中率</strong></td><td>命中率 = 正确结果数 / 请求缓存次数，核心指标</td></tr>
+  <tr><td><strong>最大容量</strong></td><td>超过后触发清空策略</td></tr>
+  <tr><td><strong>清空策略</strong></td><td>FIFO（先进先出）、LFU（最少使用）、LRU（最近最少使用）</td></tr>
+</table>
+
+<h3>本地缓存 vs 分布式缓存</h3>
+<table>
+  <tr><th>维度</th><th>本地缓存</th><th>分布式缓存</th></tr>
+  <tr><td><strong>代表</strong></td><td>Ehcache、Guava Cache</td><td>Redis、Memcached</td></tr>
+  <tr><td><strong>优点</strong></td><td>无网络开销，极快</td><td>多应用共享，独立扩展</td></tr>
+  <tr><td><strong>缺点</strong></td><td>进程内，无法跨应用共享</td><td>网络开销，序列化成本</td></tr>
+  <tr><td><strong>适用</strong></td><td>单机小数据量、配置数据</td><td>大规模分布式系统</td></tr>
+</table>
+
+<h3>Memcached vs Redis</h3>
+<table>
+  <tr><th>维度</th><th>Memcached</th><th>Redis</th></tr>
+  <tr><td><strong>数据结构</strong></td><td>仅 key-value</td><td>String/List/Set/Hash/ZSet</td></tr>
+  <tr><td><strong>持久化</strong></td><td>❌</td><td>✅ RDB + AOF</td></tr>
+  <tr><td><strong>内存管理</strong></td><td>Slab 预分配（chunk 最大 1MB）</td><td>现场申请，有碎片</td></tr>
+  <tr><td><strong>分布式</strong></td><td>客户端一致性 Hash</td><td>Redis Cluster（服务端）</td></tr>
+  <tr><td><strong>线程模型</strong></td><td>多线程</td><td>单线程 I/O 多路复用</td></tr>
+  <tr><td><strong>淘汰策略</strong></td><td>LRU</td><td>6 种策略</td></tr>
+</table>
+
+<h3>Spring Cache 注解</h3>
+<table>
+  <tr><th>注解</th><th>作用</th></tr>
+  <tr><td><code>@Cacheable</code></td><td>方法结果缓存，命中则不执行方法</td></tr>
+  <tr><td><code>@CachePut</code></td><td>每次执行方法并更新缓存</td></tr>
+  <tr><td><code>@CacheEvict</code></td><td>清除缓存</td></tr>
+</table>
+
+<div class="box box-amber">
+  <div class="title">⚠️ 注意事项</div>
+  <p>类内部调用（this 引用）会导致代理失效，缓存不生效；非 public 方法无法使用注解缓存。</p>
+</div>
+</section>
+
+<section id="sec-quiz">
+<h2 class="section-title"><span class="num">6</span> 知识测验</h2>
+
+<div class="demo">
+  <h4>🎮 交互式测验</h4>
+  <button onclick="loadQuiz()">📋 开始测验</button>
+  <div id="quiz-area"></div>
+  <div id="quiz-score" style="margin-top:1rem;font-size:.95rem;color:#94a3b8"></div>
+</div>
+</section>
+
+</div>
+
+<footer>
+  <p>基于多篇技术文章整理为交互式教程</p>
+  <p><a href="../">← 返回主页</a></p>
+</footer>
+
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+const quizData = [
+  { q: 'Cache Aside Pattern 写操作的正确顺序是？', opts: ['先删缓存，再更新数据库', '先更新数据库，再让缓存失效', '先更新缓存，再更新数据库', '只更新缓存'], ans: 1 },
+  { q: '缓存穿透是指什么？', opts: ['热点 key 过期', '大量缓存同时过期', '查询不存在的数据，每次打到 DB', '缓存服务宕机'], ans: 2 },
+  { q: 'Instagram Promise 缓存的核心思想是？', opts: ['缓存实际的值', '缓存一个 Promise 对象', '使用外部缓存', '预热所有数据'], ans: 1 },
+  { q: 'Write Behind 模式的特点是？', opts: ['同步更新数据库', '只更新缓存，异步批量更新数据库', '先删缓存再更新数据库', '由缓存层同步更新数据库'], ans: 1 },
+  { q: 'Redis 与 Memcached 的主要区别不包括？', opts: ['Redis 支持更多数据结构', 'Redis 支持持久化', 'Redis 使用多线程模型', 'Redis 支持 Redis Cluster'], ans: 2 },
+  { q: 'TSO 内存模型对应缓存系统中的哪种模式？', opts: ['强一致性缓存', 'Cache Aside（最终一致）', 'Write Behind（弱一致）', '无缓存'], ans: 1 },
+];
+
+let quizAnswers = {};
+function loadQuiz() {
+  const area = document.getElementById('quiz-area');
+  quizAnswers = {};
+  area.innerHTML = quizData.map((q, i) => `<div style="margin-bottom:1.5rem"><p style="font-weight:600;color:#f8fafc">${i + 1}. ${q.q}</p><div class="quiz-options">${q.opts.map((opt, j) => `<label><input type="radio" name="q${i}" value="${j}" onchange="checkAnswer(${i}, ${j})">${opt}</label>`).join('')}</div><div class="quiz-result" id="result-${i}"></div></div>`).join('') + '<button onclick="showScore()" style="margin-top:.5rem">📊 查看得分</button>';
+}
+function checkAnswer(qi, selected) {
+  const el = document.getElementById('result-' + qi);
+  const correct = quizData[qi].ans;
+  quizAnswers[qi] = selected;
+  if (selected === correct) { el.className = 'quiz-result correct'; el.textContent = '✅ 正确！'; }
+  else { el.className = 'quiz-result wrong'; el.textContent = '❌ 错误，正确答案是：' + quizData[qi].opts[correct]; }
+}
+function showScore() {
+  let correct = 0;
+  for (let i = 0; i < quizData.length; i++) { if (quizAnswers[i] === quizData[i].ans) correct++; }
+  const pct = Math.round(correct / quizData.length * 100);
+  document.getElementById('quiz-score').innerHTML = `得分：<strong style="color:#60a5fa">${correct}/${quizData.length}</strong>（${pct}%）`;
+}
+window.addEventListener('scroll', () => { document.getElementById('backTop').classList.toggle('show', window.scrollY > 400); });
+</script>
+
+<script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDORuTVww" data-category="General" data-category-id="DIC_kwDORuTVw84C5OW8" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="dark_dimmed" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous" async></script>
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

@@ -8,6 +8,70 @@ export interface Tutorial {
 
 export const tutorials: Tutorial[] = [
   {
+    slug: 'dist-theory',
+    tag: '📐 分布式',
+    title: '分布式系统理论与实践全面总结',
+    description:
+      'CAP/BASE 理论、分布式八大谬误、分布式锁、延时任务。覆盖一致性模型、FLP 不可能性、Redlock 争议、不可变性原则，含交互式测验。',
+    meta: '基于 12 篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'dist-zookeeper',
+    tag: '🐘 ZooKeeper',
+    title: 'ZooKeeper 全面总结',
+    description:
+      'ZAB 协议、数据模型、典型应用、跨数据中心部署。覆盖服务发现、分布式锁、Leader 选举、阿里为何不用 ZK，含交互式测验。',
+    meta: '基于 12 篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'dist-microservice',
+    tag: '🧩 微服务',
+    title: '微服务架构与服务治理全面总结',
+    description:
+      '服务拆分、注册发现、熔断限流、配置中心。覆盖 Consul/ZK/etcd 对比、Service Mesh 演进、遗留系统改造，含交互式测验。',
+    meta: '基于 11 篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'dist-mq',
+    tag: '📨 消息队列',
+    title: '消息队列全面总结',
+    description:
+      'Kafka/RocketMQ/Pulsar/RabbitMQ 对比、可靠性保证、Kafka 监控。覆盖幂等/顺序/事务消息、微信 MQ 实践，含交互式测验。',
+    meta: '基于 6 篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'dist-rpc',
+    tag: '🔗 RPC',
+    title: 'RPC 与通信协议全面总结',
+    description:
+      'RPC 核心原理、序列化协议、框架对比。覆盖 Dubbo/gRPC/Thrift/Motan 性能测试、I/O 模型、选型建议，含交互式测验。',
+    meta: '基于 3 篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'dist-cache',
+    tag: '🗄️ 缓存',
+    title: '分布式缓存实战全面总结',
+    description:
+      '缓存更新策略、穿透/击穿/雪崩/惊群效应。覆盖 Instagram Promise 缓存、内存一致性模型、Memcached vs Redis，含交互式测验。',
+    meta: '基于 4 篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'dist-storage',
+    tag: '💾 存储',
+    title: '分布式文件存储全面总结',
+    description:
+      '分布式存储架构、GFS/HDFS/Ceph 对比、Ceph 运维实战。覆盖中心化 vs 去中心化架构、存储选型，含交互式测验。',
+    meta: '基于 3 篇技术文章 · 2026-04',
+  },
+  {
+    slug: 'dist-arch-cases',
+    tag: '🏢 案例',
+    title: '分布式架构案例与实战全面总结',
+    description:
+      '去哪儿网搜索/支付、创业公司架构变迁、负载均衡、混沌工程。覆盖 MapReduce、系统设计核心组件，含交互式测验。',
+    meta: '基于 12 篇技术文章 · 2026-04',
+  },
+  {
     slug: 'performance-latency',
     tag: '⏱️ 性能',
     title: '性能与延迟全面总结',
