@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="编辑距离算法：从原理到交互式可视化，动态规划逐步图解">
+<title>编辑距离算法教程</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+.dp-table { border-collapse: collapse; margin: 1rem auto; font-family: 'JetBrains Mono', monospace; }
+.dp-table th, .dp-table td { width: 3rem; height: 3rem; text-align: center; border: 1px solid #334155; font-size: .95rem; }
+.dp-table th { background: #1e293b; color: #93c5fd; font-weight: 600; }
+.dp-table td { color: #cbd5e1; transition: all .3s; }
+.dp-table td.highlight { background: #3b82f6; color: #fff; font-weight: 700; }
+.dp-table td.current { background: #f59e0b; color: #0f172a; font-weight: 700; }
+.dp-table td.path { background: #22c55e; color: #0f172a; font-weight: 700; }
+.dp-table td.base { background: rgba(59,130,246,.15); }
+.step-controls { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: center; margin: 1rem 0; }
+.step-controls button { background: linear-gradient(135deg,#3b82f6,#6366f1); color: #fff; border: none; border-radius: 6px; padding: .5rem 1.2rem; cursor: pointer; font-size: .9rem; font-weight: 600; }
+.step-controls button:disabled { opacity: .4; cursor: default; }
+.step-info { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1rem; margin: 1rem 0; min-height: 3rem; font-size: .9rem; color: #e2e8f0; }
+#try-input { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin: 1rem 0; }
+#try-input input { background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: .5rem .8rem; color: #f8fafc; font-size: .95rem; width: 160px; font-family: 'JetBrains Mono', monospace; }
+.op-tag { display: inline-block; padding: .15rem .5rem; border-radius: 4px; font-size: .8rem; font-weight: 600; }
+.op-insert { background: #166534; color: #86efac; }
+.op-delete { background: #7f1d1d; color: #fca5a5; }
+.op-replace { background: #78350f; color: #fde68a; }
+.op-match { background: #1e3a5f; color: #93c5fd; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>✏️ <span>编辑距离</span>算法教程</h1>
+  <p class="subtitle">Levenshtein Distance · 动态规划逐步图解 · 交互式可视化</p>
+  <span class="badge">🧮 动态规划</span>
+  <span class="badge">📏 字符串</span>
+  <span class="badge">🎮 交互式</span>
+</header>
+
+<div class="container">
+
+<nav class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#sec-what">什么是编辑距离</a></li>
+    <li><a href="#sec-dp">动态规划求解</a></li>
+    <li><a href="#sec-walkthrough">手推示例图解</a></li>
+    <li><a href="#sec-interactive">交互式可视化</a></li>
+    <li><a href="#sec-similarity">编辑距离转相似度</a></li>
+    <li><a href="#sec-code">Python 实现</a></li>
+    <li><a href="#sec-tips">实用技巧</a></li>
+    <li><a href="#sec-quiz">知识测验</a></li>
+  </ol>
+</nav>
+
+<!-- Section 1 -->
+<section id="sec-what">
+<h2 class="section-title"><span class="num">1</span> 什么是编辑距离</h2>
+
+<p>编辑距离（Levenshtein Distance）衡量将字符串 A 变成字符串 B 所需的<strong>最少操作次数</strong>。</p>
+
+<h3>三种允许的操作</h3>
+<div class="flow">
+  <div class="step"><span class="op-tag op-insert">插入</span><br><small>添加一个字符</small></div>
+  <div class="step"><span class="op-tag op-delete">删除</span><br><small>移除一个字符</small></div>
+  <div class="step"><span class="op-tag op-replace">替换</span><br><small>换成另一个字符</small></div>
+</div>
+
+<div class="analogy">
+  <div class="emoji">🔤</div>
+  <h4>直觉理解</h4>
+  <p>想象你在文本编辑器里，只能用「退格删除」「打字插入」「选中替换」三个键，把一个单词改成另一个单词——最少按几次键？这就是编辑距离。</p>
+</div>
+
+<h3>举个例子</h3>
+<table>
+  <tr><th>A</th><th>B</th><th>操作</th><th>编辑距离</th></tr>
+  <tr><td><code>abc</code></td><td><code>adc</code></td><td>替换 b→d</td><td>1</td></tr>
+  <tr><td><code>kitten</code></td><td><code>sitting</code></td><td>替换 k→s, 替换 e→i, 插入 g</td><td>3</td></tr>
+  <tr><td><code>abc</code></td><td><code>abc</code></td><td>无需操作</td><td>0</td></tr>
+  <tr><td><code>abc</code></td><td><code></code></td><td>删除 3 次</td><td>3</td></tr>
+</table>
+</section>
+
+<!-- Section 2 -->
+<section id="sec-dp">
+<h2 class="section-title"><span class="num">2</span> 动态规划求解</h2>
+
+<h3>状态定义</h3>
+<div class="box box-blue">
+  <div class="title">📐 dp[i][j] 的含义</div>
+  <p>构建 <code>(m+1) × (n+1)</code> 的矩阵，<code>dp[i][j]</code> = A 的前 i 个字符变成 B 的前 j 个字符的<strong>最小操作数</strong>。</p>
+</div>
+
+<h3>初始化</h3>
+<table>
+  <tr><th>边界</th><th>含义</th><th>值</th></tr>
+  <tr><td><code>dp[i][0] = i</code></td><td>A 的前 i 个字符 → 空串</td><td>删除 i 次</td></tr>
+  <tr><td><code>dp[0][j] = j</code></td><td>空串 → B 的前 j 个字符</td><td>插入 j 次</td></tr>
+</table>
+
+<h3>转移方程</h3>
+<div class="box box-purple">
+  <div class="title">🧮 核心公式</div>
+  <p>如果 <code>A[i] == B[j]</code>（字符相同）：</p>
+  <pre><code>dp[i][j] = dp[i-1][j-1]    // 无需操作，直接继承</code></pre>
+  <p>如果 <code>A[i] != B[j]</code>（字符不同）：</p>
+  <pre><code>dp[i][j] = 1 + min(
+    dp[i-1][j],      // ← 删除 A[i]
+    dp[i][j-1],      // ← 插入 B[j]
+    dp[i-1][j-1]     // ← 替换 A[i] 为 B[j]
+)</code></pre>
+</div>
+
+<h3>三个方向的含义</h3>
+<div class="flow">
+  <div class="step">⬆️ 上方 <code>dp[i-1][j]</code><br><small><span class="op-tag op-delete">删除</span> A[i]</small></div>
+  <div class="step">⬅️ 左方 <code>dp[i][j-1]</code><br><small><span class="op-tag op-insert">插入</span> B[j]</small></div>
+  <div class="step">↖️ 左上 <code>dp[i-1][j-1]</code><br><small><span class="op-tag op-replace">替换</span> 或 <span class="op-tag op-match">匹配</span></small></div>
+</div>
+
+<div class="box box-amber">
+  <div class="title">💡 一句话总结</div>
+  <p>每个格子在问：「到这一步为止，最少改几次？」——从上面删除(+1)、从左边插入(+1)、从左上角替换(不同+1，相同+0)，三选最小。</p>
+</div>
+</section>
+
+<!-- Section 3 -->
+<section id="sec-walkthrough">
+<h2 class="section-title"><span class="num">3</span> 手推示例：<code>abc</code> → <code>adc</code></h2>
+
+<h3>第一步：初始化边界</h3>
+<p>第 0 行和第 0 列表示「从空串变过去需要多少步」：</p>
+
+<table class="dp-table">
+  <tr><th></th><th>""</th><th>a</th><th>d</th><th>c</th></tr>
+  <tr><th>""</th><td class="base">0</td><td class="base">1</td><td class="base">2</td><td class="base">3</td></tr>
+  <tr><th>a</th><td class="base">1</td><td></td><td></td><td></td></tr>
+  <tr><th>b</th><td class="base">2</td><td></td><td></td><td></td></tr>
+  <tr><th>c</th><td class="base">3</td><td></td><td></td><td></td></tr>
+</table>
+
+<div class="box box-blue">
+  <div class="title">📖 读法</div>
+  <p><code>dp[0][2]=2</code>：空串变成 "ad" 需要插入 2 次。<code>dp[3][0]=3</code>："abc" 变成空串需要删除 3 次。</p>
+</div>
+
+<h3>第二步：逐格填写</h3>
+
+<p><strong>dp[1][1]：A[1]=a vs B[1]=a</strong> → <span class="op-tag op-match">相同</span>，取左上角 <code>dp[0][0]=0</code></p>
+<p><strong>dp[1][2]：A[1]=a vs B[2]=d</strong> → <span class="op-tag op-replace">不同</span>，min(左0, 上2, 左上1)+1 = <strong>1</strong></p>
+<p><strong>dp[1][3]：A[1]=a vs B[3]=c</strong> → <span class="op-tag op-replace">不同</span>，min(左1, 上3, 左上2)+1 = <strong>2</strong></p>
+<p><strong>dp[2][1]：A[2]=b vs B[1]=a</strong> → <span class="op-tag op-replace">不同</span>，min(左2, 上0, 左上1)+1 = <strong>1</strong></p>
+<p><strong>dp[2][2]：A[2]=b vs B[2]=d</strong> → <span class="op-tag op-replace">不同</span>，min(左1, 上1, 左上0)+1 = <strong>1</strong></p>
+<p><strong>dp[2][3]：A[2]=b vs B[3]=c</strong> → <span class="op-tag op-replace">不同</span>，min(左1, 上2, 左上1)+1 = <strong>2</strong></p>
+<p><strong>dp[3][1]：A[3]=c vs B[1]=a</strong> → <span class="op-tag op-replace">不同</span>，min(左3, 上1, 左上1)+1 = <strong>2</strong></p>
+<p><strong>dp[3][2]：A[3]=c vs B[2]=d</strong> → <span class="op-tag op-replace">不同</span>，min(左2, 上1, 左上1)+1 = <strong>2</strong></p>
+<p><strong>dp[3][3]：A[3]=c vs B[3]=c</strong> → <span class="op-tag op-match">相同</span>，取左上角 <code>dp[2][2]=1</code></p>
+
+<h3>最终矩阵</h3>
+<table class="dp-table">
+  <tr><th></th><th>""</th><th>a</th><th>d</th><th>c</th></tr>
+  <tr><th>""</th><td class="base">0</td><td class="base">1</td><td class="base">2</td><td class="base">3</td></tr>
+  <tr><th>a</th><td class="base">1</td><td>0</td><td>1</td><td>2</td></tr>
+  <tr><th>b</th><td class="base">2</td><td>1</td><td>1</td><td>2</td></tr>
+  <tr><th>c</th><td class="base">3</td><td>2</td><td>2</td><td class="path">1</td></tr>
+</table>
+
+<div class="box box-green">
+  <div class="title">✅ 结果</div>
+  <p>右下角 <code>dp[3][3] = 1</code>，即 <code>abc</code> → <code>adc</code> 只需 <strong>1 步</strong>（把 b 替换成 d）。</p>
+</div>
+</section>
+
+<!-- Section 4 -->
+<section id="sec-interactive">
+<h2 class="section-title"><span class="num">4</span> 交互式可视化</h2>
+
+<p>输入两个字符串，点击「逐步演示」观察 DP 矩阵的填充过程：</p>
+
+<div class="demo">
+  <h4>🎮 编辑距离计算器</h4>
+  <div id="try-input">
+    <label style="color:#94a3b8">A：</label><input id="strA" value="kitten" placeholder="字符串 A">
+    <label style="color:#94a3b8">B：</label><input id="strB" value="sitting" placeholder="字符串 B">
+    <button onclick="initDemo()">生成矩阵</button>
+  </div>
+  <div class="step-controls">
+    <button id="btnPrev" onclick="stepPrev()" disabled>⬅ 上一步</button>
+    <button id="btnNext" onclick="stepNext()">下一步 ➡</button>
+    <button id="btnAll" onclick="stepAll()">⏩ 全部填完</button>
+    <button onclick="initDemo()">🔄 重置</button>
+  </div>
+  <div id="step-info" class="step-info">点击「生成矩阵」开始。</div>
+  <div id="dp-container" style="overflow-x:auto"></div>
+  <div id="result-info" style="margin-top:.75rem;color:#94a3b8;font-size:.9rem"></div>
+</div>
+</section>
+
+<!-- Section 5 -->
+<section id="sec-similarity">
+<h2 class="section-title"><span class="num">5</span> 编辑距离转相似度</h2>
+
+<div class="box box-purple">
+  <div class="title">📐 公式</div>
+  <p><code>similarity = 1 - edit_distance / max(len(A), len(B))</code></p>
+</div>
+
+<table>
+  <tr><th>文件名 A</th><th>文件名 B</th><th>编辑距离</th><th>相似度</th></tr>
+  <tr><td><code>report_v1.txt</code></td><td><code>report_v2.txt</code></td><td>1</td><td>≈ 0.93 ✅</td></tr>
+  <tr><td><code>readme.md</code></td><td><code>readme.txt</code></td><td>3</td><td>0.70</td></tr>
+  <tr><td><code>readme.md</code></td><td><code>license.txt</code></td><td>9</td><td>≈ 0.18 ❌</td></tr>
+</table>
+
+<div class="box box-amber">
+  <div class="title">💡 阈值建议</div>
+  <p>通常 similarity &gt; 0.7 可认为「相似文件名」，具体按场景调整。</p>
+</div>
+</section>
+
+<!-- Section 6 -->
+<section id="sec-code">
+<h2 class="section-title"><span class="num">6</span> Python 实现</h2>
+
+<h3>空间优化版（滚动数组）</h3>
+<pre><code>def edit_distance(a: str, b: str) -> int:
+    m, n = len(a), len(b)
+    prev = list(range(n + 1))
+    curr = [0] * (n + 1)
+    for i in range(1, m + 1):
+        curr[0] = i
+        for j in range(1, n + 1):
+            if a[i-1] == b[j-1]:
+                curr[j] = prev[j-1]
+            else:
+                curr[j] = 1 + min(prev[j], curr[j-1], prev[j-1])
+        prev, curr = curr, prev
+    return prev[n]</code></pre>
+
+<h3>相似度计算</h3>
+<pre><code>def filename_similarity(a: str, b: str) -> float:
+    dist = edit_distance(a, b)
+    max_len = max(len(a), len(b))
+    return 1 - dist / max_len if max_len > 0 else 1.0</code></pre>
+
+<h3>复杂度</h3>
+<table>
+  <tr><th>维度</th><th>复杂度</th><th>说明</th></tr>
+  <tr><td>时间</td><td>O(m × n)</td><td>两层循环</td></tr>
+  <tr><td>空间</td><td>O(min(m, n))</td><td>滚动数组优化</td></tr>
+</table>
+</section>
+
+<!-- Section 7 -->
+<section id="sec-tips">
+<h2 class="section-title"><span class="num">7</span> 实用技巧</h2>
+
+<table>
+  <tr><th>技巧</th><th>说明</th></tr>
+  <tr><td>忽略大小写</td><td>先 <code>.lower()</code> 再比较</td></tr>
+  <tr><td>去掉扩展名</td><td>用 <code>os.path.splitext()</code> 分离</td></tr>
+  <tr><td>归一化路径</td><td>跨平台统一 <code>/</code> 和 <code>\</code></td></tr>
+  <tr><td>设阈值判断</td><td>similarity &gt; 0.7 → 相似</td></tr>
+  <tr><td>批量剪枝</td><td>长度差超过阈值直接跳过（编辑距离 ≥ 长度差）</td></tr>
+</table>
+</section>
+
+<!-- Section 8 -->
+<section id="sec-quiz">
+<h2 class="section-title"><span class="num">8</span> 知识测验</h2>
+<div class="demo">
+  <h4>🎮 交互式测验</h4>
+  <button onclick="loadQuiz()">📋 开始测验</button>
+  <div id="quiz-area"></div>
+  <div id="quiz-score" style="margin-top:1rem;color:#94a3b8"></div>
+</div>
+</section>
+
+</div><!-- end container -->
+
+<footer>
+  <p>基于编辑距离算法整理 · 含交互式 DP 可视化</p>
+  <p><a href="../">← 返回主页</a></p>
+</footer>
+<a href="#" class="back-top" id="backTop">↑</a>
+
+<script>
+/* ===== Interactive DP Visualization ===== */
+let A='', B='', dp=[], steps=[], curStep=-1;
+
+function initDemo(){
+  A=document.getElementById('strA').value;
+  B=document.getElementById('strB').value;
+  const m=A.length, n=B.length;
+  dp=Array.from({length:m+1},()=>Array(n+1).fill(0));
+  steps=[]; curStep=-1;
+  // init borders
+  for(let i=0;i<=m;i++){dp[i][0]=i; steps.push({i,j:0,val:i,type:'init'});}
+  for(let j=1;j<=n;j++){dp[0][j]=j; steps.push({i:0,j,val:j,type:'init'});}
+  // fill
+  for(let i=1;i<=m;i++) for(let j=1;j<=n;j++){
+    if(A[i-1]===B[j-1]){
+      dp[i][j]=dp[i-1][j-1];
+      steps.push({i,j,val:dp[i][j],type:'match',from:'diag'});
+    } else {
+      const del=dp[i-1][j], ins=dp[i][j-1], rep=dp[i-1][j-1];
+      const mn=Math.min(del,ins,rep);
+      dp[i][j]=1+mn;
+      const from=mn===rep?'diag':mn===del?'up':'left';
+      steps.push({i,j,val:dp[i][j],type:'diff',from});
+    }
+  }
+  curStep=m+n; // skip init steps
+  renderTable();
+  document.getElementById('step-info').textContent='边界已初始化。点击「下一步」逐格填写。';
+  document.getElementById('result-info').textContent='';
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPrev').disabled=true;
+}
+
+function renderTable(){
+  const m=A.length, n=B.length;
+  let h='<table class="dp-table"><tr><th></th><th>""</th>';
+  for(let j=0;j<n;j++) h+=`<th>${B[j]}</th>`;
+  h+='</tr>';
+  for(let i=0;i<=m;i++){
+    h+=`<tr><th>${i===0?'""':A[i-1]}</th>`;
+    for(let j=0;j<=n;j++){
+      const filled=steps.findIndex(s=>s.i===i&&s.j===j);
+      const isFilled=filled!==-1&&filled<=curStep;
+      const isCurrent=filled===curStep&&filled>A.length+B.length;
+      let cls=isCurrent?'current':((i===0||j===0)&&isFilled)?'base':'';
+      if(i===m&&j===n&&curStep>=steps.length-1) cls='path';
+      h+=`<td class="${cls}">${isFilled?dp[i][j]:''}</td>`;
+    }
+    h+='</tr>';
+  }
+  h+='</table>';
+  document.getElementById('dp-container').innerHTML=h;
+}
+
+function stepNext(){
+  if(curStep>=steps.length-1) return;
+  curStep++;
+  const s=steps[curStep];
+  renderTable();
+  const opMap={match:'字符相同，取左上角',diff:'字符不同，三方向取最小+1'};
+  const fromMap={diag:'↖️左上',up:'⬆️上方(删除)',left:'⬅️左方(插入)'};
+  if(s.type==='init'){
+    document.getElementById('step-info').textContent=`初始化 dp[${s.i}][${s.j}] = ${s.val}`;
+  } else {
+    const charA=A[s.i-1], charB=B[s.j-1];
+    document.getElementById('step-info').innerHTML=
+      `<strong>dp[${s.i}][${s.j}]</strong>：A[${s.i}]='${charA}' vs B[${s.j}]='${charB}' → `+
+      `<span class="op-tag ${s.type==='match'?'op-match':'op-replace'}">${s.type==='match'?'相同':'不同'}</span> `+
+      `来自 ${fromMap[s.from]}，值 = <strong>${s.val}</strong>`;
+  }
+  document.getElementById('btnPrev').disabled=false;
+  if(curStep>=steps.length-1){
+    document.getElementById('btnNext').disabled=true;
+    document.getElementById('result-info').innerHTML=
+      `✅ 编辑距离 = <strong style="color:#60a5fa;font-size:1.2rem">${dp[A.length][B.length]}</strong>` +
+      ` · 相似度 = <strong style="color:#22c55e">${(1-dp[A.length][B.length]/Math.max(A.length,B.length)).toFixed(3)}</strong>`;
+  }
+}
+
+function stepPrev(){
+  if(curStep<=A.length+B.length) return;
+  curStep--;
+  renderTable();
+  document.getElementById('btnNext').disabled=false;
+  if(curStep<=A.length+B.length) document.getElementById('btnPrev').disabled=true;
+}
+
+function stepAll(){
+  curStep=steps.length-1;
+  renderTable();
+  document.getElementById('btnNext').disabled=true;
+  document.getElementById('btnPrev').disabled=false;
+  document.getElementById('step-info').textContent='全部填写完成！';
+  document.getElementById('result-info').innerHTML=
+    `✅ 编辑距离 = <strong style="color:#60a5fa;font-size:1.2rem">${dp[A.length][B.length]}</strong>` +
+    ` · 相似度 = <strong style="color:#22c55e">${(1-dp[A.length][B.length]/Math.max(A.length,B.length)).toFixed(3)}</strong>`;
+}
+
+// Auto-init on load
+window.addEventListener('DOMContentLoaded', initDemo);
+
+/* ===== Quiz ===== */
+const quizData=[
+  {q:'编辑距离允许哪三种操作？',opts:['插入、删除、替换','插入、删除、交换','插入、复制、替换','删除、替换、翻转'],ans:0},
+  {q:'dp[i][0] 的值是什么？',opts:['0','j','i','m+n'],ans:2},
+  {q:'当 A[i]==B[j] 时，dp[i][j] 等于？',opts:['dp[i-1][j-1]+1','dp[i-1][j-1]','dp[i][j-1]','0'],ans:1},
+  {q:'编辑距离的时间复杂度是？',opts:['O(n)','O(n log n)','O(m×n)','O(2^n)'],ans:2},
+  {q:'空间优化后的空间复杂度是？',opts:['O(m×n)','O(m+n)','O(min(m,n))','O(1)'],ans:2},
+  {q:'"abc"→"adc" 的编辑距离是？',opts:['0','1','2','3'],ans:1},
+];
+let quizAnswers={};
+function loadQuiz(){
+  const area=document.getElementById('quiz-area'); quizAnswers={};
+  area.innerHTML=quizData.map((q,i)=>`<div style="margin-bottom:1.5rem"><p style="font-weight:600;color:#f8fafc">${i+1}. ${q.q}</p><div class="quiz-options">${q.opts.map((o,j)=>`<label><input type="radio" name="q${i}" value="${j}" onchange="checkAns(${i},${j})">${o}</label>`).join('')}</div><div class="quiz-result" id="qr-${i}"></div></div>`).join('')+'<button onclick="showScore()">📊 查看得分</button>';
+}
+function checkAns(qi,s){const el=document.getElementById('qr-'+qi);quizAnswers[qi]=s;if(s===quizData[qi].ans){el.className='quiz-result correct';el.textContent='✅ 正确！';}else{el.className='quiz-result wrong';el.textContent='❌ 错误';}}
+function showScore(){let c=0;for(let i=0;i<quizData.length;i++)if(quizAnswers[i]===quizData[i].ans)c++;document.getElementById('quiz-score').innerHTML=`得分：<strong style="color:#60a5fa">${c}/${quizData.length}</strong>`;}
+
+/* ===== Back to top ===== */
+window.addEventListener('scroll',()=>{document.getElementById('backTop').classList.toggle('show',window.scrollY>400);});
+</script>
+
+<script src="https://giscus.app/client.js" data-repo="EathVader/EathVader.github.io" data-repo-id="R_kgDORuTVww" data-category="General" data-category-id="DIC_kwDORuTVw84C5OW8" data-mapping="pathname" data-strict="0" data-reactions-enabled="1" data-emit-metadata="0" data-input-position="top" data-theme="dark_dimmed" data-lang="zh-CN" data-loading="lazy" crossorigin="anonymous" async></script>
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9f41b767ec504f5a95ad899aea911665"}'></script>
+</body>
+</html>

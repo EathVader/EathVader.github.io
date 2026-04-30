@@ -8,6 +8,14 @@ export interface Tutorial {
 
 export const tutorials: Tutorial[] = [
   {
+    slug: 'edit-distance',
+    tag: '🧮 动态规划',
+    title: '编辑距离算法教程',
+    description:
+      'Levenshtein Distance 从原理到实现。覆盖 DP 状态转移、逐步矩阵图解、交互式可视化、相似度计算、Python 空间优化，含交互式测验。',
+    meta: '基于算法教程 · 2026-04',
+  },
+  {
     slug: 'dist-theory',
     tag: '📐 分布式',
     title: '分布式系统理论与实践全面总结',
