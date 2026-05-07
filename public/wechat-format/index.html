@@ -212,45 +212,6 @@
       return footnoteIndex;
     }
 
-    const renderer = new marked.Renderer();
-    renderer.heading = (text, level) => {
-      const tag = level < 3 ? 'h2' : 'h3';
-      return '<' + tag + ' ' + styleAttr(tag) + '>' + text + '</' + tag + '>';
-    };
-    renderer.paragraph = (text) => '<p ' + styleAttr('p') + '>' + text + '</p>';
-    renderer.blockquote = (text) => '<blockquote ' + styleAttr('blockquote') + '>' + text + '</blockquote>';
-    renderer.code = (text, lang) => {
-      const safeText = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const lines = safeText.split('\n');
-      const codeLines = lines.map(line => '<code><span class="code-snippet_outer">' + (line || '<br>') + '</span></code>').join('');
-      const numbers = lines.map(() => '<li></li>').join('');
-      return '<section class="code-snippet__fix code-snippet__js"><ul class="code-snippet__line-index code-snippet__js">' + numbers + '</ul><pre class="code-snippet__js" data-lang="' + (lang || '') + '">' + codeLines + '</pre></section>';
-    };
-    renderer.codespan = (text) => '<code ' + styleAttr('codespan') + '>' + text + '</code>';
-    renderer.listitem = (text) => '<span ' + styleAttr('listitem') + '><span style="margin-right:10px"><%s/></span>' + text + '</span>';
-    renderer.list = (text, ordered) => {
-      const segments = text.split('<%s/>');
-      if (!ordered) return '<p ' + styleAttr('ul') + '>' + segments.join('•') + '</p>';
-      let result = segments[0];
-      for (let i = 1; i < segments.length; i++) result += i + '.' + segments[i];
-      return '<p ' + styleAttr('ol') + '>' + result + '</p>';
-    };
-    renderer.image = (href, title, text) => '<img ' + styleAttr('image') + ' src="' + href + '" title="' + (title || '') + '" alt="' + text + '"/>';
-    renderer.link = (href, title, text) => {
-      if (href.startsWith('https://mp.weixin.qq.com')) return '<a href="' + href + '" title="' + (title || text) + '" ' + styleAttr('link') + '>' + text + '</a>';
-      if (href === text) return text;
-      const ref = addFootnote(title || text, href);
-      return '<span ' + styleAttr('link') + '>' + text + '<sup>[' + ref + ']</sup></span>';
-    };
-    renderer.strong = (text) => '<strong ' + styleAttr('strong') + '>' + text + '</strong>';
-    renderer.em = renderer.strong;
-    renderer.table = (header, body) => '<table ' + styleAttr('table') + '><thead ' + styleAttr('thead') + '>' + header + '</thead><tbody>' + body + '</tbody></table>';
-    renderer.tablerow = (text) => '<tr>' + text + '</tr>';
-    renderer.tablecell = (text) => '<td ' + styleAttr('td') + '>' + text + '</td>';
-    renderer.hr = () => '<hr style="border-style:solid;border-width:1px 0 0;border-color:rgba(0,0,0,0.1);transform:scale(1,0.5);transform-origin:0 0">';
-
-    marked.setOptions({ renderer, breaks: true });
-
     function format() {
       const input = document.getElementById('input').value;
       footnotes = [];
