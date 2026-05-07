@@ -18,6 +18,8 @@
     .btn { background: #07c160; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; }
     .btn:hover { background: #06ad56; }
     .btn:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-secondary { background: #666; }
+    .btn-secondary:hover { background: #555; }
     textarea { width: 100%; height: 500px; border: 1px solid #ddd; border-radius: 4px; padding: 12px; font-size: 14px; font-family: monospace; resize: vertical; }
     textarea:focus { outline: none; border-color: #07c160; }
     #output { height: 500px; overflow-y: auto; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #fafafa; }
@@ -53,7 +55,10 @@
       <div class="panel">
         <div class="panel-header">
           <span class="panel-title">Markdown 输入</span>
-          <button class="btn" onclick="format()">格式化</button>
+          <div>
+            <button class="btn btn-secondary" onclick="downloadMd()">下载 MD</button>
+            <button class="btn" onclick="format()">格式化</button>
+          </div>
         </div>
         <textarea id="input" placeholder="在此输入 Markdown 内容..."># 一级标题
 
@@ -210,6 +215,17 @@
       footnoteIndex++;
       footnotes.push([footnoteIndex, title, link]);
       return footnoteIndex;
+    }
+
+    function downloadMd() {
+      const content = document.getElementById('input').value;
+      const blob = new Blob([content], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'article.md';
+      a.click();
+      URL.revokeObjectURL(url);
     }
 
     function format() {
