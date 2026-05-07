@@ -20,6 +20,7 @@
     .btn:disabled { background: #ccc; cursor: not-allowed; }
     .btn-secondary { background: #666; }
     .btn-secondary:hover { background: #555; }
+    .btn-accent { background: #07c160; }
     textarea { width: 100%; height: 500px; border: 1px solid #ddd; border-radius: 4px; padding: 12px; font-size: 14px; font-family: monospace; resize: vertical; }
     textarea:focus { outline: none; border-color: #07c160; }
     #output { height: 500px; overflow-y: auto; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #fafafa; }
@@ -54,38 +55,29 @@
     <div class="main">
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-title">Markdown 输入</span>
+          <span class="panel-title">文本输入</span>
           <div>
-            <button class="btn btn-secondary" onclick="downloadMd()">下载 MD</button>
-            <button class="btn" onclick="format()">格式化</button>
+            <button class="btn btn-secondary" onclick="toMarkdown()">转 MD</button>
+            <button class="btn btn-accent" onclick="format()">格式化</button>
+            <button class="btn btn-secondary" onclick="downloadMd()">下载</button>
           </div>
         </div>
-        <textarea id="input" placeholder="在此输入 Markdown 内容..."># 一级标题
+        <textarea id="input" placeholder="在此输入文本，支持普通文本或 Markdown...">这是一段普通文本。
+会自动转换为 Markdown 格式。
 
-## 二级标题
+这是第二个段落。
 
-**粗体**，*斜体*，***粗体加斜体***，`行内代码`
-
-- 无序列表 1
-- 无序列表 2
-  - 子列表
+列表项一
+列表项二
+列表项三
 
 1. 有序列表 1
 2. 有序列表 2
 
-> 引用内容
-
-[链接文字](https://example.com)
-
-![图片](https://via.placeholder.com/400x200)
-
-```
-代码块
-```
-
-| 表头 | 表头 |
-| ---- | ---- |
-| 单元格 | 单元格 |
+代码示例
+function hello() {
+  console.log("Hello World");
+}
 </textarea>
       </div>
       <div class="panel">
@@ -226,6 +218,51 @@
       a.download = 'article.md';
       a.click();
       URL.revokeObjectURL(url);
+    }
+
+    function downloadMd() {
+      const content = document.getElementById('input').value;
+      const blob = new Blob([content], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'article.md';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function toMarkdown() {
+      const text = document.getElementById('input').value;
+      const lines = text.split('\n');
+      let md = [];
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) { md.push(''); continue; }
+        // 代码块检测
+        if (trimmed.includes('function') || trimmed.includes('const ') || trimmed.includes('let ') || 
+            trimmed.includes('var ') || trimmed.includes('import ') || trimmed.includes('=>') ||
+            trimmed.includes('if (') || trimmed.includes('for (') || trimmed.includes('while (')) {
+          md.push('```js\n' + text + '\n```');
+          break;
+        }
+        // 列表检测
+        if (/^[•\-\*]/.test(trimmed)) {
+          md.push('- ' + trimmed.replace(/^[•\-\*]\s*/, ''));
+          continue;
+        }
+        if (/^\d+\.\s/.test(trimmed)) {
+          md.push(trimmed);
+          continue;
+        }
+        // 标题检测 (全大写或短句)
+        if (trimmed.length < 20 && trimmed === trimmed.toUpperCase() && /[A-Z]/.test(trimmed)) {
+          md.push('## ' + trimmed);
+          continue;
+        }
+        // 段落
+        md.push(trimmed);
+      }
+      document.getElementById('input').value = md.join('\n');
     }
 
     function format() {
