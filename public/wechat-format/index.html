@@ -97,8 +97,85 @@
   </div>
   <div class="toast" id="toast">已复制到剪贴板</div>
 
-  <script src="https://unpkg.com/marked/marked.min.js"></script>
   <script>
+    // Minimal markdown parser (no external deps)
+    const md = {
+      escape: s => s.replace(/</g, '&lt;').replace(/>/g, '&gt;'),
+      parse: function(text) {
+        text = text || '';
+        const lines = text.split('\n');
+        let html = [], inCode = false, codeLang = '', codeLines = [];
+        for (let i = 0; i < lines.length; i++) {
+          let line = lines[i];
+          // code block
+          if (line.startsWith('```')) {
+            if (!inCode) { inCode = true; codeLang = line.slice(3).trim(); codeLines = []; continue; }
+            else { inCode = false; html.push(this.renderCode(codeLines.join('\n'), codeLang)); codeLines = []; continue; }
+          }
+          if (inCode) { codeLines.push(line); continue; }
+          // hr
+          if (line.match(/^---?$/)) { html.push('<hr style="border-style:solid;border-width:1px 0 0;border-color:rgba(0,0,0,0.1);transform:scale(1,0.5);transform-origin:0 0">'); continue; }
+          // headings
+          let h = line.match(/^(#{1,6})\s+(.*)/);
+          if (h) { let level = h[1].length; let tag = level < 3 ? 'h2' : 'h3'; html.push('<' + tag + ' ' + styleAttr(tag) + '>' + this.parseInline(h[2]) + '</' + tag + '>'); continue; }
+          // blockquote
+          if (line.startsWith('> ')) { html.push('<blockquote ' + styleAttr('blockquote') + '>' + this.parseInline(line.slice(2)) + '</blockquote>'); continue; }
+          // ul/ol
+          let ul = line.match(/^(\s*)[-*]\s+(.*)/);
+          if (ul) { html.push(this.renderListItem(ul[2], ul[1])); continue; }
+          let ol = line.match(/^(\s*)\d+\.\s+(.*)/);
+          if (ol) { html.push(this.renderListItem(ol[2], ol[1], true)); continue; }
+          // table
+          if (line.match(/^\|/) && lines[i+1] && lines[i+1].match(/^\|[\s-|]+\|/)) {
+            let rows = [];
+            while (i < lines.length && lines[i].match(/^\|/)) {
+              let cells = lines[i].split('|').slice(1, -1).map(c => c.trim());
+              rows.push(cells); i++;
+            }
+            i--;
+            html.push(this.renderTable(rows)); continue;
+          }
+          // paragraph
+          if (line.trim()) html.push('<p ' + styleAttr('p') + '>' + this.parseInline(line) + '</p>');
+          else html.push('');
+        }
+        return html.join('\n');
+      },
+      parseInline: function(text) {
+        text = this.escape(text);
+        // code
+        text = text.replace(/`([^`]+)`/g, '<code ' + styleAttr('codespan') + '>$1</code>');
+        // strong + em
+        text = text.replace(/\*\*\*([^*]+)\*\*\*/g, '<strong ' + styleAttr('strong') + '><em>$1</em></strong>');
+        text = text.replace(/\*\*([^*]+)\*\*/g, '<strong ' + styleAttr('strong') + '>$1</strong>');
+        text = text.replace(/\*([^*]+)\*/g, '<em ' + styleAttr('strong') + '>$1</em>');
+        // image
+        text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img ' + styleAttr('image') + ' alt="$1" src="$2"/>');
+        // link
+        text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, t, l) => {
+          if (l.startsWith('https://mp.weixin.qq.com')) return '<a href="' + l + '" ' + styleAttr('link') + '>' + t + '</a>';
+          const ref = addFootnote(t, l);
+          return '<span ' + styleAttr('link') + '>' + t + '<sup>[' + ref + ']</sup></span>';
+        });
+        return text;
+      },
+      renderCode: function(text, lang) {
+        const lines = text.split('\n');
+        const codeLines = lines.map(l => '<code><span class="code-snippet_outer">' + (l || '<br>') + '</span></code>').join('');
+        const nums = lines.map(() => '<li></li>').join('');
+        return '<section class="code-snippet__fix code-snippet__js"><ul class="code-snippet__line-index code-snippet__js">' + nums + '</ul><pre class="code-snippet__js" data-lang="' + (lang || '') + '">' + codeLines + '</pre></section>';
+      },
+      renderListItem: function(text, indent, ordered) {
+        return '<span ' + styleAttr('listitem') + '><span style="margin-right:10px">' + (ordered ? '1.' : '•') + '</span>' + this.parseInline(text) + '</span>';
+      },
+      renderTable: function(rows) {
+        if (!rows.length) return '';
+        let header = rows[0].map(c => '<td ' + styleAttr('td') + '><b>' + c + '</b></td>').join('');
+        let body = rows.slice(2).map(row => '<tr>' + row.map(c => '<td ' + styleAttr('td') + '>' + c + '</td>').join('') + '</tr>').join('');
+        return '<table ' + styleAttr('table') + '><thead ' + styleAttr('thead') + '><tr>' + header + '</tr></thead><tbody>' + body + '</tbody></table>';
+      }
+    };
+
     const defaultTheme = {
       BASE: { 'text-align': 'left', 'color': '#3f3f3f', 'line-height': '1.5' },
       block: {
@@ -175,10 +252,10 @@
     marked.setOptions({ renderer, breaks: true });
 
     function format() {
-      const md = document.getElementById('input').value;
+      const input = document.getElementById('input').value;
       footnotes = [];
       footnoteIndex = 0;
-      let html = marked.parse(md);
+      let html = md.parse(input);
       if (footnotes.length > 0) {
         const footnoteHtml = footnotes.map(([idx, title, link]) => {
           return '<code style="font-size:90%;opacity:0.6;">[' + idx + ']</code> ' + (title === link ? '<i>' + title + '</i>' : title + ': <i>' + link + '</i>') + '<br/>';
@@ -203,6 +280,5 @@
 
     format();
   </script>
-  <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "92ceeccf6b0646c4a04dff795f4df27d"}'></script>
 </body>
 </html>
