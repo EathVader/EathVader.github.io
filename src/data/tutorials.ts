@@ -679,4 +679,12 @@ export const tutorials: Tutorial[] = [
       'Java 完整学习路线图：从 HelloWorld 到 Spring 生态，OOP、集合、并发、JVM、框架，附学习资源推荐。',
     meta: '基于多篇技术文章综合 · 2026-04',
   },
+  {
+    slug: 'wechat-format',
+    tag: '🛠️ 效率工具',
+    title: '微信公众号排版工具',
+    description:
+      '将 Markdown 一键转换为微信公众号样式，支持代码高亮、链接转脚注、一键复制。',
+    meta: '工具 · 2026-05',
+  },
 ];
